@@ -1,0 +1,91 @@
+---
+description: Error handling, logging, plugin failures, and score -1 behavior in ex3
+alwaysApply: true
+---
+
+# Error Handling and Logging
+
+## Two different "error code" systems (do not mix)
+
+| System | Source | Use |
+|--------|--------|-----|
+| **Review rubric** (`e05`, `b04`, …) | `docs/review-error-codes.md` | Grading — how we write C++ and handle failures |
+| **Runtime codes** (`MAP_FILE_NOT_FOUND`, `DRONE_HITS_OBSTACLE`, …) | `common::types::ErrorRef::code` | Per-run semantics in logs and report YAML |
+
+Never put a rubric code in `ErrorRef::code`. Never pass a free-form string where a structured `ErrorRef` is
+expected (e05):
+
+```cpp
+// BAD - e05
+logError("file not found: " + path.string());
+
+// GOOD - structured code, message only at the log/YAML boundary
+logError({.code = "MAP_FILE_NOT_FOUND", .message = path.string()});
+```
+
+Note that ex3 removed `config_load_error` from the four config structs, so config parse failures must be
+carried by our own `UserCommon` result type — not stuffed into a frozen struct.
+
+## Never
+
+- Crash, `exit()`, or `abort()`.
+- Defer error logging to shutdown. Every error is written and flushed **when it occurs**.
+- Abort the whole run matrix because one run, one scenario, or one plugin failed.
+- Let an exception escape a worker thread (see `.cursor/rules/threading-model.mdc`).
+
+## Failure scope determines behavior
+
+| Scope | Behavior |
+|-------|----------|
+| CLI arguments invalid | usage + error naming every problem → return from `main`; create nothing |
+| Output directory cannot be created | proper error to screen → return from `main` |
+| Composition YAML missing/unparseable | log to stderr → return from `main`; no report written |
+| A plugin `.so` cannot be loaded or run | filename into the report's `errors: [...]`; other plugins still run |
+| One config in the composition is bad | that run scores `-1`, log immediately, continue the matrix |
+| Bad `.npy` for one simulation config | `-1` for every run in that group, continue other groups |
+| Mission returns `MissionRunStatus::Error` | `-1` for that run, log, continue |
+| A plugin throws | contain at the run boundary, `-1` for that run, log, continue |
+| A plugin **crashes** the process | not required to survive (assignment) |
+
+Recoverable input errors get a reasonable default plus an immediate log entry.
+
+## error.log format
+
+One line per error, flushed immediately:
+
+```text
+<ISO-8601 UTC> <ERROR_CODE> <user-facing message>
+```
+
+Example: `2026-08-01T14:32:01Z MAP_FILE_NOT_FOUND inputs/map/missing.npy`
+
+Every error in a per-plugin `Simulation Result Output File` must be mirrored in the corresponding
+`error.log`, and vice versa.
+
+## Who writes what
+
+| Producer | May write |
+|----------|-----------|
+| `Simulator` | usage/startup errors to screen; the aggregate report; per-run error logs |
+| `MissionControl` | error logs; **verbose output files iff `MissionControlDependencies::verbose`** |
+| `Algorithm` | error logs |
+
+`-verbose` reaches only `MissionControl` — `MappingAlgorithmDependencies` has no `verbose` field. Verbose
+content is our choice; write nothing extra when the flag is off.
+
+Both plugins run under other teams' hosts, so a plugin must never assume a writable path other than the
+one it was given, and must degrade gracefully (log to stderr, keep running) if a log file cannot be opened.
+
+## Robustness against faulty plugins
+
+`context/Common issues and handling.pdf` defines who detects and who handles each runtime anomaly.
+Two rows are **mandatory**; the rest are optional/bonus. Full table with the exact wording:
+`docs/error-handling-matrix.md`.
+
+The mandatory pair:
+
+1. Our own algorithm must never emit a movement it could have known was illegal.
+2. `MockMovement` holds the real map, detects a wall collision, and **throws**; `DroneControl` and
+   `SimulationRun` are the catch targets.
+
+Retry counts (`N` in that table) must be named constants, not magic numbers (e23).

@@ -1,0 +1,116 @@
+---
+description: Simulator CLI modes, argument validation, output folders, and report YAML schemas
+globs: "Simulator/**"
+alwaysApply: false
+---
+
+# Simulator CLI and Outputs
+
+## Two modes
+
+```text
+./simulator_207190406_209543255 -comparative simulation=<composition_yaml> \
+    mission_control_folder=<folder> algorithm=<algorithm_so> [num_threads=<num>] [-verbose]
+
+./simulator_207190406_209543255 -competition simulation=<composition_yaml> \
+    mission_control=<mission_control_so> algorithms_folder=<folder> [num_threads=<num>] [-verbose]
+```
+
+| | Comparative | Competitive |
+|---|---|---|
+| Varies | every `MissionControl` `.so` in the folder | every algorithm `.so` in the folder |
+| Fixed | one algorithm `.so` | one `MissionControl` `.so` |
+| Output dir | `<mission_control_folder>/comparative_results_<time>` | `<algorithms_folder>/competition_<time>` |
+| Report root key | `comparative_report` | `competitive_report` |
+| Sort | by size of the agreeing group, **descending** | by `total_score` **desc**, then `total_steps` **asc** |
+
+Both modes run **all configurations in the composition YAML** — the full (simulation, mission) pairs ×
+drones × lidars expansion, per plugin.
+
+## Argument parsing (graded behavior)
+
+- Any order. `=` with **no** surrounding spaces. All arguments mandatory except `num_threads` and `-verbose`.
+- Collect **all** problems before reporting; do not stop at the first.
+- Unsupported arguments → usage + an error naming **every** unsupported argument → finish.
+- Missing arguments → usage + an error naming **every** missing argument → finish.
+- File argument pointing at a missing or unopenable file → usage + proper error → finish.
+- Folder argument pointing at a missing/untraversable folder, **or a folder containing zero files of the
+  expected kind** → usage + proper error → finish.
+- "Finish" means return from `main` gracefully — never `exit()`.
+- Usage text and error wording are our choice; make them specific enough to name the offending argument.
+
+Parse and validate **before** loading anything or creating any output directory.
+
+## Output directory
+
+`<time>` must be freshly generated per run so an existing folder is never reused. A UTC timestamp with
+seconds is fine, but must be checked for collision (two runs in the same second) — append a counter if
+the directory already exists.
+
+If the directory cannot be created, write a proper error to screen and finish.
+
+Contents:
+
+```text
+<output_dir>/
+  comparative_report.yaml            # or competitive_report.yaml - the single aggregate report
+  <plugin>_simulation_output.yaml    # one ex2-style Simulation Result Output File per plugin
+  <plugin>_run_NNNN_output_map.npy   # every output map, uniquely named and traceable to its run
+  <plugin>_run_NNNN_error.log        # error log(s)
+```
+
+Exact file names are our choice, but **every output map must be traceable to the mission that produced
+it** — encode the plugin name plus the run identity (simulation, mission, drone, lidar or the run index).
+Document the chosen pattern in `README.md`.
+
+## Report schemas
+
+Field names and nesting come straight from the assignment doc — match them exactly.
+
+```yaml
+comparative_report:
+  composition_file: "simulation_compositions.yaml"
+  mission_control_folder: "folder"
+  generated_at_utc: "2026-05-30T23:31:10Z"
+
+  results_summary:            # sorted by number of agreeing managers, descending
+    - same_results: ["manager1.so", "manager2.so", "manager5.so"]
+      total_score: 495
+      total_steps: 100
+    - same_results: ["manager3.so"]
+      total_score: 502
+      total_steps: 124
+
+  errors: ["manager7.so", "manager8.so"]   # could not be loaded / run
+```
+
+```yaml
+competitive_report:
+  composition_file: "simulation_compositions.yaml"
+  mission_control: "mission_control_filename.so"
+  generated_at_utc: "2026-05-30T23:31:10Z"
+
+  results_summary:            # sorted by score descending, then steps ascending
+    - algorithm: "algorithm1.so"
+      total_score: 495
+      total_steps: 100
+
+  errors: ["algorithm2.so"]
+```
+
+- Plugin identifiers in the report are `.so` **filenames**, not paths.
+- `errors` lists plugins that could not be loaded **or** run — they contribute no `results_summary` entry.
+- `total_score` / `total_steps` are sums across all runs for that plugin; grouping in comparative mode is
+  by the `(total_score, total_steps)` pair. Both are working assumptions — see `docs/open-questions.md`.
+- Per-plugin `Simulation Result Output File` keeps the ex2 schema (see
+  `../Drone-Mapper-ex2/readme.txt`, `simulation_output.yaml FORMAT`) with the plugin name added to the
+  filename. `SimulationManagerReport` gained a `composition_file` field in ex3 — emit it.
+
+## Inputs
+
+Configs are YAML (`drone_config`, `mission_config`, `lidar_config`, `simulation_config`,
+`simulation_compositions`); maps are `.npy`. `mission_config` YAML still uses the key `boundaries`, which
+now populates `MissionConfigData::mission_bounds`. Mission boundaries are **local** coordinates — add
+`simulation.map_axes_offset` when building the output map config (see `docs/map3d-contract.md`).
+
+Report `resolution_request_status` per run as `ACCEPTED`, `IGNORED`, or `IGNORED TOO SMALL`.

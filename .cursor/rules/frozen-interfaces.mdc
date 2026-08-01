@@ -1,0 +1,65 @@
+---
+description: Course-published ex3 headers are immutable; ex2 to ex3 API deltas
+globs: "common/**,Simulator/common_simulator/**,MissionControl/common_mission_control/**"
+alwaysApply: false
+---
+
+# Frozen Interfaces
+
+Everything under `common/`, `Simulator/common_simulator/`, and
+`MissionControl/common_mission_control/` is published by the course and used **as-is** (e18). Do not
+change a signature, add a member, add a file, or move a header between these folders.
+
+Full delta table: `docs/api-delta-ex2-to-ex3.md`. The parts that break ported ex2 code:
+
+## Include paths and namespaces
+
+| Ex2 | Ex3 |
+|-----|-----|
+| `<drone_mapper/IMap3D.h>`, namespace `drone_mapper` | `<Common/IMap3D.h>`, namespace `common` |
+| `<drone_mapper/ISimulation.h>` | `<Simulator/ISimulation.h>`, namespace `simulator` |
+| `<drone_mapper/IDroneControl.h>` | `<MissionControl/IDroneControl.h>`, namespace `mission_control` |
+| `types::` (one namespace) | `common::types::` and `simulator::types::` |
+
+`Common/Types.h` no longer includes the simulation types — `SimulationTypes.h` is Simulator-private, so
+plugins cannot see `SimulationCompositionData` or `SimulationManagerReport`.
+
+## Dependency structs replace constructor arguments
+
+`IMappingAlgorithm` takes `MappingAlgorithmDependencies`; mission-control plugins are constructed from
+`MissionControlDependencies` (`Common/MissionControlFactory.h`). Both are passed **by value** by the
+registration macros, so concrete classes need `explicit Impl(Dependencies)`.
+
+`MissionControlDependencies` carries `output_map_file` and `verbose`, and its `drone_config` comment says
+"mission will create its own drone controller" — so `DroneControl` is constructed **inside**
+`MissionControlImpl`, not by the simulator.
+
+## Removed / renamed fields
+
+- `config_load_error` is gone from `DroneConfigData`, `LidarConfigData`, `MissionConfigData`, and
+  `SimulationConfigData`. Carry parse errors in our own `UserCommon` result type instead.
+- `MissionConfigData::boundaries` → `MissionConfigData::mission_bounds`.
+- `MappingStepCommand::fusion_max` is gone — always fuse at full lidar `z_max`.
+- `VoxelOccupancy` is now `: signed char`; `Position3D` has `operator+` / `operator-`.
+
+## Composition shape
+
+`SimulationCompositionData` now holds
+`std::vector<std::tuple<SimulationConfigData, std::vector<MissionConfigData>>> simulation_mission_groups`
+plus `drone_configs` / `lidar_configs`. The set of runs is unchanged: **(simulation, mission) pairs ×
+drone_configs × lidar_configs**.
+
+## Semantics unchanged from ex2
+
+- `nextStep(state, latest_scan)` — `latest_scan` may be `nullptr` on the first call.
+- Algorithms read the output map through `const IMap3D&` and **never** write voxels; the drone controller
+  writes scan results.
+- `IMap3D` exposes `atVoxel`, `getMapConfig`, `isInBounds`; `IMutableMap3D` adds `set` and `save`.
+- `MapConfig` bundles boundaries + offset + resolution.
+- Drone-control step order: read GPS state → `algorithm.nextStep(...)` → movement (validated) → scan →
+  convert to voxels → `output_map.set(...)` → return `DroneStepResult`.
+
+## Not provided anymore
+
+Ex2 shipped `MockLidar` and `ScanResultToVoxels`; ex3 ships **neither**, nor `Map3DImpl`, `MockGPS`,
+`MockMovement`, or `MapsComparison`. All of it is ours to port — see `docs/component-placement.md`.

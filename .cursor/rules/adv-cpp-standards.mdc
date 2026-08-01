@@ -1,0 +1,51 @@
+---
+description: AdvCpp review standards and C++ hygiene (Review Guideline + rubric error codes)
+globs: "**/*.{h,hpp,cpp}"
+alwaysApply: false
+---
+
+# AdvCpp Standards
+
+Codes in parentheses are rubric codes from `docs/review-error-codes.md`. No ex3-specific review guideline
+has been published; the ex1/ex2 rubric still applies.
+
+## Memory and lifetime
+
+- No `malloc`/`free`; no raw `new`/`delete` (assignment 3 forbids them outright). RAII and smart pointers.
+- Prefer `unique_ptr`. Use `shared_ptr` only when ownership is genuinely shared and the lifetime is unknown.
+- Classes owning dynamic memory follow the rule of 3/5 (e13).
+- Plugin lifetime: no object created from a `.so` may outlive its `dlclose`
+  (`.cursor/rules/plugin-architecture.mdc`).
+
+## API design
+
+- `const` methods wherever state is not mutated (e07).
+- Pass inputs as `const&`; avoid unnecessary copies (e06).
+- Lean public APIs — no method not required by an interface or the assignment (e08).
+- No exposed internal storage; no getter returning a backing container (e22).
+- Error handlers take structured `ErrorRef` / enums, not ad-hoc diagnostic strings (e05).
+
+## Structure
+
+- Short functions, single responsibility (e09).
+- Unrelated classes not grouped in one header (e01); don't over-split either (e02).
+- Minimal `#include`s; forward-declare when possible; keep the include DAG acyclic (e17).
+- Free helpers go in an anonymous namespace in the `.cpp`, not the public class API.
+- No duplicate logic across components (e10). In ex3 this is easy to get wrong: shared logic goes in
+  `UserCommon/`, not copy-pasted into two projects.
+
+## Values
+
+- No magic numbers — named constants (e23). This includes retry counts `N` from
+  `docs/error-handling-matrix.md` and any thread/threshold tuning constants.
+- No repeated expensive computation — compute once or cache (e21).
+
+## Strong types
+
+All distances and angles use the types from `common/include/Common/Units.h` — never a raw `double` for
+cm/deg in an API. See `.cursor/rules/mp-units-strong-types.mdc`.
+
+## Compiles clean
+
+Every target builds with `-Wall -Wextra -Werror -pedantic` (the root `drone_warnings()` function). A
+warning is a build failure, so don't leave unused parameters — use `[[maybe_unused]]` or omit the name.

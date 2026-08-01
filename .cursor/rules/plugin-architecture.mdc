@@ -1,0 +1,91 @@
+---
+description: Shared-library plugin contract - registration, dlopen/dlclose, namespaces, folder placement
+globs: "Algorithm/**,MissionControl/**,Simulator/**,UserCommon/**"
+alwaysApply: false
+---
+
+# Plugin Architecture
+
+Two of the three projects are shared libraries that the simulator loads at runtime. Everything here is
+graded as submission compliance (e18) or crash behavior.
+
+## Artifacts
+
+| Project | Artifact | Namespace for our code |
+|---------|----------|------------------------|
+| `Simulator` | executable `simulator_207190406_209543255` | `simulator` |
+| `Algorithm` | `Algorithm_207190406_209543255.so` (no `lib` prefix) | `Algorithm_207190406_209543255` |
+| `MissionControl` | `MissionControl_207190406_209543255.so` (no `lib` prefix) | `MissionControl_207190406_209543255` |
+| `UserCommon` | none — compiled into each consumer | `UserCommon_207190406_209543255` |
+
+The `.so` name and the namespace must both carry both student IDs so several teams' plugins can be loaded
+into one process. Suppress CMake's `lib` prefix with `set_target_properties(... PREFIX "")`.
+
+## Registration
+
+Each plugin puts exactly one line at **global scope** in its `.cpp`:
+
+```cpp
+REGISTER_MAPPING_ALGORITHM(MappingAlgorithmImpl_207190406_209543255)
+REGISTER_MISSION_CONTROL(MissionControlImpl_207190406_209543255)
+```
+
+The macro defines a file-scope `::common::MappingAlgorithmRegistration` object, so its constructor runs
+during `dlopen`. Consequences:
+
+- The registration **headers** are shared by all three projects; the registration **`.cpp` files** live in
+  the Simulator project only. The plugin links against nothing that defines them — the symbol is resolved
+  from the already-loaded executable.
+- The simulator executable must therefore **export** those constructor symbols. In CMake:
+  `set_target_properties(<sim_target> PROPERTIES ENABLE_EXPORTS ON)` (equivalently
+  `-Wl,--export-dynamic`). Without it, `dlopen` fails with an undefined-symbol error and every plugin
+  lands in the report's `errors` list.
+- The registrar is naturally a **singleton** in the Simulator. `dlopen` must be serialized against reading
+  the registrar, because registration is a side effect of loading.
+
+Sketch of the loader contract:
+
+```cpp
+// 1. clear/observe the registrar's pending slot
+// 2. dlopen(path, RTLD_NOW | RTLD_LOCAL)   -> plugin's static ctor calls the registrar
+// 3. take the factory the plugin just registered; associate it with the .so filename
+// 4. on any failure (dlopen null, nothing registered) -> record the filename in report errors, continue
+```
+
+Use `RTLD_LOCAL` so two teams' plugins with the same internal class names cannot bind to each other.
+
+## Loading and unloading
+
+- Load each `.so` **once**. Never `dlclose` and later `dlopen` the same file — the assignment forbids
+  reloading, and re-running static initializers would double-register.
+- Loading everything up front is explicitly endorsed by the assignment and is the simple, correct choice.
+  Lazy load-once + unload-when-unused is a **bonus**, only worth attempting after the mandatory path works.
+- `dlclose` all handles before the program ends, and only after every object created from that library is
+  destroyed. Factories are `std::function`s whose target lives in the `.so`, so the registrar's factory
+  map must be cleared before `dlclose` too.
+- Order matters: destroy runs → drop factories → `dlclose` → return from `main`.
+
+## Instances vs. libraries
+
+Creating an `IMappingAlgorithm` / `IMissionControl` from its factory is cheap. **Recreate per run; never
+cache instances.** That is unrelated to caching the `.so` handle, which is required.
+
+## Folder discipline
+
+- `common/` is read-only. Anything of ours that two projects need goes in `UserCommon/`.
+- `UserCommon/` has no build file: each project's CMakeLists adds its include directory and compiles the
+  `.cpp` files it needs. A `UserCommon` translation unit can therefore exist in the executable **and**
+  inside a `.so` simultaneously — keep it small, dependency-light, and free of mutable global state.
+- Do not put simulation-only classes (`MockLidar`, `MockGPS`, `MockMovement`, `Map3DImpl`,
+  `MapsComparison`) in `UserCommon/`. They belong to `Simulator/src/` — see
+  `docs/component-placement.md` and `context/Structuring the project.pdf`.
+
+## Isolation
+
+Assume each part will be run against another team's implementation of the other two.
+
+- Plugins may only depend on `common/` (and their own project's `common_*` folder plus `UserCommon`).
+- No plugin may assume anything about the concrete simulator, its output layout, or its scoring.
+- Anything crossing the boundary goes through the published interfaces and dependency structs.
+- Exceptions must not escape a plugin call into a worker thread — catch at the run boundary. See
+  `.cursor/rules/error-handling-logging.mdc`.

@@ -1,0 +1,67 @@
+---
+description: Drone-Mapper-ex3 project context, layout, and non-negotiable constraints
+alwaysApply: true
+---
+
+# Drone-Mapper-ex3 Context
+
+TAU AdvCpp Assignment 3. Ex2's monolithic simulator is split into **three separately built projects**:
+a `simulator_<ids>` executable that `dlopen`s an `Algorithm_<ids>.so` and a `MissionControl_<ids>.so`, and
+runs many missions in parallel in either **comparative** or **competitive** mode.
+
+Deadline: **Sep 6, 2026, 23:30**. Skeleton copied from `../ex_3_skeleton`; ex2 implementation in
+`../Drone-Mapper-ex2` is the reference to port from.
+
+## Authority order
+
+1. `context/Advanced Topics TAU 2026B - Assignment 3.docx` (condensed in `docs/assignment3-checklist.md`)
+2. Skeleton headers in `common/`, `Simulator/common_simulator/`, `MissionControl/common_mission_control/`
+3. `context/Common issues and handling.pdf` and `context/Structuring the project.pdf`
+4. `context/AdvCpp Review Guideline.docx` + `docs/review-error-codes.md`
+5. Ex2 implementation — **ideas and logic only**, never a spec
+
+When the skeleton README and the assignment doc conflict, the assignment doc wins. Unresolved conflicts
+are tracked in `docs/open-questions.md` with a working assumption — follow the assumption.
+
+## Layout
+
+```text
+common/                                    course-published, READ-ONLY, do not add files
+Simulator/common_simulator/include/...     published simulator-only interfaces
+Simulator/{include,src}/                   our simulator      -> simulator_<ids> executable
+MissionControl/common_mission_control/...  published IDroneControl
+MissionControl/{include,src}/              our mission control -> MissionControl_<ids>.so
+Algorithm/{include,src}/                   our algorithm       -> Algorithm_<ids>.so
+UserCommon/                                our shared code, NO build file (must be created)
+inputs/                                    instructor maps and YAML configs
+context/                                   assignment docx/pdf sources
+docs/                                      condensed references
+```
+
+Placement decisions for every ported ex2 file: `docs/component-placement.md`.
+
+## Our identifiers
+
+Student IDs `207190406` and `209543255` appear in every artifact name and in our namespaces:
+`simulator_207190406_209543255`, `Algorithm_207190406_209543255.so`,
+`MissionControl_207190406_209543255.so`, namespaces `Algorithm_207190406_209543255`,
+`MissionControl_207190406_209543255`, `UserCommon_207190406_209543255`, zip `ex3_207190406_209543255.zip`.
+
+## Hard constraints
+
+- **Never** add files to `common/`, and never edit a published header.
+- **Never** change the registration macros or the `MappingAlgorithmRegistration` /
+  `MissionControlRegistration` declarations. Their `.cpp` belongs to the Simulator project only.
+- Each part must work with **another team's** implementation of the other parts — no cross-`.so`
+  dependency on our own symbols.
+- No `new` / `delete`. Prefer `unique_ptr`; `shared_ptr` only for real shared ownership.
+- Never `exit()` / `abort()`; return from `main` gracefully.
+- `dlclose` every handle before exit, and never while objects from that `.so` are alive.
+- The Simulator must not crash except when a plugin itself crashes.
+- Errors are logged **immediately**, never deferred to shutdown.
+- Keep the HLD aligned with the code (graded: e14/e15).
+
+## Before structural changes
+
+Read `docs/assignment3-checklist.md` and `docs/api-delta-ex2-to-ex3.md`. Ex2 code does not compile
+as-is — headers moved, namespaces changed, and several types lost or renamed fields.

@@ -1,0 +1,57 @@
+---
+description: mp-units strong types - no raw double for cm/deg in APIs (e03, e16, e17s)
+globs: "**/*.{h,hpp,cpp}"
+alwaysApply: false
+---
+
+# Strong Types (mp-units)
+
+All distances and angles use the types from `common/include/Common/Units.h`.
+
+## Required types
+
+`PhysicalLength`, `XLength`, `YLength`, `ZLength`, `Position3D`, `HorizontalAngle`, `AltitudeAngle`,
+`Orientation`.
+
+`XLength`/`YLength`/`ZLength` are distinct quantity specs, so mixing axes is a compile error — that is the
+point, don't cast around it. Ex3 adds `constexpr operator+` and `operator-` on `Position3D`; use them
+instead of writing per-axis arithmetic.
+
+## Rules
+
+```cpp
+// BAD - e16: numerical fields instead of strong types
+void move(double distance_cm);
+struct Waypoint { double x, y, z; };
+
+// GOOD
+common::types::MovementResult advance(common::PhysicalLength distance);
+common::Position3D waypoint;
+```
+
+```cpp
+// BAD - e03: unwrapping mp-units for math
+double d = length.numerical_value_in(cm);
+double x = pos.x.numerical_value_in(cm) + 1.0;
+
+// GOOD - quantity arithmetic
+auto next_x = pos.x + 10.0 * cm;
+auto dist = si::sqrt(dx * dx + dy * dy);
+```
+
+## Boundaries
+
+YAML and `.npy` parsing reads plain numbers — convert to strong types **immediately** at the parse
+boundary, so no raw `double` cm/deg value travels further than the parser. Same on the way out: unwrap only
+in the YAML/log writer.
+
+Voxel indices are the legitimate exception: they are dimensionless `std::size_t`/`int`, produced inside the
+map implementation from `(pos - offset) / resolution`. Keep that conversion in one place
+(`docs/map3d-contract.md`), not scattered across the algorithm.
+
+## Aliases
+
+`Units.h` already provides `mp`, `isq`, `si`, `cm`, and `deg` inside `namespace common`. Use those.
+
+**Never** write a per-function alias like `namespace su = mp_units::si::unit_symbols;` — this was a severe
+ex1 deduction (e17s). Import once at file scope if you need more symbols.

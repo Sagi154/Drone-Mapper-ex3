@@ -1,0 +1,40 @@
+---
+description: What we actually know about testing expectations for ex3, and what's genuinely new
+globs: "**/tests/**,**/test_*.cpp,**/*_test.cpp"
+alwaysApply: false
+---
+
+# Testing
+
+**Assignment 3 does not mention tests** — no bug injection, no required suite names, no coverage bar, and
+no Ex 3 Review Guideline has been published (`docs/open-questions.md` #6). `vcpkg.json` still lists `gtest`
+and the devcontainer installs `libgtest-dev`, so *some* testing is expected, just not specified.
+
+Don't invent ex2-style bug-injection ceremony (suite isolation guarantees, coverage percentages) for
+requirements that were never published for ex3. If a guideline appears, revisit this file.
+
+## What's safe to assume
+
+- Porting a component from `../Drone-Mapper-ex2/` is much cheaper to trust if its ex2 tests still pass
+  after the namespace/include/API migration — reuse them opportunistically rather than as a mandate.
+- Keep tests next to the project they exercise (`Simulator/tests/`, `MissionControl/tests/`,
+  `Algorithm/tests/`) so each project stays independently buildable, matching the submission structure.
+- Cover missing files/folders and invalid CLI input — the assignment is explicit that these must produce a
+  clean error, not a crash (`.cursor/rules/error-handling-logging.mdc`).
+
+## Genuinely new in ex3 — no ex2 equivalent to reuse
+
+These are worth a test regardless of whether tests end up graded, because they're easy to get subtly wrong
+and hard to notice by eye:
+
+| Area | What to check |
+|------|----------------|
+| CLI parsing | scrambled argument order; **every** missing/unsupported argument reported, not just the first; folder with zero `.so` files |
+| Plugin loading | a `.so` that fails to load or never registers lands in the report's `errors`, and the run continues with the rest |
+| Threading | the same composition with `num_threads` absent / `1` / `2` / `8` produces the same scores; a throwing plugin doesn't take down sibling runs |
+| Reports | comparative grouping/sort order; competitive sort order; per-plugin output file naming stays traceable |
+
+## Map fixtures
+
+See `docs/map3d-contract.md` — hidden-map fixtures may be `int8` **or** `uint8` (the instructor maps are
+mixed); output-map fixtures are `int8` holding the full `VoxelOccupancy` enum.

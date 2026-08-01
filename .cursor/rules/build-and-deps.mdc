@@ -1,0 +1,78 @@
+---
+description: CMake structure for the four build files, shared-library flags, and vcpkg dependencies
+globs: "**/CMakeLists.txt,CMakePresets.json,vcpkg.json,vcpkg-configuration.json"
+alwaysApply: false
+---
+
+# Build and Dependencies
+
+Assignment 3 requires **four** build files: one per project plus one at the root that builds all three
+(e18/b01). The skeleton root `CMakeLists.txt` already exists and adds the four subdirectories; the three
+project files are TODO stubs.
+
+## Root `CMakeLists.txt` (provided)
+
+- C++20, `CMAKE_EXPORT_COMPILE_COMMANDS ON`, `find_package(mp-units CONFIG REQUIRED)`.
+- Defines `drone_warnings(target)` → `-Wall -Wextra -Werror -pedantic`. **Call it on every target we add.**
+- Adds `common`, `Algorithm`, `MissionControl`, `Simulator`. Add `UserCommon` handling to the consumers,
+  not as its own subdirectory — `UserCommon/` has no build file.
+- `find_package(yaml-cpp)`, `find_package(TinyNPY CONFIG REQUIRED)`, `find_package(GTest CONFIG REQUIRED)`
+  and `enable_testing()` are **not** there yet; add them when the code that needs them lands.
+
+## Targets
+
+| Target | Kind | Key properties |
+|--------|------|----------------|
+| `drone_common` / `common::common` | `INTERFACE` (provided) | exposes `common/include`, links `mp-units::mp-units` |
+| Algorithm | `SHARED` | output name `Algorithm_207190406_209543255`, `PREFIX ""`, links `common::common` |
+| MissionControl | `SHARED` | output name `MissionControl_207190406_209543255`, `PREFIX ""`, links `common::common`, exposes `common_mission_control/include` **PRIVATE** |
+| Simulator | `EXECUTABLE` | output name `simulator_207190406_209543255`, links `common::common` + `${CMAKE_DL_LIBS}`, `ENABLE_EXPORTS ON` |
+
+`ENABLE_EXPORTS ON` (i.e. `-Wl,--export-dynamic`) is mandatory: the plugins' registration objects resolve
+`::common::MappingAlgorithmRegistration` / `::common::MissionControlRegistration` from the executable at
+`dlopen` time. Without it every plugin fails to load. The skeleton's `Simulator/CMakeLists.txt` comment
+says exactly this.
+
+`PREFIX ""` suppresses CMake's `lib` prefix so the file is `Algorithm_<ids>.so`, not
+`libAlgorithm_<ids>.so`.
+
+The registration `.cpp` files belong to the Simulator target only — never link them into a plugin.
+
+`UserCommon/` sources are added to each consuming target's source list plus an include directory. Expect
+the same translation unit to be compiled into the executable and into a `.so`.
+
+## Build
+
+```bash
+cmake --preset default          # Ninja, build/default, vcpkg toolchain from $VCPKG_ROOT
+cmake --build --preset default
+```
+
+## Dependencies
+
+`vcpkg.json` declares everything (e11 — no manual install steps in the README):
+
+| Package | Used for |
+|---------|----------|
+| `mp-units` ≥ 2.3.0 | strong physical types; required by `common/Units.h` |
+| `yaml-cpp` ≥ 0.9.0 | all config and composition YAML |
+| `tinynpy` | `.npy` voxel map read/write |
+| `gtest` | tests |
+
+Do not add a dependency without checking the assignment rule: **standard C++ libraries only, or libraries
+explicitly approved in the course forum**. If we use an approved external library, document its usage in
+`README.md` (or `bonus.txt` if it is only for a bonus).
+
+`.cw` files need no dependency — they are ClassicWorld visualization exports, not inputs
+(`docs/open-questions.md`).
+
+## Submission-time compatibility
+
+The submission must build on Linux with **gcc 11.4+** and
+`g++ -std=c++20 -Wall -Wextra -Werror -pedantic`. Verify in the devcontainer
+(`.devcontainer/Dockerfile`, Ubuntu 24.04 + vcpkg) rather than trusting a local toolchain.
+
+## README
+
+Build and run instructions in `README.md` must match the actual presets, target names, and CLI. The
+skeleton `README.md` is still the course placeholder — rewrite it.

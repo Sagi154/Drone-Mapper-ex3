@@ -1,0 +1,74 @@
+---
+description: num_threads semantics, work distribution, locking policy, and thread-safety expectations
+globs: "Simulator/**"
+alwaysApply: false
+---
+
+# Threading Model
+
+## num_threads semantics
+
+| Command line | Threads |
+|--------------|---------|
+| `num_threads` absent | 1 — the main thread does the work |
+| `num_threads=1` | 1 — the main thread does the work |
+| `num_threads=N` (N ≥ 2) | N worker threads **in addition to** the main thread |
+
+So the total is never exactly 2. With `N >= 2` the main thread is allowed (and expected) to block in
+`join()` while workers run.
+
+**Never open a thread that has nothing to run.** If the matrix has fewer runs than requested threads, cap
+the worker count at the number of runs. Actual thread count may legitimately be lower than requested.
+
+## Work distribution
+
+The full run matrix is known before any run starts — plugins × (simulation, mission) pairs × drones ×
+lidars. Therefore:
+
+- **Pre-allocate the result table** at its final size and have each worker write only its own slot. No
+  sparse structure, no `push_back` under a mutex.
+- Distribute work by index (atomic counter or pre-sliced ranges), not by a locked queue of tasks.
+- Prefer loading **all** `.so` files up front on the main thread, before spawning workers. That removes
+  `dlopen` from the concurrent path entirely, which is the single biggest source of race conditions here.
+
+## Locking policy
+
+Assignment wording: *"It is better not to lock if you can avoid locking. But if you need to lock, you
+should of course lock."*
+
+Reach for a lock only where a shared mutable resource genuinely exists:
+
+| Resource | Approach |
+|----------|----------|
+| Result table slots | no lock — disjoint indices |
+| Run index dispenser | `std::atomic<size_t>` fetch-add |
+| The registrar during `dlopen` | serialize on the main thread before workers start; a mutex only if lazy loading |
+| Per-run output files (maps, error logs) | no lock — unique path per run |
+| Aggregate report writing | main thread only, after `join()` |
+| `std::cout` / `std::cerr` | avoid from workers; if unavoidable, one mutex, one line at a time |
+
+Do not share a plugin **instance** between threads. Each run creates its own instances from the factories
+(cheap by design), so per-run object graphs are naturally thread-local.
+
+## Exception containment
+
+An exception escaping a `std::thread`'s function calls `std::terminate` and kills every other run. Wrap
+the body of each worker's per-run call in a `try`/`catch(...)` that records the failure in that run's slot
+and error log, then continues to the next index. The assignment only excuses the Simulator from surviving
+a plugin **crash** — a plugin that *throws* must be contained.
+
+## What not to do
+
+- Do not cache plugin instances across runs to "save allocation" — the assignment explicitly forbids it.
+- Do not `dlclose` from a worker thread.
+- Do not make the number of threads depend on `std::thread::hardware_concurrency()`; the command line is
+  authoritative.
+- Do not add a thread pool abstraction bigger than the problem — a vector of `std::thread` plus an atomic
+  index covers the requirement.
+
+## Verification
+
+- Run the same composition with `num_threads` absent, `=1`, `=2`, and `=8` and diff the reports. Results
+  must be **identical** apart from ordering-independent fields; the algorithm is deterministic.
+- Check the thread count is capped when the matrix is smaller than `num_threads`.
+- Build a debug configuration with `-fsanitize=thread` for at least one full run before submission.
