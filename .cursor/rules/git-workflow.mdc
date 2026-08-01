@@ -1,0 +1,88 @@
+---
+description: Git workflow — branch names, conventional commits, checkpoint commits, and PR conventions
+alwaysApply: true
+---
+
+# Git Workflow
+
+How we name branches, write commits, and open PRs. Names and messages describe **what changed**,
+not which `docs/workplan.md` item or owner it maps to — the workplan is a planning document, not a
+git taxonomy, and its shorthand shouldn't outlive the file it's written in.
+
+## Never use in branch names, PR titles, commit messages, or PR bodies
+
+- Workplan item codes: `s1`, `s6`, `y9`, `u3` (from `docs/workplan.md`)
+- Owner names as a namespace: `sagi/...`, `yoav-mission-control`, `person-a`
+- Internal workplan terms: `vertical-slice`, `meeting-point-3`, `walking-skeleton`
+- Vague buckets: `runtime`, `orchestration`, `foundation` (unless naming a real component)
+
+## Branch names
+
+- **kebab-case**, lowercase, named for the component/feature/fix, not the plan item
+- One logical change per branch
+
+| Bad | Good |
+|-----|------|
+| `s2-mapping-algorithm` | `port-mapping-algorithm-impl` |
+| `sagi/plugin-loader` | `dlopen-plugin-registrar` |
+| `y9-run-factory` | `simulation-run-factory-mocks` |
+| `vertical-slice` | `end-to-end-comparative-run` |
+
+## Starting a new branch
+
+Default to branching from an up-to-date `main` unless told otherwise:
+
+```bash
+git checkout main
+git pull
+git checkout -b <branch-name>
+```
+
+## Commit messages
+
+[Conventional Commits](https://www.conventionalcommits.org/): `<type>: <summary>`.
+
+- **type**: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `build`
+- **summary**: imperative, lowercase after the colon, ≤ 72 chars
+- **body** (optional): what changed and how to verify — no item codes or owner names
+
+| Bad | Good |
+|-----|------|
+| `S2: port mapping algorithm` | `feat: port MappingAlgorithmImpl to dependency struct ctor` |
+| `Yoav: run factory stub` | `feat: add SimulationRunFactoryImpl stub for orchestrator` |
+| `docs: update workplan meeting point` | `docs: document per-run output naming in README` |
+
+**Type guide**: `feat` new behavior/capability · `fix` bug fix · `refactor` no behavior change ·
+`test` tests only · `docs` README/HLD/AGENTS.md/rules · `chore` tooling/housekeeping · `ci`
+CI/CD · `build` CMake/vcpkg/compile settings.
+
+## Commit granularity
+
+Commit like a human implementing a feature — several small commits at natural checkpoints, not one
+commit for everything at the end.
+
+- Commit when a coherent slice is done: compiles, a test passes, one sub-behavior is wired
+- Typical checkpoint order: scaffolding → core logic → error paths → tests → docs
+- Each commit is reviewable on its own — one concern, one message
+- Don't batch a whole plan item into one commit, and don't split so finely that a commit doesn't
+  build (e.g. `feat: port DroneControlImpl step loop` → `feat: catch movement collision in DroneControl`
+  → `test: cover collision containment in DroneControl`)
+
+## PR titles and descriptions
+
+- Title in Conventional Commits style, naming the deliverable: `feat: load hidden map in
+  SimulationRunFactoryImpl`, not `Yoav track: run factory`
+- **Summary**: what the PR does and why (1–3 bullets)
+- **Test plan**: concrete commands or scenarios (e.g. `ctest --preset default`, the exact CLI
+  invocation exercised)
+- Link to code/components (`MappingAlgorithmImpl`, `error.log`) instead of `docs/workplan.md`
+  sections — the plan will keep changing as items land; the PR history shouldn't depend on it
+  staying stable to make sense
+
+## Checklist
+
+1. New feature branch? Update `main` from remote, then branch from it.
+2. Name the branch from the code change, not a `docs/workplan.md` item code or owner.
+3. If the only available name would include an item code or owner name, rename before pushing.
+4. Rename existing branches that violate this when you next touch them.
+5. Commit incrementally as you implement — don't wait until the item is finished.
