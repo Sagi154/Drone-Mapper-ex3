@@ -11,13 +11,16 @@ Deadline: **Sep 6, 2026, 23:30**.
 ## Start here
 
 1. Read `.cursor/rules/project-context.mdc` (always applies) and `docs/assignment3-checklist.md`.
-2. Before touching a published header: `frozen-interfaces.mdc` and `docs/api-delta-ex2-to-ex3.md` —
+2. Read `docs/workplan.md` for the current work breakdown between Sagi and Yoav, ownership of
+   `UserCommon/`, and the explicit points where one of us waits on the other.
+3. Before git branches, commits, or PRs: `git-workflow.mdc`.
+4. Before touching a published header: `frozen-interfaces.mdc` and `docs/api-delta-ex2-to-ex3.md` —
    ex2 code does not compile as-is (moved headers, changed namespaces, changed types).
-3. Before deciding where new code lives: `docs/component-placement.md`.
-4. Before writing the plugin loader, CLI, or threading: `plugin-architecture.mdc`,
+5. Before deciding where new code lives: `docs/component-placement.md`.
+6. Before writing the plugin loader, CLI, or threading: `plugin-architecture.mdc`,
    `simulator-cli-and-outputs.mdc`, `threading-model.mdc`.
-5. Before error paths: `error-handling-logging.mdc` and `docs/error-handling-matrix.md`.
-6. Before editing C++: `adv-cpp-standards.mdc`, `mp-units-strong-types.mdc`.
+7. Before error paths: `error-handling-logging.mdc` and `docs/error-handling-matrix.md`.
+8. Before editing C++: `adv-cpp-standards.mdc`, `mp-units-strong-types.mdc`.
 
 ## Skills (invoke by name)
 
@@ -32,6 +35,7 @@ Deadline: **Sep 6, 2026, 23:30**.
 
 | Path | Purpose |
 |------|---------|
+| `docs/workplan.md` | Concrete work items split between Sagi and Yoav, ordered by dependency, with explicit hand-off points and the smallest deliverable that unblocks each one |
 | `docs/assignment3-checklist.md` | Mandatory requirements, condensed from the assignment docx |
 | `docs/api-delta-ex2-to-ex3.md` | Header/type/namespace deltas between the ex2 and ex3 skeletons — **and** where our own `Drone-Mapper-ex2` deviated from the frozen ex2 headers itself (those need reverting, not porting) |
 | `docs/component-placement.md` | Which ex2 file goes in which of the 5 folders, and why |
@@ -62,7 +66,11 @@ Assignment 3.docx` before submission.
 
 The rules/skills here were written for ex3's own requirements, not ported wholesale from
 `../Drone-Mapper-ex2/.cursor/`. Generic ex2 team-process conventions (workplan-phase-naming avoidance,
-bug-injection coverage bureaucracy) were deliberately **not** copied — they addressed problems specific
-to that team's workplan, not this assignment. Where the same course rubric genuinely still applies
-(AdvCpp code-quality rules, mp-units usage), it's cited from ex3's own `context/` docs, not from ex2's
-files.
+bug-injection coverage bureaucracy) were deliberately **not** copied verbatim — they addressed problems
+specific to that team's workplan, not this assignment. Where the same underlying concern genuinely
+applies here too, it's rewritten against ex3's own workplan shape instead of reused as-is: `docs/workplan.md`
+splits work by owner and dependency (no phases, no gates), and `.cursor/rules/git-workflow.mdc` keeps
+*our* workplan's shorthand (item codes, owner names) out of git history the same way ex2's rule kept
+its phase/gate labels out — same problem, different labels, so the rule was rewritten, not copied. Where
+the same course rubric genuinely still applies (AdvCpp code-quality rules, mp-units usage), it's cited
+from ex3's own `context/` docs, not from ex2's files.
