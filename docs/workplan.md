@@ -5,14 +5,78 @@ Concrete work items only — what to build, port, wire up, or verify. Grounded i
 `.cursor/rules/`, and the actual skeleton contents (`common/`, `Simulator/common_simulator/`,
 `MissionControl/common_mission_control/` headers; the three TODO-stub `CMakeLists.txt`; no
 `Simulator/`, `Algorithm/`, or `MissionControl` `.cpp` files exist yet). Student IDs used below
-(`207190406`, `209543255`) match every existing doc's naming examples — `students.txt` still needs
-real names filled in (see the submission section).
+(`207190406`, `209543255`) match every existing doc's naming examples — `students.txt` is filled in
+(`Sagi Eisenberg, 207190406` / `Yoav Naaman, 209543255`).
 
 No schedule, no estimates. Items are ordered by what must compile/exist before what, split between
 two people along the boundary that blocks least: **the frozen headers under `common/`,
 `Simulator/common_simulator/`, and `MissionControl/common_mission_control/` are a fixed contract —
 both people code against those directly and independently, never against each other's concrete
 classes, until the explicit meeting points called out below.**
+
+## Joint setup completed (before track split)
+
+Done on **2026-08-05** against the skeleton on `main` (pre-split baseline):
+
+- **`students.txt`**: filled with real names + IDs (see above).
+- **Baseline build verified**: `cmake --preset default` configures clean; `cmake --build --preset default`
+  succeeds as a no-op (`ninja: no work to do`) with the three TODO-stub project `CMakeLists.txt`
+  files still empty of targets. Known-good anchor for "it suddenly broke".
+- **`Simulator/` subfolder layout settled and materialised** (see §Simulator layout below):
+  `Simulator/src/io/`, `Simulator/tests/`, and `Simulator/tests/fixtures/` now exist with `.gitkeep`
+  files — do not invent alternate subfolders.
+
+### WSL local-build notes (resolved)
+
+First configure attempt on this WSL host failed until the local toolchain was present. None of this
+changed project sources; record it so the other person does not re-debug the same gaps:
+
+| Gap | Resolution used here |
+|---|---|
+| No Linux `cmake` / `ninja` on PATH | `pip3 install --user cmake ninja` → `~/.local/bin` |
+| No `pkg-config` (vcpkg gtest port needs it) | extract Ubuntu `pkg-config` / `libpkgconf3` debs into `~/.local` (no sudo) |
+| `VCPKG_ROOT` unset | clone + bootstrap `~/vcpkg`; export `VCPKG_ROOT=$HOME/vcpkg` before configure |
+| Preferred long-term | use the course `.devcontainer` (`VCPKG_ROOT=/usr/local/vcpkg`) when Docker/WSL integration is available |
+
+### Simulator layout (authoritative)
+
+Both people write into `Simulator/` independently. Use these directories and the expected filenames
+unless there is a strong reason not to — if a name changes, update this section in the same commit.
+
+```
+Simulator/
+  src/                          # core logic (not disk I/O)
+    MockGPS.cpp, MockLidar.cpp, MockMovement.cpp     # Y2
+    Map3DImpl.cpp                                    # Y3
+    SimulationRunFactoryImpl.cpp                     # Y9
+    SimulationRunImpl.cpp                            # Y10
+    PluginRegistrar.cpp                              # S5
+    MappingAlgorithmRegistration.cpp                 # S5
+    MissionControlRegistration.cpp                   # S5
+    PluginLoader.cpp                                 # S6
+    WorkDistributor.cpp                              # S7
+    MapsComparison.cpp                               # S8
+    RunMatrixOrchestrator.cpp                        # S9
+    io/                         # parsers, writers, CLI, output dirs
+      SimulationCli.cpp                              # S4
+      DroneConfigYamlParser.cpp                      # Y8
+      LidarConfigYamlParser.cpp                      # Y8
+      MissionConfigYamlParser.cpp                    # Y8
+      SimulationConfigYamlParser.cpp                 # Y8
+      CompositionYamlParser.cpp                      # Y8
+      ComparativeReportWriter.cpp                    # S10
+      CompetitiveReportWriter.cpp                    # S10
+      SimulationOutputYamlWriter.cpp                 # S10
+      OutputDirHelper.cpp                            # S11
+  tests/                        # Simulator unit / integration tests
+    fixtures/                   # test-only .so stubs for the loader (S6); never shipped
+  include/Simulator/            # existing
+  common_simulator/             # frozen — never touch
+  CMakeLists.txt
+```
+
+**Rule:** `src/` = core logic; `src/io/` = anything that reads from or writes to disk (YAML, reports,
+CLI, output-directory helpers). `SimulationCli` belongs in `io/` (same as ex2's `src/io/`).
 
 ## Ownership at a glance
 
@@ -389,7 +453,7 @@ people compile and test independently.
 | `MappingAlgorithmFactory`/`MissionControlFactory` handoff (S6 ↔ Y9) | — | The frozen `std::function` types already exist in `common/` | Nothing to build first — both sides just use the exact typedefs from `Common/MappingAlgorithmFactory.h` / `MissionControlFactory.h`. Yoav tests with hand-written lambdas; Sagi's loader supplies the real ones later; no header needs to change hands. |
 | `SimulationRunFactoryImpl` concrete class (S9 ↔ Y9) | Yoav's constructor signature + a compiling `create()` | — | Yoav pushes a compiling `SimulationRunFactoryImpl.h`/`.cpp` with the agreed constructor and a stub `create()` (returns a trivially-succeeding fake run) on day one of Y9, before the real body is finished, so Sagi's orchestrator (S9) always has something concrete to `make_unique` against. |
 | Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | Whoever decides first writes the pattern into `README.md`; the other follows it — no code dependency, just one shared doc. |
-| `Simulator/CMakeLists.txt` final source list | Yoav's file list | Sagi's file list | Add sources incrementally as each item lands rather than merging once at the end; filenames don't collide since the two trees are disjoint (`Simulator/src/io/*` vs. `Simulator/src/*` mocks — agree on subfolders once, upfront). |
+| `Simulator/CMakeLists.txt` final source list | Yoav's file list | Sagi's file list | Add sources incrementally as each item lands rather than merging once at the end; filenames don't collide — layout is **decided** (see §Simulator layout above): core under `Simulator/src/`, I/O under `Simulator/src/io/`, tests under `Simulator/tests/` (+ `fixtures/` for loader stubs). |
 | End-to-end run (both CLI modes, real plugins) | Yoav's `Map3DImpl`/mocks/run-factory | Sagi's loader/CLI/threading/report writer | See the vertical slice below — do this with **minimal** versions of everything, before either side is feature-complete. |
 
 ---
@@ -451,9 +515,8 @@ alone against a stub.
 
 ## Path to a submittable artifact
 
-- **`students.txt`**: fill in real names next to the already-used IDs `207190406`/`209543255`
-  (either person, no dependency — do this early, it's a two-line fix with a compliance
-  consequence if forgotten).
+- **`students.txt`**: **done** — `Sagi Eisenberg, 207190406` / `Yoav Naaman, 209543255`. Keep it
+  free of `TODO:` before packaging.
 - **`README.md`**: rewrite with the actual build presets, binary/`.so` names, both CLI invocations,
   and the output-map/error-log naming pattern agreed in the meeting-points table. Either person,
   once the naming stabilizes (after S11/Y11).
