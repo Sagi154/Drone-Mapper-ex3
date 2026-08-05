@@ -147,6 +147,19 @@ target_include_directories(simulator_cli PUBLIC
 )
 drone_warnings(simulator_cli)
 
+# Registrar + registration ctor bodies (Simulator only — never link into a plugin).
+add_library(simulator_registrar STATIC
+    src/PluginRegistrar.cpp
+    src/MappingAlgorithmRegistration.cpp
+    src/MissionControlRegistration.cpp
+)
+add_library(simulator::registrar ALIAS simulator_registrar)
+target_link_libraries(simulator_registrar PUBLIC common::common)
+target_include_directories(simulator_registrar PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+drone_warnings(simulator_registrar)
+
 add_executable(simulator_cli_test
     tests/test_simulation_cli.cpp
 )
@@ -155,8 +168,19 @@ target_link_libraries(simulator_cli_test PRIVATE
     GTest::gtest_main
 )
 drone_warnings(simulator_cli_test)
+
+add_executable(simulator_registrar_test
+    tests/test_plugin_registrar.cpp
+)
+target_link_libraries(simulator_registrar_test PRIVATE
+    simulator::registrar
+    GTest::gtest_main
+)
+drone_warnings(simulator_registrar_test)
+
 include(GoogleTest)
 gtest_discover_tests(simulator_cli_test)
+gtest_discover_tests(simulator_registrar_test)
 
 # TODO: Build the simulator executable and its private implementation sources.
 # Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
