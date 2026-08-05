@@ -199,6 +199,21 @@ target_include_directories(simulator_scoring PUBLIC
 )
 drone_warnings(simulator_scoring)
 
+# Run-matrix orchestrator (frozen ISimulationRunFactory / ISimulationRun).
+add_library(simulator_orchestrator STATIC
+    src/RunMatrixOrchestrator.cpp
+)
+add_library(simulator::orchestrator ALIAS simulator_orchestrator)
+target_include_directories(simulator_orchestrator PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+)
+target_link_libraries(simulator_orchestrator PUBLIC
+    simulator::work
+    common::common
+)
+drone_warnings(simulator_orchestrator)
+
 # ── Unit tests ────────────────────────────────────────────────────────────────
 add_executable(simulator_cli_test
     tests/test_simulation_cli.cpp
@@ -276,12 +291,22 @@ target_link_libraries(simulator_scoring_test PRIVATE
 )
 drone_warnings(simulator_scoring_test)
 
+add_executable(simulator_orchestrator_test
+    tests/test_run_matrix_orchestrator.cpp
+)
+target_link_libraries(simulator_orchestrator_test PRIVATE
+    simulator::orchestrator
+    GTest::gtest_main
+)
+drone_warnings(simulator_orchestrator_test)
+
 include(GoogleTest)
 gtest_discover_tests(simulator_cli_test)
 gtest_discover_tests(simulator_registrar_test)
 gtest_discover_tests(simulator_loader_test)
 gtest_discover_tests(simulator_work_test)
 gtest_discover_tests(simulator_scoring_test)
+gtest_discover_tests(simulator_orchestrator_test)
 
 # TODO: Build the simulator executable and its private implementation sources.
 # Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
