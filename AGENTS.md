@@ -4,9 +4,11 @@ TAU Advanced Topics in Programming, Assignment 3. Splits ex2's monolithic simula
 separately built projects — `simulator_<ids>` executable that `dlopen`s an `Algorithm_<ids>.so` and a
 `MissionControl_<ids>.so` — and adds multithreaded comparative/competitive run modes.
 
-**Status:** skeleton copied from `../ex_3_skeleton`; implementation not started. Ex2's finished
-implementation in `../Drone-Mapper-ex2` is the reference to port from — not a spec to imitate blindly.
-Deadline: **Sep 6, 2026, 23:30**.
+**Status:** joint setup complete (students.txt filled, baseline build verified, `Simulator/` subfolder
+layout materialised — see `docs/workplan.md` §Joint setup completed). Individual tracks in progress:
+Sagi → Algorithm + Simulator runtime shell (S1+); Yoav → MissionControl + Simulator world & data (U1+).
+Ex2's finished implementation in `../Drone-Mapper-ex2` is the reference to port from — not a spec to
+imitate blindly. Deadline: **Sep 6, 2026, 23:30**.
 
 ## Start here
 
