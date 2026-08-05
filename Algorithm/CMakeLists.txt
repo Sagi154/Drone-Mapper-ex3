@@ -1,5 +1,6 @@
 add_library(Algorithm_207190406_209543255 SHARED
-    src/algorithm_placeholder.cpp
+    src/MappingAlgorithmFrontier.cpp
+    src/MappingAlgorithmImpl.cpp
 )
 set_target_properties(Algorithm_207190406_209543255 PROPERTIES PREFIX "")
 target_link_libraries(Algorithm_207190406_209543255 PRIVATE common::common)
