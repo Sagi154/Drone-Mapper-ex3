@@ -136,3 +136,28 @@ target_link_libraries(test_simulation_run_factory PRIVATE
 
 drone_warnings(test_simulation_run_factory)
 add_test(NAME test_simulation_run_factory COMMAND test_simulation_run_factory)
+
+# CLI parse/validation is self-contained (no plugins / dlopen / threading).
+add_library(simulator_cli STATIC
+    src/io/SimulationCli.cpp
+)
+add_library(simulator::cli ALIAS simulator_cli)
+target_include_directories(simulator_cli PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+drone_warnings(simulator_cli)
+
+add_executable(simulator_cli_test
+    tests/test_simulation_cli.cpp
+)
+target_link_libraries(simulator_cli_test PRIVATE
+    simulator::cli
+    GTest::gtest_main
+)
+drone_warnings(simulator_cli_test)
+include(GoogleTest)
+gtest_discover_tests(simulator_cli_test)
+
+# TODO: Build the simulator executable and its private implementation sources.
+# Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
+# registration-constructor symbols needed by dynamically loaded plugins.
