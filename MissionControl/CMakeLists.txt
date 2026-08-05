@@ -1,6 +1,6 @@
 # MissionControl plugin — SHARED library loaded by the simulator via dlopen.
 add_library(MissionControl_207190406_209543255 SHARED
-    src/plugin_placeholder.cpp
+    src/ScanResultToVoxels.cpp
 )
 set_target_properties(MissionControl_207190406_209543255 PROPERTIES PREFIX "")
 
