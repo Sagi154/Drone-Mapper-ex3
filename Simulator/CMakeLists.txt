@@ -27,3 +27,18 @@ target_link_libraries(test_usercommon_config_parse_result PRIVATE
 )
 drone_warnings(test_usercommon_config_parse_result)
 add_test(NAME test_usercommon_config_parse_result COMMAND test_usercommon_config_parse_result)
+
+add_executable(test_usercommon_simulation_coord_util
+    tests/test_usercommon_simulation_coord_util.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
+)
+target_include_directories(test_usercommon_simulation_coord_util PRIVATE
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
+    ${CMAKE_SOURCE_DIR}/common/include
+    ${CMAKE_SOURCE_DIR}/Simulator/common_simulator/include
+)
+target_link_libraries(test_usercommon_simulation_coord_util PRIVATE
+    GTest::gtest GTest::gtest_main common::common
+)
+drone_warnings(test_usercommon_simulation_coord_util)
+add_test(NAME test_usercommon_simulation_coord_util COMMAND test_usercommon_simulation_coord_util)
