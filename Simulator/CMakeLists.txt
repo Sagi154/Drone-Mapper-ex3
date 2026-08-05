@@ -176,6 +176,18 @@ add_library(simulator::loader ALIAS simulator_loader)
 target_link_libraries(simulator_loader PUBLIC simulator::registrar ${CMAKE_DL_LIBS})
 drone_warnings(simulator_loader)
 
+# Work matrix distributor (threads + atomic index).
+find_package(Threads REQUIRED)
+add_library(simulator_work STATIC
+    src/WorkDistributor.cpp
+)
+add_library(simulator::work ALIAS simulator_work)
+target_include_directories(simulator_work PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(simulator_work PUBLIC Threads::Threads)
+drone_warnings(simulator_work)
+
 # ── Unit tests ────────────────────────────────────────────────────────────────
 add_executable(simulator_cli_test
     tests/test_simulation_cli.cpp
@@ -235,10 +247,20 @@ target_compile_definitions(simulator_loader_test PRIVATE
 add_dependencies(simulator_loader_test valid_algorithm_plugin unregistered_plugin)
 drone_warnings(simulator_loader_test)
 
+add_executable(simulator_work_test
+    tests/test_work_distributor.cpp
+)
+target_link_libraries(simulator_work_test PRIVATE
+    simulator::work
+    GTest::gtest_main
+)
+drone_warnings(simulator_work_test)
+
 include(GoogleTest)
 gtest_discover_tests(simulator_cli_test)
 gtest_discover_tests(simulator_registrar_test)
 gtest_discover_tests(simulator_loader_test)
+gtest_discover_tests(simulator_work_test)
 
 # TODO: Build the simulator executable and its private implementation sources.
 # Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
