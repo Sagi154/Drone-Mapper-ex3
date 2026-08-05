@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(mp-units CONFIG REQUIRED)
+find_package(GTest CONFIG REQUIRED)
+enable_testing()
 
 function(drone_warnings target)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Werror -pedantic)
