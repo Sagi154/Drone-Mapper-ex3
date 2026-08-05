@@ -147,11 +147,10 @@ target_include_directories(simulator_cli PUBLIC
 )
 drone_warnings(simulator_cli)
 
-# Registrar + registration ctor bodies (Simulator only — never link into a plugin).
+# Registrar singleton (no registration ctor bodies — those are an OBJECT lib so
+# the linker cannot drop them from a static archive before ENABLE_EXPORTS).
 add_library(simulator_registrar STATIC
     src/PluginRegistrar.cpp
-    src/MappingAlgorithmRegistration.cpp
-    src/MissionControlRegistration.cpp
 )
 add_library(simulator::registrar ALIAS simulator_registrar)
 target_link_libraries(simulator_registrar PUBLIC common::common)
@@ -160,6 +159,24 @@ target_include_directories(simulator_registrar PUBLIC
 )
 drone_warnings(simulator_registrar)
 
+# Registration ctor bodies — OBJECT so every consumer that links them exports
+# the symbols (required for dlopen'd plugins to resolve the undefined ctor).
+add_library(simulator_registration OBJECT
+    src/MappingAlgorithmRegistration.cpp
+    src/MissionControlRegistration.cpp
+)
+target_link_libraries(simulator_registration PUBLIC simulator::registrar)
+drone_warnings(simulator_registration)
+
+# dlopen/dlclose loader (depends on registrar).
+add_library(simulator_loader STATIC
+    src/PluginLoader.cpp
+)
+add_library(simulator::loader ALIAS simulator_loader)
+target_link_libraries(simulator_loader PUBLIC simulator::registrar ${CMAKE_DL_LIBS})
+drone_warnings(simulator_loader)
+
+# ── Unit tests ────────────────────────────────────────────────────────────────
 add_executable(simulator_cli_test
     tests/test_simulation_cli.cpp
 )
@@ -171,6 +188,7 @@ drone_warnings(simulator_cli_test)
 
 add_executable(simulator_registrar_test
     tests/test_plugin_registrar.cpp
+    $<TARGET_OBJECTS:simulator_registration>
 )
 target_link_libraries(simulator_registrar_test PRIVATE
     simulator::registrar
@@ -178,10 +196,51 @@ target_link_libraries(simulator_registrar_test PRIVATE
 )
 drone_warnings(simulator_registrar_test)
 
+# Test-only .so fixtures for the loader (never shipped). Registration ctor stays
+# UNDEFINED in these libs and is resolved from the test executable via ENABLE_EXPORTS.
+set(PLUGIN_FIXTURES_OUT "${CMAKE_CURRENT_BINARY_DIR}/tests/fixtures")
+file(MAKE_DIRECTORY "${PLUGIN_FIXTURES_OUT}")
+
+add_library(valid_algorithm_plugin SHARED
+    tests/fixtures/valid_algorithm_plugin.cpp
+)
+set_target_properties(valid_algorithm_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(valid_algorithm_plugin PRIVATE common::common)
+drone_warnings(valid_algorithm_plugin)
+
+add_library(unregistered_plugin SHARED
+    tests/fixtures/unregistered_plugin.cpp
+)
+set_target_properties(unregistered_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+drone_warnings(unregistered_plugin)
+
+add_executable(simulator_loader_test
+    tests/test_plugin_loader.cpp
+    $<TARGET_OBJECTS:simulator_registration>
+)
+set_target_properties(simulator_loader_test PROPERTIES ENABLE_EXPORTS ON)
+target_link_libraries(simulator_loader_test PRIVATE
+    simulator::loader
+    GTest::gtest_main
+)
+target_compile_definitions(simulator_loader_test PRIVATE
+    PLUGIN_FIXTURES_DIR="${PLUGIN_FIXTURES_OUT}"
+)
+add_dependencies(simulator_loader_test valid_algorithm_plugin unregistered_plugin)
+drone_warnings(simulator_loader_test)
+
 include(GoogleTest)
 gtest_discover_tests(simulator_cli_test)
 gtest_discover_tests(simulator_registrar_test)
+gtest_discover_tests(simulator_loader_test)
 
 # TODO: Build the simulator executable and its private implementation sources.
 # Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
 # registration-constructor symbols needed by dynamically loaded plugins.
+# Must also link $<TARGET_OBJECTS:simulator_registration> + ENABLE_EXPORTS ON.
