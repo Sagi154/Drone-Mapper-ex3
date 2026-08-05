@@ -188,6 +188,17 @@ target_include_directories(simulator_work PUBLIC
 target_link_libraries(simulator_work PUBLIC Threads::Threads)
 drone_warnings(simulator_work)
 
+# Map scoring (stub body returns -1 until full BFS port).
+add_library(simulator_scoring STATIC
+    src/MapsComparison.cpp
+)
+add_library(simulator::scoring ALIAS simulator_scoring)
+target_link_libraries(simulator_scoring PUBLIC common::common)
+target_include_directories(simulator_scoring PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+drone_warnings(simulator_scoring)
+
 # ── Unit tests ────────────────────────────────────────────────────────────────
 add_executable(simulator_cli_test
     tests/test_simulation_cli.cpp
@@ -256,11 +267,21 @@ target_link_libraries(simulator_work_test PRIVATE
 )
 drone_warnings(simulator_work_test)
 
+add_executable(simulator_scoring_test
+    tests/test_maps_comparison.cpp
+)
+target_link_libraries(simulator_scoring_test PRIVATE
+    simulator::scoring
+    GTest::gtest_main
+)
+drone_warnings(simulator_scoring_test)
+
 include(GoogleTest)
 gtest_discover_tests(simulator_cli_test)
 gtest_discover_tests(simulator_registrar_test)
 gtest_discover_tests(simulator_loader_test)
 gtest_discover_tests(simulator_work_test)
+gtest_discover_tests(simulator_scoring_test)
 
 # TODO: Build the simulator executable and its private implementation sources.
 # Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
