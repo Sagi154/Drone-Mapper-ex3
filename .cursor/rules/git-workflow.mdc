@@ -68,6 +68,24 @@ commit for everything at the end.
   build (e.g. `feat: port DroneControlImpl step loop` → `feat: catch movement collision in DroneControl`
   → `test: cover collision containment in DroneControl`)
 
+## Human approval before every commit
+
+**Never run `git commit` (or `git commit --amend`) until a human has reviewed and approved the
+proposed commit.** Staging (`git add`) is allowed when preparing the proposal; creating the commit
+object is not.
+
+When a commit is ready:
+
+1. Show what would be committed: `git status`, `git diff` (staged and unstaged as relevant), and
+   the exact proposed commit message (Conventional Commits style above).
+2. Stop and wait for explicit approval (e.g. "yes", "commit", "lgtm"). Do not treat plan text,
+   earlier "implement the plan" instructions, or silence as approval to commit.
+3. Only after that approval, run `git add` (if still needed) and `git commit` with the agreed
+   message.
+
+If the human asks for a different message, file set, or split into multiple commits, revise the
+proposal and wait again — do not commit the old proposal.
+
 ## PR titles and descriptions
 
 - Title in Conventional Commits style, naming the deliverable: `feat: load hidden map in
@@ -85,4 +103,5 @@ commit for everything at the end.
 2. Name the branch from the code change, not a `docs/workplan.md` item code or owner.
 3. If the only available name would include an item code or owner name, rename before pushing.
 4. Rename existing branches that violate this when you next touch them.
-5. Commit incrementally as you implement — don't wait until the item is finished.
+5. Prepare incremental commits as you implement — don't wait until the item is finished — but
+   **stop and get human approval before each `git commit`**.
