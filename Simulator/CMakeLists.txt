@@ -14,3 +14,16 @@ target_include_directories(test_usercommon_time_error_log PRIVATE
 target_link_libraries(test_usercommon_time_error_log PRIVATE GTest::gtest GTest::gtest_main common::common)
 drone_warnings(test_usercommon_time_error_log)
 add_test(NAME test_usercommon_time_error_log COMMAND test_usercommon_time_error_log)
+
+add_executable(test_usercommon_config_parse_result
+    tests/test_usercommon_config_parse_result.cpp
+)
+target_include_directories(test_usercommon_config_parse_result PRIVATE
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
+    ${CMAKE_SOURCE_DIR}/common/include
+)
+target_link_libraries(test_usercommon_config_parse_result PRIVATE
+    GTest::gtest GTest::gtest_main common::common
+)
+drone_warnings(test_usercommon_config_parse_result)
+add_test(NAME test_usercommon_config_parse_result COMMAND test_usercommon_config_parse_result)
