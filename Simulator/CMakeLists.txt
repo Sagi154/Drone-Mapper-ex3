@@ -106,3 +106,33 @@ target_link_libraries(test_yaml_config_parsers PRIVATE
 
 drone_warnings(test_yaml_config_parsers)
 add_test(NAME test_yaml_config_parsers COMMAND test_yaml_config_parsers)
+
+set(SIMULATOR_CORE_SOURCES
+    src/MockGPS.cpp
+    src/MockLidar.cpp
+    src/MockMovement.cpp
+    src/Map3DImpl.cpp
+    src/SimulationRunImpl.cpp
+    src/SimulationRunFactoryImpl.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/RunErrorLog.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
+)
+
+add_executable(test_simulation_run_factory
+    tests/test_simulation_run_factory.cpp
+    ${SIMULATOR_CORE_SOURCES}
+)
+
+target_include_directories(test_simulation_run_factory PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
+)
+
+target_link_libraries(test_simulation_run_factory PRIVATE
+    GTest::gtest GTest::gtest_main common::common TinyNPY::TinyNPY
+)
+
+drone_warnings(test_simulation_run_factory)
+add_test(NAME test_simulation_run_factory COMMAND test_simulation_run_factory)
