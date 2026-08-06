@@ -7,6 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(mp-units CONFIG REQUIRED)
 find_package(TinyNPY CONFIG REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 enable_testing()
 
