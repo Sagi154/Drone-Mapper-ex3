@@ -71,6 +71,9 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
 
     const std::size_t total = plugin_count * cell_count;
 
+    // Disjoint flat indices — one writer per slot; no lock needed.
+    std::vector<char> threw(total, 0);
+
     (void)WorkDistributor::distribute(
         total, num_threads,
         [&](std::size_t flat_index) {
@@ -97,15 +100,25 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
             table[plugin_index].results[cell_index] = run->run();
         },
         [&](std::size_t flat_index) {
+            threw[flat_index] = 1;
             const std::size_t plugin_index = flat_index / cell_count;
             const std::size_t cell_index   = flat_index % cell_count;
-            std::cerr << "error: matrix cell plugin=" << plugins[plugin_index].plugin_filename
-                      << " cell=" << cell_index << " threw\n";
             table[plugin_index].results[cell_index] =
                 makeFailureResult(cells[cell_index],
                                   output_root / plugins[plugin_index].plugin_filename /
                                       std::to_string(cell_index));
         });
+
+    // Log throws from the main thread only (after join) — avoid concurrent cerr.
+    for (std::size_t flat_index = 0; flat_index < total; ++flat_index) {
+        if (threw[flat_index] == 0) {
+            continue;
+        }
+        const std::size_t plugin_index = flat_index / cell_count;
+        const std::size_t cell_index   = flat_index % cell_count;
+        std::cerr << "error: matrix cell plugin=" << plugins[plugin_index].plugin_filename
+                  << " cell=" << cell_index << " threw\n";
+    }
 
     return table;
 }

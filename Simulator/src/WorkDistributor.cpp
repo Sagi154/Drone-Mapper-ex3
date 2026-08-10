@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <iostream>
 #include <thread>
 #include <vector>
 
@@ -15,7 +14,8 @@ void runOneCell(std::size_t index,
     try {
         cell_work(index);
     } catch (...) {
-        std::cerr << "error: work cell " << index << " threw; recording failure and continuing\n";
+        // Do not write to std::cerr here — workers may run concurrently.
+        // Callers record the failure in the result slot via on_throw.
         on_throw(index);
     }
 }
