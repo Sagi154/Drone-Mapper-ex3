@@ -110,11 +110,12 @@ common::PhysicalLength MockLidar::traceBeam(const common::Orientation& beam_orie
 
     const PhysicalLength step = 0.1 * map_.getMapConfig().resolution;
 
+    const double dir_x = dx.force_numerical_value_in(mp::one);
+    const double dir_y = dy.force_numerical_value_in(mp::one);
+    const double dir_z = dz.force_numerical_value_in(mp::one);
+
     for (PhysicalLength distance = 0.0 * cm; distance <= config_.z_max; distance += step) {
         const double distance_cm = distance.force_numerical_value_in(cm);
-        const double dir_x = dx.force_numerical_value_in(mp::one);
-        const double dir_y = dy.force_numerical_value_in(mp::one);
-        const double dir_z = dz.force_numerical_value_in(mp::one);
 
         const common::Position3D sample{
             origin.x + dir_x * distance_cm * x_extent[cm],

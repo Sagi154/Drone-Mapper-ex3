@@ -18,8 +18,6 @@ public:
 
 private:
     common::types::MissionConfigData mission_;
-    common::types::DroneConfigData drone_;
-    common::IMutableMap3D& output_map_;
     std::filesystem::path output_map_file_;
     bool verbose_ = false;
     std::unique_ptr<DroneControlImpl> drone_control_;

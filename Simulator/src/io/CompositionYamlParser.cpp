@@ -64,6 +64,12 @@ parseCompositionFile(const std::filesystem::path& path, UC::IRunErrorLog& log) {
         const auto sim_path =
             resolveConfigPath(base_dir, entry["simulation_config"].as<std::string>());
         const auto sim_result = parseSimulationConfig(sim_path, log);
+        if (!sim_result.ok) {
+            detail::logRecoverable(log, "COMPOSITION_INVALID",
+                                   "[simulation_compositions] failed to parse simulation_config \"" +
+                                       sim_path.string() + "\" — group skipped");
+            continue;
+        }
         const simulator::types::SimulationConfigData sim_cfg = sim_result.value;
 
         const YAML::Node mission_list = entry["mission_configs"];
@@ -79,7 +85,14 @@ parseCompositionFile(const std::filesystem::path& path, UC::IRunErrorLog& log) {
                 continue;
             }
             const auto m_path = resolveConfigPath(base_dir, mission_entry.as<std::string>());
-            missions.push_back(parseMissionConfig(m_path, log).value);
+            const auto m_result = parseMissionConfig(m_path, log);
+            if (!m_result.ok) {
+                detail::logRecoverable(log, "COMPOSITION_INVALID",
+                                       "[simulation_compositions] failed to parse mission_config \"" +
+                                           m_path.string() + "\" — entry skipped");
+                continue;
+            }
+            missions.push_back(m_result.value);
         }
 
         if (missions.empty()) {

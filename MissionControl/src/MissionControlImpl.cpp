@@ -1,6 +1,5 @@
 #include <MissionControl/MissionControlImpl.h>
 
-#include <exception>
 #include <fstream>
 #include <utility>
 #include <vector>
@@ -12,20 +11,7 @@ namespace {
 [[nodiscard]] common::types::MissionRunResult finalizeMission(
     common::types::MissionRunStatus status,
     std::size_t steps,
-    std::vector<common::types::ErrorRef> errors,
-    common::IMutableMap3D& output_map,
-    const std::filesystem::path& output_file) {
-    try {
-        output_map.save(output_file);
-    } catch (const std::exception& ex) {
-        errors.push_back(common::types::ErrorRef{"MAP_SAVE_FAILED", ex.what()});
-        return common::types::MissionRunResult{
-            common::types::MissionRunStatus::Error,
-            steps,
-            std::move(errors),
-        };
-    }
-
+    std::vector<common::types::ErrorRef> errors) {
     return common::types::MissionRunResult{
         status,
         steps,
@@ -63,8 +49,6 @@ void writeVerboseLog(const std::filesystem::path& output_map_file,
 MissionControlImpl_207190406_209543255::MissionControlImpl_207190406_209543255(
     common::MissionControlDependencies dependencies)
     : mission_(dependencies.mission_config),
-      drone_(dependencies.drone_config),
-      output_map_(dependencies.output_map),
       output_map_file_(std::move(dependencies.output_map_file)),
       verbose_(dependencies.verbose),
       drone_control_(std::make_unique<DroneControlImpl>(
@@ -92,9 +76,8 @@ common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMissi
                 "DRONE_STEP_FAILED",
                 step_result.message.empty() ? "Drone step failed." : step_result.message,
             });
-            auto result =
-                finalizeMission(status, steps, std::move(errors), output_map_, output_map_file_);
-            if (verbose_) {
+            auto result = finalizeMission(status, steps, std::move(errors));
+            if (verbose_ && !output_map_file_.empty()) {
                 writeVerboseLog(output_map_file_, result.status, result.steps);
             }
             return result;
@@ -102,21 +85,19 @@ common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMissi
 
         if (step_result.status == common::types::DroneStepStatus::Completed) {
             status = common::types::MissionRunStatus::Completed;
-            auto result =
-                finalizeMission(status, steps, std::move(errors), output_map_, output_map_file_);
-            if (verbose_) {
+            auto result = finalizeMission(status, steps, std::move(errors));
+            if (verbose_ && !output_map_file_.empty()) {
                 writeVerboseLog(output_map_file_, result.status, result.steps);
             }
             return result;
         }
     }
 
-    auto result = finalizeMission(status, steps, std::move(errors), output_map_, output_map_file_);
-    if (verbose_) {
+    auto result = finalizeMission(status, steps, std::move(errors));
+    if (verbose_ && !output_map_file_.empty()) {
         writeVerboseLog(output_map_file_, result.status, result.steps);
     }
     return result;
 }
 
 } // namespace MissionControl_207190406_209543255
-

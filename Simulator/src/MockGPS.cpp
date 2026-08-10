@@ -24,7 +24,9 @@ double snapToCm(double value, double res_cm) {
 MockGPS::MockGPS(common::Position3D position,
                  common::Orientation heading,
                  common::PhysicalLength gps_resolution)
-    : position_(position), heading_(heading), resolution_(gps_resolution) {}
+    : heading_(heading), resolution_(gps_resolution) {
+    setPosition(position);
+}
 
 common::Position3D MockGPS::position() const {
     return position_;

@@ -20,6 +20,10 @@ parseDroneConfig(const std::filesystem::path& path, UC::IRunErrorLog& log) {
 
     if (const auto v = detail::readLengthCm(node, "dimensions_cm")) {
         result.value.radius = *v / 2.0;
+    } else {
+        result.errors.push_back({"CONFIG_MISSING_FIELD",
+                                  "[drone_config] mandatory field dimensions_cm is absent"});
+        return result;
     }
     if (const auto v = detail::readHorizontalAngleDeg(node, "max_rotate_deg")) {
         result.value.max_rotate = *v;

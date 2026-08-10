@@ -82,7 +82,17 @@ types::SimulationResult SimulationRunImpl::run() {
     if (!output_map_file_.empty()) {
         std::error_code ec;
         std::filesystem::create_directories(output_map_file_.parent_path(), ec);
-        output_map_->save(output_map_file_);
+        try {
+            output_map_->save(output_map_file_);
+        } catch (const std::exception& ex) {
+            result.mission_results.push_back(common::types::MissionRunResult{
+                common::types::MissionRunStatus::Error,
+                0,
+                {common::types::ErrorRef{"MAP_SAVE_FAILED", ex.what()}},
+            });
+            result.mission_score = -1.0;
+            return result;
+        }
     }
 
     // Scoring via MapsComparison is deferred to Y10.

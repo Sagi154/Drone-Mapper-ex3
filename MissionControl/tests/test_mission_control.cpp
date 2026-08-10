@@ -147,7 +147,8 @@ TEST(MissionControl, CompletesWhenAlgorithmFinishes) {
     const auto result = control.runMission();
     EXPECT_EQ(result.status, common::types::MissionRunStatus::Completed);
     EXPECT_EQ(result.steps, 1U);
-    EXPECT_EQ(output.save_count_, 1);
+    // Map save is owned by SimulationRunImpl, not MissionControlImpl.
+    EXPECT_EQ(output.save_count_, 0);
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::path(output_file.string() + ".verbose.txt")));
 
     std::error_code ec;

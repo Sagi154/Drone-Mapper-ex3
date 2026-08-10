@@ -17,6 +17,9 @@ void RunErrorLog::log(const common::types::ErrorRef& error) {
     if (!stream_.is_open()) {
         stream_.open(log_path_, std::ios::app);
     }
+    if (!stream_.is_open()) {
+        return;
+    }
     stream_ << currentUtcTimestamp() << ' ' << error.code << ' ' << error.message << '\n';
     stream_.flush();
 }

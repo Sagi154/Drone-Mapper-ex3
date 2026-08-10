@@ -19,7 +19,18 @@ parseLidarConfig(const std::filesystem::path& path, UC::IRunErrorLog& log) {
     const YAML::Node node = detail::configRoot(*root, "lidar_config");
 
     if (const auto v = detail::readLengthCm(node, "z_min_cm")) { result.value.z_min = *v; }
-    if (const auto v = detail::readLengthCm(node, "z_max_cm")) { result.value.z_max = *v; }
+
+    bool has_z_max = false;
+    if (const auto v = detail::readLengthCm(node, "z_max_cm")) {
+        result.value.z_max = *v;
+        has_z_max = true;
+    }
+    if (!has_z_max) {
+        result.errors.push_back({"CONFIG_MISSING_FIELD",
+                                  "[lidar_config] mandatory field z_max_cm is absent"});
+        return result;
+    }
+
     if (const auto v = detail::readLengthCm(node, "d_cm"))     { result.value.d = *v; }
 
     if (const YAML::Node fov = node["fov_circles"]; fov && fov.IsScalar()) {

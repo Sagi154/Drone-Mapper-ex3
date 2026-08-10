@@ -24,14 +24,21 @@ parseMissionConfig(const std::filesystem::path& path, UC::IRunErrorLog& log) {
         result.value.mission_bounds = *v;
     }
 
+    bool has_max_steps = false;
     if (const YAML::Node n = node["max_steps"]; n && n.IsScalar()) {
         try {
             result.value.max_steps = n.as<std::size_t>();
+            has_max_steps = true;
         } catch (const YAML::Exception&) {
             detail::logRecoverable(log, "CONFIG_BAD_VALUE",
                                    "[mission_config] bad value for max_steps — field keeps default");
             result.errors.push_back({"CONFIG_BAD_VALUE", "[mission_config] bad value for max_steps"});
         }
+    }
+    if (!has_max_steps) {
+        result.errors.push_back({"CONFIG_MISSING_FIELD",
+                                  "[mission_config] mandatory field max_steps is absent or invalid"});
+        return result;
     }
 
     if (const auto v = detail::readLengthCm(node, "gps_resolution_cm")) {

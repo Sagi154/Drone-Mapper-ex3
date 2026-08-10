@@ -171,8 +171,9 @@ TEST(MockMovement, ElevateIntoWallThrows) {
     GridMap map{10, 10, 10, 10.0};
     map.setOccupied(5, 5, 9); // ceiling at z=90..100
 
+    // 50.0 cm snaps exactly to cell 5 at 10 cm resolution — stays on the wall column
     simulator::MockGPS gps{
-        Position3D{55.0 * x_extent[cm], 55.0 * y_extent[cm], 40.0 * z_extent[cm]},
+        Position3D{50.0 * x_extent[cm], 50.0 * y_extent[cm], 40.0 * z_extent[cm]},
         Orientation{0.0 * deg, 0.0 * deg},
         10.0 * cm};
     simulator::MockMovement mv{gps, map, makeDroneConfig(5.0, 200.0, 200.0)};

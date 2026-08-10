@@ -2,10 +2,9 @@
 
 #include <MissionControl/ScanResultToVoxels.h>
 
-#include <mp-units/systems/si/math.h>
+#include "BeamMath.hpp"
 
 #include <cmath>
-#include <limits>
 #include <utility>
 
 namespace MissionControl_207190406_209543255 {
@@ -19,8 +18,7 @@ using common::cm;
 using common::x_extent;
 using common::y_extent;
 using common::z_extent;
-namespace mp = common::mp;
-namespace si = common::si;
+namespace bm = beam_math;
 
 void markDroneFootprintEmpty(common::IMutableMap3D& map,
                              const Position3D& centre,
@@ -96,38 +94,6 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map,
            message.find("boundary") != std::string::npos;
 }
 
-[[nodiscard]] bool isMissDistance(PhysicalLength distance) {
-    return distance.force_numerical_value_in(cm) == std::numeric_limits<double>::max();
-}
-
-[[nodiscard]] Orientation absoluteBeamOrientation(const Orientation& drone_heading,
-                                                  const Orientation& relative_beam) {
-    return Orientation{
-        relative_beam.horizontal + drone_heading.horizontal,
-        relative_beam.altitude + drone_heading.altitude,
-    };
-}
-
-[[nodiscard]] Position3D pointAlongBeam(const Position3D& origin,
-                                        const Orientation& beam_orientation,
-                                        PhysicalLength distance) {
-    const auto cos_altitude = si::cos(beam_orientation.altitude);
-    const auto dx = cos_altitude * si::cos(beam_orientation.horizontal);
-    const auto dy = cos_altitude * si::sin(beam_orientation.horizontal);
-    const auto dz = si::sin(beam_orientation.altitude);
-
-    const double distance_cm = distance.force_numerical_value_in(cm);
-    const double dir_x = dx.force_numerical_value_in(mp::one);
-    const double dir_y = dy.force_numerical_value_in(mp::one);
-    const double dir_z = dz.force_numerical_value_in(mp::one);
-
-    return Position3D{
-        origin.x + dir_x * distance_cm * x_extent[cm],
-        origin.y + dir_y * distance_cm * y_extent[cm],
-        origin.z + dir_z * distance_cm * z_extent[cm],
-    };
-}
-
 void setEmptyIfNotOccupied(common::IMutableMap3D& map, const Position3D& position) {
     if (!map.isInBounds(position)) {
         return;
@@ -162,12 +128,12 @@ void supplementGridAlignedFusion(common::IMutableMap3D& map,
         }
 
         const Orientation beam_orientation =
-            absoluteBeamOrientation(drone_heading, hit.angle);
+            bm::absoluteBeamOrientation(drone_heading, hit.angle);
 
-        if (isMissDistance(hit.distance)) {
+        if (bm::isMissDistance(hit.distance)) {
             for (double t_cm = step_cm; t_cm <= fusion_max_cm + 1e-9; t_cm += step_cm) {
                 setEmptyIfNotOccupied(
-                    map, pointAlongBeam(scan_origin, beam_orientation, t_cm * cm));
+                    map, bm::pointAlongBeam(scan_origin, beam_orientation, t_cm * cm));
             }
             continue;
         }
@@ -178,9 +144,9 @@ void supplementGridAlignedFusion(common::IMutableMap3D& map,
         }
         for (double t_cm = step_cm; t_cm < hit_cm - 1e-9; t_cm += step_cm) {
             setEmptyIfNotOccupied(
-                map, pointAlongBeam(scan_origin, beam_orientation, t_cm * cm));
+                map, bm::pointAlongBeam(scan_origin, beam_orientation, t_cm * cm));
         }
-        setOccupied(map, pointAlongBeam(scan_origin, beam_orientation, hit.distance));
+        setOccupied(map, bm::pointAlongBeam(scan_origin, beam_orientation, hit.distance));
     }
 }
 

@@ -21,6 +21,10 @@ parseSimulationConfig(const std::filesystem::path& path, UC::IRunErrorLog& log) 
 
     if (const YAML::Node n = node["map_filename"]; n && n.IsScalar()) {
         result.value.map_filename = resolveMapFilename(n.as<std::string>(), path);
+    } else {
+        result.errors.push_back({"CONFIG_MISSING_FIELD",
+                                  "[simulation_config] mandatory field map_filename is absent"});
+        return result;
     }
     if (const auto v = detail::readLengthCm(node, "map_resolution_cm")) {
         result.value.map_resolution = *v;
