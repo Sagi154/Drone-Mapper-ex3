@@ -136,3 +136,193 @@ target_link_libraries(test_simulation_run_factory PRIVATE
 
 drone_warnings(test_simulation_run_factory)
 add_test(NAME test_simulation_run_factory COMMAND test_simulation_run_factory)
+
+# CLI parse/validation is self-contained (no plugins / dlopen / threading).
+add_library(simulator_cli STATIC
+    src/io/SimulationCli.cpp
+)
+add_library(simulator::cli ALIAS simulator_cli)
+target_include_directories(simulator_cli PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+drone_warnings(simulator_cli)
+
+# Registrar singleton (no registration ctor bodies — those are an OBJECT lib so
+# the linker cannot drop them from a static archive before ENABLE_EXPORTS).
+add_library(simulator_registrar STATIC
+    src/PluginRegistrar.cpp
+)
+add_library(simulator::registrar ALIAS simulator_registrar)
+target_link_libraries(simulator_registrar PUBLIC common::common)
+target_include_directories(simulator_registrar PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+drone_warnings(simulator_registrar)
+
+# Registration ctor bodies — OBJECT so every consumer that links them exports
+# the symbols (required for dlopen'd plugins to resolve the undefined ctor).
+add_library(simulator_registration OBJECT
+    src/MappingAlgorithmRegistration.cpp
+    src/MissionControlRegistration.cpp
+)
+target_link_libraries(simulator_registration PUBLIC simulator::registrar)
+drone_warnings(simulator_registration)
+
+# dlopen/dlclose loader (depends on registrar).
+add_library(simulator_loader STATIC
+    src/PluginLoader.cpp
+)
+add_library(simulator::loader ALIAS simulator_loader)
+target_link_libraries(simulator_loader PUBLIC simulator::registrar ${CMAKE_DL_LIBS})
+drone_warnings(simulator_loader)
+
+# Work matrix distributor (threads + atomic index).
+find_package(Threads REQUIRED)
+add_library(simulator_work STATIC
+    src/WorkDistributor.cpp
+)
+add_library(simulator::work ALIAS simulator_work)
+target_include_directories(simulator_work PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(simulator_work PUBLIC Threads::Threads)
+drone_warnings(simulator_work)
+
+# Map scoring (stub body returns -1 until full BFS port).
+add_library(simulator_scoring STATIC
+    src/MapsComparison.cpp
+)
+add_library(simulator::scoring ALIAS simulator_scoring)
+target_link_libraries(simulator_scoring PUBLIC common::common)
+target_include_directories(simulator_scoring PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+drone_warnings(simulator_scoring)
+
+# Run-matrix orchestrator (frozen ISimulationRunFactory / ISimulationRun).
+add_library(simulator_orchestrator STATIC
+    src/RunMatrixOrchestrator.cpp
+)
+add_library(simulator::orchestrator ALIAS simulator_orchestrator)
+target_include_directories(simulator_orchestrator PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+)
+target_link_libraries(simulator_orchestrator PUBLIC
+    simulator::work
+    common::common
+)
+drone_warnings(simulator_orchestrator)
+
+# ── Unit tests ────────────────────────────────────────────────────────────────
+add_executable(simulator_cli_test
+    tests/test_simulation_cli.cpp
+)
+target_link_libraries(simulator_cli_test PRIVATE
+    simulator::cli
+    GTest::gtest_main
+)
+drone_warnings(simulator_cli_test)
+
+add_executable(simulator_registrar_test
+    tests/test_plugin_registrar.cpp
+    $<TARGET_OBJECTS:simulator_registration>
+)
+target_link_libraries(simulator_registrar_test PRIVATE
+    simulator::registrar
+    GTest::gtest_main
+)
+drone_warnings(simulator_registrar_test)
+
+# Test-only .so fixtures for the loader (never shipped). Registration ctor stays
+# UNDEFINED in these libs and is resolved from the test executable via ENABLE_EXPORTS.
+set(PLUGIN_FIXTURES_OUT "${CMAKE_CURRENT_BINARY_DIR}/tests/fixtures")
+file(MAKE_DIRECTORY "${PLUGIN_FIXTURES_OUT}")
+
+add_library(valid_algorithm_plugin SHARED
+    tests/fixtures/valid_algorithm_plugin.cpp
+)
+set_target_properties(valid_algorithm_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(valid_algorithm_plugin PRIVATE common::common)
+drone_warnings(valid_algorithm_plugin)
+
+add_library(unregistered_plugin SHARED
+    tests/fixtures/unregistered_plugin.cpp
+)
+set_target_properties(unregistered_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+drone_warnings(unregistered_plugin)
+
+add_library(valid_mission_control_plugin SHARED
+    tests/fixtures/valid_mission_control_plugin.cpp
+)
+set_target_properties(valid_mission_control_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(valid_mission_control_plugin PRIVATE common::common)
+drone_warnings(valid_mission_control_plugin)
+
+add_executable(simulator_loader_test
+    tests/test_plugin_loader.cpp
+    $<TARGET_OBJECTS:simulator_registration>
+)
+set_target_properties(simulator_loader_test PROPERTIES ENABLE_EXPORTS ON)
+target_link_libraries(simulator_loader_test PRIVATE
+    simulator::loader
+    GTest::gtest_main
+)
+target_compile_definitions(simulator_loader_test PRIVATE
+    PLUGIN_FIXTURES_DIR="${PLUGIN_FIXTURES_OUT}"
+)
+add_dependencies(simulator_loader_test
+    valid_algorithm_plugin
+    unregistered_plugin
+    valid_mission_control_plugin
+)
+drone_warnings(simulator_loader_test)
+
+add_executable(simulator_work_test
+    tests/test_work_distributor.cpp
+)
+target_link_libraries(simulator_work_test PRIVATE
+    simulator::work
+    GTest::gtest_main
+)
+drone_warnings(simulator_work_test)
+
+add_executable(simulator_scoring_test
+    tests/test_maps_comparison.cpp
+)
+target_link_libraries(simulator_scoring_test PRIVATE
+    simulator::scoring
+    GTest::gtest_main
+)
+drone_warnings(simulator_scoring_test)
+
+add_executable(simulator_orchestrator_test
+    tests/test_run_matrix_orchestrator.cpp
+)
+target_link_libraries(simulator_orchestrator_test PRIVATE
+    simulator::orchestrator
+    GTest::gtest_main
+)
+drone_warnings(simulator_orchestrator_test)
+
+include(GoogleTest)
+gtest_discover_tests(simulator_cli_test)
+gtest_discover_tests(simulator_registrar_test)
+gtest_discover_tests(simulator_loader_test)
+gtest_discover_tests(simulator_work_test)
+gtest_discover_tests(simulator_scoring_test)
+gtest_discover_tests(simulator_orchestrator_test)
+
+# TODO: Build the simulator executable and its private implementation sources.
+# Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
+# registration-constructor symbols needed by dynamically loaded plugins.
+# Must also link $<TARGET_OBJECTS:simulator_registration> + ENABLE_EXPORTS ON.

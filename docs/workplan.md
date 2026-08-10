@@ -2,10 +2,9 @@
 
 Concrete work items only — what to build, port, wire up, or verify. Grounded in `AGENTS.md`,
 `docs/assignment3-checklist.md`, `docs/component-placement.md`, `docs/api-delta-ex2-to-ex3.md`,
-`.cursor/rules/`, and the actual skeleton contents (`common/`, `Simulator/common_simulator/`,
-`MissionControl/common_mission_control/` headers; the three TODO-stub `CMakeLists.txt`; no
-`Simulator/`, `Algorithm/`, or `MissionControl` `.cpp` files exist yet). Student IDs used below
-(`207190406`, `209543255`) match every existing doc's naming examples — `students.txt` is filled in
+`.cursor/rules/`, and the skeleton contents (`common/`, `Simulator/common_simulator/`,
+`MissionControl/common_mission_control/` headers). Student IDs used below (`207190406`,
+`209543255`) match every existing doc's naming examples — `students.txt` is filled in
 (`Sagi Eisenberg, 207190406` / `Yoav Naaman, 209543255`).
 
 No schedule, no estimates. Items are ordered by what must compile/exist before what, split between
@@ -189,13 +188,17 @@ Verify: port ex2's coordinate-math unit tests; confirm the house scenario's know
 Ordered by dependency. Every item here needs only `common/` (already frozen and complete) plus
 whichever `UserCommon/` item is noted — nothing from Yoav's track.
 
-**S1 — `Algorithm/CMakeLists.txt`.**
+**Progress (2026-08-05):** S1–S7 and S9 **done**. S8 **done as signature stub** (`compare` returns
+`-1`; real 0–100 BFS scoring still open, needs U4). S10+ blocked on Yoav meeting points /
+remaining items. Branch: `cmake-algorithm-shared-target`. Local builds use `g++-12` (mp-units).
+
+**S1 — `Algorithm/CMakeLists.txt`.** ✅ **DONE**
 Depends on: nothing. `SHARED` target, output name `Algorithm_207190406_209543255`, `PREFIX ""`,
 links `common::common`, calls `drone_warnings()`. Start with an empty source list; add files as S2
 lands.
 Verify: `cmake --build --preset default` still succeeds tree-wide (empty target is a valid no-op).
 
-**S2 — Port `MappingAlgorithmImpl` + `MappingAlgorithmFrontier`.**
+**S2 — Port `MappingAlgorithmImpl` + `MappingAlgorithmFrontier`.** ✅ **DONE**
 Depends on: S1. Source: `../Drone-Mapper-ex2/src/{MappingAlgorithmImpl.cpp,MappingAlgorithmFrontier.{h,cpp}}`
 into `Algorithm/src/`. Apply the mechanical changes from `docs/api-delta-ex2-to-ex3.md` §1–§3:
 `<Common/...>` includes, `explicit MappingAlgorithmImpl_207190406_209543255(common::MappingAlgorithmDependencies)`
@@ -210,7 +213,7 @@ Verify: `cmake --build --preset default --target Algorithm_207190406_209543255` 
 must show the registration constructor as **undefined** — if it's defined, the registration `.cpp`
 leaked into the plugin target, which breaks the `dlopen` handshake later.
 
-**S3 — Algorithm tests.**
+**S3 — Algorithm tests.** ✅ **DONE**
 Depends on: S2. Port `test_mapping_algorithm.cpp` and `test_mapping_algorithm_frontier.cpp` into
 `Algorithm/tests/`, with a small hand-written `IMap3D` fake local to these tests (no dependency on
 Yoav's `Map3DImpl`). Add `find_package(GTest CONFIG REQUIRED)` + `enable_testing()` to the root
@@ -219,7 +222,7 @@ Verify: `ctest --preset default` (or the gtest binary directly) green. Confirm t
 without any `fusion_max` reference and the ex2 assertion that used to check
 `cmd.fusion_max.has_value() == false` is simply deleted, not "still passing" (the field is gone).
 
-**S4 — Simulator CLI argument parser.**
+**S4 — Simulator CLI argument parser.** ✅ **DONE**
 Depends on: nothing (pure `std::filesystem` + string parsing). Rewrite
 `../Drone-Mapper-ex2/src/io/SimulationCli.cpp` for the two ex3 modes (`-comparative`,
 `-competition` — note the second is *not* `-competitive`). Any argument order; `=` with no
@@ -234,7 +237,7 @@ reported together; a nonexistent file path; a folder with zero `.so` files; an u
 All pass without the test process ever seeing `exit()` called (assert via a return-value-based
 parse result type, not a process-exit side effect).
 
-**S5 — Plugin registrar singleton + registration constructor bodies.**
+**S5 — Plugin registrar singleton + registration constructor bodies.** ✅ **DONE**
 Depends on: nothing beyond `common/MappingAlgorithmRegistration.h` / `MissionControlRegistration.h`
 (already exist, frozen). In `Simulator/src/`: a singleton holding the most recently registered
 `MappingAlgorithmFactory`/`MissionControlFactory`, plus the two registration-constructor `.cpp`
@@ -246,7 +249,7 @@ factory (no `.so`, no `dlopen` involved) and confirms the registrar's "take pend
 accessor returns it exactly once, and returns empty on a second call without an intervening
 registration.
 
-**S6 — `dlopen`/`dlclose` loader.**
+**S6 — `dlopen`/`dlclose` loader.** ✅ **DONE**
 Depends on: S5. Load one `.so` by path, or every `.so` in a folder; `dlopen(path, RTLD_NOW | RTLD_LOCAL)`;
 clear the registrar's pending slot before each `dlopen`, take it after; attribute the resulting
 factory to the `.so` filename; on any failure (`dlopen` returns null, or nothing was registered),
@@ -260,7 +263,7 @@ factory is retrievable; a `.so` with no registration call lands in the "failed" 
 `dlclose`ing and never `dlopen`-ing the same path again is enforced by the loader's own bookkeeping
 (e.g. an assertion or early-return if asked to reload a cached path).
 
-**S7 — Threading / work distribution.**
+**S7 — Threading / work distribution.** ✅ **DONE**
 Depends on: S4 (`num_threads` value). `std::vector<std::thread>` + `std::atomic<std::size_t>` index
 into a result table pre-sized to `plugins_under_test × (simulation, mission) pairs × drone_configs
 × lidar_configs`; cap worker count at the matrix size; each worker wraps its per-cell call in
@@ -272,7 +275,7 @@ worker count is exactly `min(requested, matrix_size - 1)` main-thread-inclusive 
 `.cursor/rules/threading-model.mdc` (never open a thread with nothing to do); every cell's slot is
 written exactly once; the throwing cell's slot shows the failure without stopping sibling cells.
 
-**S8 — `MapsComparison` (scoring).**
+**S8 — `MapsComparison` (scoring).** ✅ **DONE (signature stub)** — full 0–100 BFS body still open
 Depends on: nothing structurally (needs an `IMap3D&` pair, which a hand-built fake can provide
 before Yoav's real `Map3DImpl` exists). Port
 `../Drone-Mapper-ex2/{include/drone_mapper/MapsComparison.h,src/MapsComparison.cpp}` into
@@ -280,12 +283,14 @@ before Yoav's real `Map3DImpl` exists). Port
 spawn position (local spawn + `map_axes_offset`, via `SimulationCoordUtil`, item U4). **Publish the
 function/constructor signature to Yoav as soon as it's decided** — see the meeting-point list below
 — so `SimulationRunImpl` (item Y13) can call it before the scoring logic is fully tuned.
+**Landed for Yoav:** `simulator::MapsComparison::compare(origin, target, spawn) -> double` in
+`Simulator/include/Simulator/MapsComparison.h`; stub body returns `-1.0`. Fill real scoring after U4.
 Verify: port `test_maps_comparison.cpp`. Once Yoav's real map fixtures land, cross-check against
 ex2's recorded reference ranges from `../Drone-Mapper-ex2/docs/HLD.md` (house_lower 100%, large_room
 ~92–96%, small_room ~87–90%, large_out ~80–88%, small_out ~75–89%, house_full ~56–62%) — a large
 drop means the port broke the offset or dtype handling, not the scoring logic itself.
 
-**S9 — Run-matrix orchestrator.**
+**S9 — Run-matrix orchestrator.** ✅ **DONE** (not wired into `main()` yet — needs Yoav's Y9 factory)
 Depends on: S6 (loaded plugins), S7 (threading), the frozen `simulator::ISimulationRunFactory` /
 `simulator::ISimulationRun` interfaces (already exist — **not** Yoav's concrete classes yet). Given
 loaded plugins and a `simulator::types::SimulationCompositionData`, expand the run matrix and
@@ -449,7 +454,7 @@ people compile and test independently.
 
 | Meeting point | What Sagi needs | What Yoav needs | Smallest unblocking deliverable |
 |---|---|---|---|
-| `MapsComparison` (S8 ↔ Y10) | — | Callable signature | Sagi commits the header with the final signature and a stub body (`return -1;`) before the real scoring logic is done; Yoav codes `SimulationRunImpl` against it immediately. |
+| `MapsComparison` (S8 ↔ Y10) | — | Callable signature | ✅ Stub published: `simulator::MapsComparison::compare(origin, target, spawn) -> double` returns `-1`. Yoav can code `SimulationRunImpl` against it; real scoring body still open (needs U4). |
 | `MappingAlgorithmFactory`/`MissionControlFactory` handoff (S6 ↔ Y9) | — | The frozen `std::function` types already exist in `common/` | Nothing to build first — both sides just use the exact typedefs from `Common/MappingAlgorithmFactory.h` / `MissionControlFactory.h`. Yoav tests with hand-written lambdas; Sagi's loader supplies the real ones later; no header needs to change hands. |
 | `SimulationRunFactoryImpl` concrete class (S9 ↔ Y9) | Yoav's constructor signature + a compiling `create()` | — | Yoav pushes a compiling `SimulationRunFactoryImpl.h`/`.cpp` with the agreed constructor and a stub `create()` (returns a trivially-succeeding fake run) on day one of Y9, before the real body is finished, so Sagi's orchestrator (S9) always has something concrete to `make_unique` against. |
 | Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | Whoever decides first writes the pattern into `README.md`; the other follows it — no code dependency, just one shared doc. |
