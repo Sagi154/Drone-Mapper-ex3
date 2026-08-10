@@ -105,6 +105,11 @@ PluginLoadOutcome PluginLoader::loadOneAlgorithm(const std::filesystem::path& so
     if (!factory.has_value() || !*factory) {
         std::cerr << "error: algorithm plugin '" << filename
                   << "' loaded but did not register a factory\n";
+        // Clear both slots — a wrong-kind .so may have filled the MC pending slot.
+        registrar.clearPendingAlgorithmFactory();
+        registrar.clearPendingMissionControlFactory();
+        // Record the path so a later retry cannot reload after this close.
+        loaded_canonical_paths_.insert(canonical);
         ::dlclose(handle);
         outcome.errors.push_back(filename);
         return outcome;
@@ -137,6 +142,11 @@ PluginLoadOutcome PluginLoader::loadOneMissionControl(const std::filesystem::pat
     if (!factory.has_value() || !*factory) {
         std::cerr << "error: mission-control plugin '" << filename
                   << "' loaded but did not register a factory\n";
+        // Clear both slots — a wrong-kind .so may have filled the algorithm pending slot.
+        registrar.clearPendingAlgorithmFactory();
+        registrar.clearPendingMissionControlFactory();
+        // Record the path so a later retry cannot reload after this close.
+        loaded_canonical_paths_.insert(canonical);
         ::dlclose(handle);
         outcome.errors.push_back(filename);
         return outcome;
