@@ -133,7 +133,7 @@ Because the same translation unit can end up compiled into the executable **and*
 
 ### Known early items (two consumers are already certain — build these directly in `UserCommon/`, skip step 1 of the convention for just these)
 
-**Item U1 — `UserCommon/README.md` + the include-dir wiring pattern.**
+**Item U1 ✅ DONE — `UserCommon/README.md` + the include-dir wiring pattern.**
 Owner: **Yoav**. Depends on: nothing.
 Create `UserCommon/` with a short `README.md` stating the convention above, and demonstrate the
 CMake wiring once (e.g. in the first real consumer below) so the pattern is copy-pasteable:
@@ -146,7 +146,7 @@ target_sources(<target> PRIVATE ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cp
 Verify: the directory exists, has no `CMakeLists.txt` of its own, and the README is legible to
 Sagi without needing to ask.
 
-**Item U2 — `TimeFormat` + `IRunErrorLog`/`RunErrorLog`.**
+**Item U2 ✅ DONE — `TimeFormat` + `IRunErrorLog`/`RunErrorLog`.**
 Owner: **Yoav**. Depends on: U1. Port from `../Drone-Mapper-ex2/include/drone_mapper/io/{TimeFormat,IRunErrorLog,RunErrorLog}.h`
 and `src/io/{TimeFormat,RunErrorLog}.cpp`. ISO-8601 UTC formatting; the log line format is
 `<ISO-8601 UTC> <ERROR_CODE> <message>`, flushed immediately, never at shutdown. This is needed by
@@ -158,7 +158,7 @@ Verify: unit-test the timestamp format against a fixed `std::chrono::system_cloc
 unit-test that a line written via `RunErrorLog` is readable from disk immediately after the call
 returns, before any explicit close/flush from the test.
 
-**Item U3 — `ConfigParseResult<T>`.**
+**Item U3 ✅ DONE — `ConfigParseResult<T>`.**
 Owner: **Yoav**. Depends on: nothing. Port the shape from
 `../Drone-Mapper-ex2/include/drone_mapper/io/ConfigParseResult.h`
 (`{ bool ok; T value; std::vector<common::types::ErrorRef> errors; }`), namespaced under
@@ -169,7 +169,7 @@ they can report "parsed, but with recoverable issues" without an exception or a 
 Verify: compiles standalone; a throwaway parser stub returning `ConfigParseResult<int>` builds
 clean under `-Wall -Wextra -Werror -pedantic`.
 
-**Item U4 — `SimulationCoordUtil`.**
+**Item U4 ✅ DONE — `SimulationCoordUtil`.**
 Owner: **Yoav**. Depends on: nothing. Port `worldInitialDronePosition` and `isDroneSpawnPassable`
 from `../Drone-Mapper-ex2/include/drone_mapper/SimulationCoordUtil.{h,cpp}`. First consumers:
 `Simulator`'s run-factory (world spawn position, offset-shifted mission bounds — item Y12) and
@@ -323,12 +323,12 @@ confirm the second call produces a distinct directory rather than colliding.
 
 ## Yoav's track: `MissionControl/` + Simulator world & data
 
-**Y1 — `MissionControl/CMakeLists.txt`.**
+**Y1 ✅ DONE — `MissionControl/CMakeLists.txt`.**
 Depends on: nothing. `SHARED` target, output name `MissionControl_207190406_209543255`, `PREFIX ""`,
 links `common::common`, exposes `common_mission_control/include` **PRIVATE**.
 Verify: `cmake --build --preset default` still succeeds tree-wide with an empty source list.
 
-**Y2 — Port `MockGPS`, `MockLidar`, `MockMovement`.**
+**Y2 ✅ DONE — Port `MockGPS`, `MockLidar`, `MockMovement`.**
 Depends on: nothing (implement directly against frozen `IGPS`/`ILidar`/`IDroneMovement`; the hidden
 map access can start against a minimal in-memory stand-in until Y3 lands, then be pointed at the
 real `Map3DImpl`). Source: `../Drone-Mapper-ex2/{include/drone_mapper,src}/Mock{GPS,Lidar,Movement}.*`
@@ -339,7 +339,7 @@ Verify: port the collision-detection test (from `test_mock_lidar.cpp`'s ex2 equi
 focused test); confirm `MockMovement` throws exactly on the documented collision case and not on a
 legal move adjacent to a wall.
 
-**Y3 — Port `Map3DImpl`.**
+**Y3 ✅ DONE — Port `Map3DImpl`.**
 Depends on: nothing structurally; needs the TinyNPY vcpkg dependency wired. Source:
 `../Drone-Mapper-ex2/{include/drone_mapper/Map3DImpl.h,src/Map3DImpl.cpp}` into `Simulator/src/`.
 Implements both `IMap3D` and `IMutableMap3D`; dtype dispatch per `docs/map3d-contract.md` (hidden
@@ -351,14 +351,14 @@ Verify: port `test_map3d_impl.cpp`, keeping the three ex2 dtype-regression cases
 hidden map value `> 1` → `Occupied`; `uint8` hidden map values `2`/`3`/`4`/`18`/`45` → `Occupied`;
 `int8` output map `-1` stays `Unmapped` (no unsigned-path clamping).
 
-**Y4 — Port `ScanResultToVoxels`.**
+**Y4 ✅ DONE — Port `ScanResultToVoxels`.**
 Depends on: nothing. Stays in `MissionControl/src/` per `docs/component-placement.md` — only
 `DroneControlImpl` calls it, so it does **not** go into `UserCommon/` (no second project needs it
 yet).
 Verify: port whichever ex2 unit coverage exists for it (folded into Y5's `DroneControlImpl` test if
 ex2 never isolated it).
 
-**Y5 — Port `DroneControlImpl`.**
+**Y5 ✅ DONE — Port `DroneControlImpl`.**
 Depends on: U4 (`SimulationCoordUtil`, if bounds math is needed), Y4. Implements the frozen
 `mission_control::IDroneControl`. Step order (frozen contract, `frozen-interfaces.mdc`): read GPS
 state → `algorithm.nextStep(state, latest_scan)` → validate movement → execute movement → scan →
@@ -372,7 +372,7 @@ Verify: port `test_drone_control.cpp` with hand-written fakes for `ILidar`/`IGPS
 own `MockMovement`. Confirm a fake `IDroneMovement` that throws on `advance()` produces an
 exception that is observable escaping `DroneControl::step()` in the test, not swallowed.
 
-**Y6 — Port `MissionControlImpl`.**
+**Y6 ✅ DONE — Port `MissionControlImpl`.**
 Depends on: Y5. Constructed from `common::MissionControlDependencies` (by value) — builds its own
 `DroneControlImpl` internally from the raw `ILidar&`/`IGPS&`/`IDroneMovement&` references (the
 ownership inversion from ex2 — see `docs/api-delta-ex2-to-ex3.md` §2). Drives the step loop until
@@ -385,12 +385,12 @@ Verify: `cmake --build --target MissionControl_207190406_209543255` clean.
 shows the constructor undefined (same check as S2). Port `test_mission_control.cpp`; confirm a run
 with `verbose = false` writes no extra file and one with `verbose = true` does.
 
-**Y7 — MissionControl tests wiring.**
+**Y7 ✅ DONE — MissionControl tests wiring.**
 Depends on: Y5, Y6. Add `MissionControl/CMakeLists.txt` test target reusing the root
 `GTest`/`enable_testing()` that Sagi's S3 already turned on.
 Verify: `ctest --preset default` picks up and passes the MissionControl suite alongside Algorithm's.
 
-**Y8 — YAML config + composition parsers.**
+**Y8 ✅ DONE — YAML config + composition parsers.**
 Depends on: U3 (`ConfigParseResult<T>`). Port
 `../Drone-Mapper-ex2/src/io/{DroneConfigYamlParser,LidarConfigYamlParser,MissionConfigYamlParser,SimulationConfigYamlParser,CompositionYamlParser}.cpp`
 into `Simulator/src/io/`, rebuilding the **nested** `simulation_mission_groups` shape (a
@@ -404,7 +404,7 @@ Verify: port `test_yaml_config_parsers.cpp`; parse `inputs/sim_compose.yaml` end
 exactly 6 (simulation, mission) pairs × 2 `drone_configs` × 2 `lidar_configs` = **24** run cells
 (per `docs/map3d-contract.md`).
 
-**Y9 — `SimulationRunFactoryImpl`.**
+**Y9 ✅ DONE — `SimulationRunFactoryImpl`.**
 Depends on: Y2, Y3, U4. Implements `simulator::ISimulationRunFactory::create(simulation_config,
 mission_config, drone_config, lidar_config, output_path)`. Builds the per-run mocks + hidden/output
 `Map3DImpl` pair; applies `simulation.map_axes_offset` to the mission's boundaries when constructing
@@ -418,7 +418,7 @@ Verify: unit test with hand-written lambda factories matching the exact frozen s
 dependency on Sagi's real registrar/loader. Confirm the returned `ISimulationRun` is non-null and
 the output map's `MapConfig` reflects the offset-shifted bounds for a house-scenario-shaped input.
 
-**Y10 — `SimulationRunImpl`.**
+**Y10 ⏳ DEFERRED — `SimulationRunImpl`.**
 Depends on: Y9, S8 (`MapsComparison` signature — stub body is fine to start). Implements
 `simulator::ISimulationRun::run()`: call `missionControl->runMission()`, `save()` the output map,
 score via `MapsComparison`, catch any exception escaping `runMission()` **here** — this is the
@@ -433,7 +433,7 @@ Verify: unit test with a fake `IMissionControl` that throws mid-`runMission()`; 
 `SimulationRunImpl::run()` does not propagate the exception further and instead returns a
 `-1`-equivalent result with a logged error.
 
-**Y11 — Per-run output naming (coordinate with S11).**
+**Y11 ⏳ DEFERRED — Per-run output naming (coordinate with S11).**
 Depends on: Y10, S11's chosen pattern. Whichever of Sagi/Yoav settles the exact per-run
 output-map/error-log filename pattern first documents it in `README.md`; the other's code follows
 that pattern rather than inventing a second one.
@@ -580,3 +580,24 @@ Not flagged because they don't change the split or verification: #2 (already act
 `UserCommon/` section above), #5 (`.cw` files — no parser reads them, nothing in this plan touches
 them), #7 (already settled by the frozen `MappingAlgorithmDependencies` header having no `verbose`
 field — not actually ambiguous for coding purposes, only for wording).
+
+---
+
+## Implementation open questions (raised during coding)
+
+These arose during Yoav's track and are not in `docs/open-questions.md`. They affect Y10 and downstream
+work and need a decision before those items are implemented.
+
+- **OQ-Y1 — Who owns the output map save when `output_map_file` is empty?**
+  `MissionControlImpl` calls `output_map.save(output_file)` inside `finalizeMission`. If the orchestrator
+  (or a test) passes an **empty** `output_path`, `Map3DImpl::save("")` throws and `finalizeMission` returns
+  a spurious `MAP_SAVE_FAILED` error, making an otherwise-successful mission report `Error`.
+  `SimulationRunImpl::run()` also saves the map after `runMission()` returns — so the map is saved twice
+  when `output_path` is non-empty.
+  **Working resolution (applied in code-review fixes):** `MissionControlImpl` no longer saves the map;
+  `SimulationRunImpl` is the sole save owner. The verbose log path for `MissionControlImpl` is derived from
+  `output_map_file_` only when that path is non-empty.
+  **Remaining question for Y10/S11:** when the Simulator intentionally wants no on-disk output for a
+  particular run (e.g., dry-run mode or in-process unit tests), the convention should be that an empty
+  `output_path` is passed and `SimulationRunImpl` skips the save silently. Verify this is consistent with
+  whatever naming convention S11 adopts for `OutputDirHelper`.

@@ -1,0 +1,103 @@
+// SimulationRunImpl.cpp
+// Drives one simulation run.
+//
+// NOTE: Scoring via MapsComparison is deferred (Y10). Until that step lands,
+// run() returns mission_score = -1.0 (the "not yet scored" sentinel).
+// All other behaviour — error propagation, output map saving, mission loop —
+// is complete.
+
+#include <Simulator/SimulationRunImpl.h>
+
+#include <stdexcept>
+
+namespace simulator {
+
+namespace {
+
+[[nodiscard]] types::ResolutionRequestStatus resolutionStatus(double factor) {
+    if (factor < 1.0) {
+        return types::ResolutionRequestStatus::IgnoredTooSmall;
+    }
+    if (factor > 1.0) {
+        return types::ResolutionRequestStatus::Accepted;
+    }
+    return types::ResolutionRequestStatus::Ignored;
+}
+
+} // namespace
+
+SimulationRunImpl::SimulationRunImpl(
+    std::unique_ptr<common::IMap3D>            hidden_map,
+    std::unique_ptr<common::IMutableMap3D>     output_map,
+    std::unique_ptr<common::IGPS>              gps,
+    std::unique_ptr<common::IDroneMovement>    movement,
+    std::unique_ptr<common::ILidar>            lidar,
+    std::unique_ptr<common::IMappingAlgorithm> mapping_algorithm,
+    std::unique_ptr<common::IMissionControl>   mission_control,
+    types::SimulationConfigData                simulation_config,
+    common::types::MissionConfigData           mission_config,
+    std::filesystem::path                      output_map_file,
+    std::vector<common::types::ErrorRef>       startup_errors)
+    : hidden_map_(std::move(hidden_map)),
+      output_map_(std::move(output_map)),
+      gps_(std::move(gps)),
+      movement_(std::move(movement)),
+      lidar_(std::move(lidar)),
+      mapping_algorithm_(std::move(mapping_algorithm)),
+      mission_control_(std::move(mission_control)),
+      simulation_config_(std::move(simulation_config)),
+      mission_config_(std::move(mission_config)),
+      output_map_file_(std::move(output_map_file)),
+      startup_errors_(std::move(startup_errors)) {
+    if (!hidden_map_ || !output_map_ || !gps_ || !movement_ ||
+        !lidar_ || !mapping_algorithm_ || !mission_control_) {
+        throw std::invalid_argument("SimulationRunImpl: all dependencies must be non-null.");
+    }
+}
+
+types::SimulationResult SimulationRunImpl::run() {
+    types::SimulationResult result{};
+    result.simulation_config = simulation_config_;
+    result.mission_config    = mission_config_;
+    result.output_map_file   = output_map_file_;
+    result.resolution_request_status =
+        resolutionStatus(mission_config_.output_mapping_resolution_factor);
+
+    if (!startup_errors_.empty()) {
+        result.mission_score = -1.0;
+        result.mission_results.push_back(common::types::MissionRunResult{
+            common::types::MissionRunStatus::Error,
+            0,
+            startup_errors_,
+        });
+        return result;
+    }
+
+    // Let any exception escaping runMission() propagate — it is caught at the
+    // worker-thread boundary by the Simulator (the mandatory collision scenario).
+    const common::types::MissionRunResult mission_result = mission_control_->runMission();
+    result.mission_results.push_back(mission_result);
+    result.output_map_config = output_map_->getMapConfig();
+
+    if (!output_map_file_.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(output_map_file_.parent_path(), ec);
+        try {
+            output_map_->save(output_map_file_);
+        } catch (const std::exception& ex) {
+            result.mission_results.push_back(common::types::MissionRunResult{
+                common::types::MissionRunStatus::Error,
+                0,
+                {common::types::ErrorRef{"MAP_SAVE_FAILED", ex.what()}},
+            });
+            result.mission_score = -1.0;
+            return result;
+        }
+    }
+
+    // Scoring via MapsComparison is deferred to Y10.
+    result.mission_score = -1.0;
+    return result;
+}
+
+} // namespace simulator
