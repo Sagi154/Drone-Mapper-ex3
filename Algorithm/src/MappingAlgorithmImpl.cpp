@@ -5,7 +5,6 @@
 
 #include "MappingAlgorithmFrontier.h"
 
-#include <Common/IMutableMap3D.h>
 #include <Common/MappingAlgorithmRegistration.h>
 
 #include <cmath>
@@ -17,8 +16,6 @@
 namespace Algorithm_207190406_209543255 {
 
 namespace types = common::types;
-using common::IMap3D;
-using common::IMutableMap3D;
 using common::Orientation;
 using common::Position3D;
 using common::cm;
@@ -92,7 +89,6 @@ struct MappingAlgorithmImpl_207190406_209543255::Impl {
     detail::GridIntMap explore_dist_cache{};
     std::optional<detail::GridKey> pending_frontier_visit{};
     bool finished = false;
-    IMutableMap3D* mutable_output = nullptr;
     int no_frontier_stuck_cycles = 0;
     std::size_t prev_unmapped_count = std::numeric_limits<std::size_t>::max();
     int no_progress_cycles = 0;
@@ -109,8 +105,6 @@ MappingAlgorithmImpl_207190406_209543255::~MappingAlgorithmImpl_207190406_209543
 MappingAlgorithmImpl_207190406_209543255::MappingAlgorithmImpl_207190406_209543255(
     common::MappingAlgorithmDependencies dependencies)
     : common::IMappingAlgorithm(dependencies), impl_(std::make_unique<Impl>()) {
-    impl_->mutable_output = dynamic_cast<IMutableMap3D*>(
-        const_cast<IMap3D*>(&dependencies.output_map));
     // Mid-path scanning only for tight step budgets (large_room); full matrix runs
     // showed it regresses large_out when enabled globally.
     impl_->enable_scan_during_travel = mission_config_.max_steps <= 500;
@@ -359,6 +353,7 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::handleFronti
                 output_map_, state.position, drone_config_.radius, impl_->blocked_cells,
                 &impl_->explore_dist_cache);
             if (explore.found && !explore.path.empty()) {
+                impl_->no_frontier_stuck_cycles = 0;
                 impl_->pending_frontier_visit.reset();
                 impl_->current_path = compressPath(explore.path);
                 impl_->path_index = 0;
@@ -372,6 +367,7 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::handleFronti
             const detail::FrontierPathResult unstick =
                 impl_->frontier.findUnstickPath(output_map_, state.position, drone_config_.radius);
             if (unstick.found && !unstick.path.empty()) {
+                impl_->no_frontier_stuck_cycles = 0;
                 impl_->pending_frontier_visit.reset();
                 impl_->current_path = compressPath(unstick.path);
                 impl_->path_index = 0;
@@ -384,6 +380,7 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::handleFronti
         const detail::FrontierPathResult wander = impl_->frontier.findAnyPassableNeighbor(
             output_map_, state.position, drone_config_.radius, impl_->blocked_cells);
         if (wander.found && !wander.path.empty()) {
+            impl_->no_frontier_stuck_cycles = 0;
             impl_->pending_frontier_visit.reset();
             impl_->current_path = compressPath(wander.path);
             impl_->path_index = 0;
@@ -439,10 +436,6 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::handleMoving
             const Position3D& wp = impl_->current_path[impl_->path_index];
             const auto blocked_key = detail::quantizePosition(wp, output_map_.getMapConfig());
             impl_->blocked_cells.insert(blocked_key);
-            if (impl_->mutable_output != nullptr &&
-                output_map_.atVoxel(wp) != types::VoxelOccupancy::Unmapped) {
-                impl_->mutable_output->set(wp, types::VoxelOccupancy::Occupied);
-            }
             impl_->moving_stall_ticks = 0;
             impl_->phase = Phase::Planning;
             return handlePlanningPhase(state);
