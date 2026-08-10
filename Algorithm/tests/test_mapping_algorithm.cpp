@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -17,6 +18,7 @@
 #include <optional>
 #include <set>
 #include <tuple>
+#include <vector>
 
 namespace Algo = Algorithm_207190406_209543255;
 using Impl    = Algo::MappingAlgorithmImpl_207190406_209543255;
@@ -523,4 +525,58 @@ TEST(MappingAlgorithm, HandlesNonNullScanResultWithoutCrashOrPrematureFinish) {
 
     EXPECT_EQ(second_cmd.status, ct::AlgorithmStatus::Working);
     EXPECT_NE(second_cmd.status, ct::AlgorithmStatus::Finished);
+}
+
+// What: drone fails to advance toward a waypoint for kMaxMovingStallTicks steps.
+// Expected: stall recovery only records blocked_cells; output map voxels stay unchanged.
+TEST(MappingAlgorithm, StallPathDoesNotMutateMap) {
+    const ct::MapConfig config = makeCorridorConfig();
+    constexpr std::array<int, 3> dims{11, 3, 3};
+    Map output_map{dims, config};
+    fillEmptyBox(output_map, 0, 4, 0, 2, 0, 2, config);
+
+    const auto snapshotOccupancy = [&]() {
+        std::vector<ct::VoxelOccupancy> cells;
+        cells.reserve(static_cast<std::size_t>(dims[0] * dims[1] * dims[2]));
+        for (int x = 0; x < dims[0]; ++x) {
+            for (int y = 0; y < dims[1]; ++y) {
+                for (int z = 0; z < dims[2]; ++z) {
+                    cells.push_back(output_map.atVoxel(gridPoint(x, y, z, config)));
+                }
+            }
+        }
+        return cells;
+    };
+
+    const auto mc = makeMissionConfig();
+    const auto lc = makeLidarConfig();
+    const auto dc = makeDroneConfig();
+    Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
+
+    const ct::DroneState state{
+        gridPoint(2, 1, 1, config), Orientation{0.0 * deg, 0.0 * deg}, 0};
+
+    // Reach Moving and emit a non-hover movement (establishes last_position).
+    const auto move_cmd = firstCommandMatching(
+        algorithm, state, 500, [](const ct::MappingStepCommand& step) {
+            return step.movement.has_value() &&
+                   step.movement->type != ct::MovementCommandType::Hover;
+        });
+    ASSERT_TRUE(move_cmd.has_value());
+
+    const auto before = snapshotOccupancy();
+
+    // Hold position long enough to trip stall recovery (kMaxMovingStallTicks == 8).
+    constexpr int kStallTicks = 8;
+    for (int tick = 0; tick < kStallTicks + 2; ++tick) {
+        const ct::MappingStepCommand cmd = algorithm.nextStep(state, nullptr);
+        EXPECT_NE(cmd.status, ct::AlgorithmStatus::Finished)
+            << "unexpected finish during stall drive at tick " << tick;
+    }
+
+    const auto after = snapshotOccupancy();
+    ASSERT_EQ(before.size(), after.size());
+    for (std::size_t i = 0; i < before.size(); ++i) {
+        EXPECT_EQ(before[i], after[i]) << "voxel " << i << " mutated by stall path";
+    }
 }

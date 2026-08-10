@@ -258,6 +258,16 @@ set_target_properties(unregistered_plugin PROPERTIES
 )
 drone_warnings(unregistered_plugin)
 
+add_library(valid_mission_control_plugin SHARED
+    tests/fixtures/valid_mission_control_plugin.cpp
+)
+set_target_properties(valid_mission_control_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(valid_mission_control_plugin PRIVATE common::common)
+drone_warnings(valid_mission_control_plugin)
+
 add_executable(simulator_loader_test
     tests/test_plugin_loader.cpp
     $<TARGET_OBJECTS:simulator_registration>
@@ -270,7 +280,11 @@ target_link_libraries(simulator_loader_test PRIVATE
 target_compile_definitions(simulator_loader_test PRIVATE
     PLUGIN_FIXTURES_DIR="${PLUGIN_FIXTURES_OUT}"
 )
-add_dependencies(simulator_loader_test valid_algorithm_plugin unregistered_plugin)
+add_dependencies(simulator_loader_test
+    valid_algorithm_plugin
+    unregistered_plugin
+    valid_mission_control_plugin
+)
 drone_warnings(simulator_loader_test)
 
 add_executable(simulator_work_test

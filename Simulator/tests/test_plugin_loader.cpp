@@ -97,3 +97,42 @@ TEST_F(PluginLoaderTest, DirectoryLoadCollectsValidAndFailed) {
     }
     EXPECT_TRUE(saw_valid);
 }
+
+TEST_F(PluginLoaderTest, ReloadBlockedAfterFailedRegistration) {
+    simulator::PluginLoader loader;
+    const fs::path so = fixturePath("unregistered_plugin.so");
+    ASSERT_TRUE(fs::exists(so)) << so;
+
+    const auto first = loader.loadAlgorithmSo(so);
+    ASSERT_EQ(first.errors.size(), 1U);
+    EXPECT_EQ(first.errors.front(), "unregistered_plugin.so");
+    EXPECT_TRUE(loader.algorithms().empty());
+
+    const auto second = loader.loadAlgorithmSo(so);
+    ASSERT_EQ(second.errors.size(), 1U);
+    EXPECT_EQ(second.errors.front(), "unregistered_plugin.so");
+    EXPECT_TRUE(loader.algorithms().empty());
+}
+
+TEST_F(PluginLoaderTest, WrongKindSoDoesNotLeaveDanglingPending) {
+    simulator::PluginLoader loader;
+    const fs::path mc_so = fixturePath("valid_mission_control_plugin.so");
+    ASSERT_TRUE(fs::exists(mc_so)) << mc_so;
+
+    // MC .so loaded as algorithm: registers into the wrong pending slot, then fails.
+    const auto wrong_kind = loader.loadAlgorithmSo(mc_so);
+    ASSERT_EQ(wrong_kind.errors.size(), 1U);
+    EXPECT_EQ(wrong_kind.errors.front(), "valid_mission_control_plugin.so");
+    EXPECT_TRUE(loader.algorithms().empty());
+    EXPECT_TRUE(loader.missionControls().empty());
+
+    // unloadAll must not trip over a dangling pending factory from the closed image.
+    loader.unloadAll();
+
+    // A subsequent correct MC load still succeeds.
+    const auto ok = loader.loadMissionControlSo(mc_so);
+    EXPECT_TRUE(ok.errors.empty());
+    ASSERT_EQ(loader.missionControls().size(), 1U);
+    EXPECT_EQ(loader.missionControls().front().filename, "valid_mission_control_plugin.so");
+    ASSERT_TRUE(static_cast<bool>(loader.missionControls().front().factory));
+}
