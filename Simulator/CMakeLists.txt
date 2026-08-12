@@ -199,6 +199,55 @@ target_include_directories(simulator_scoring PUBLIC
 )
 drone_warnings(simulator_scoring)
 
+# SimulationRunImpl (in test_simulation_run_factory) calls MapsComparison.
+target_link_libraries(test_simulation_run_factory PRIVATE simulator::scoring)
+
+# Report YAML writers (comparative / competitive / per-plugin).
+add_library(simulator_report_writers STATIC
+    src/io/SimulationOutputYamlWriter.cpp
+    src/io/ComparativeReportWriter.cpp
+    src/io/CompetitiveReportWriter.cpp
+)
+add_library(simulator::report_writers ALIAS simulator_report_writers)
+target_include_directories(simulator_report_writers PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+)
+target_link_libraries(simulator_report_writers PUBLIC common::common yaml-cpp::yaml-cpp)
+drone_warnings(simulator_report_writers)
+
+add_executable(simulator_report_writers_test
+    tests/test_simulation_output_yaml_writer.cpp
+    tests/test_comparative_report_writer.cpp
+    tests/test_competitive_report_writer.cpp
+)
+target_link_libraries(simulator_report_writers_test PRIVATE
+    simulator::report_writers
+    GTest::gtest_main
+)
+drone_warnings(simulator_report_writers_test)
+
+# Collision-checked output directory helper.
+add_library(simulator_output_dir STATIC
+    src/io/OutputDirHelper.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
+)
+add_library(simulator::output_dir ALIAS simulator_output_dir)
+target_include_directories(simulator_output_dir PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
+)
+drone_warnings(simulator_output_dir)
+
+add_executable(simulator_output_dir_test
+    tests/test_output_dir_helper.cpp
+)
+target_link_libraries(simulator_output_dir_test PRIVATE
+    simulator::output_dir
+    GTest::gtest_main
+)
+drone_warnings(simulator_output_dir_test)
+
 # Run-matrix orchestrator (frozen ISimulationRunFactory / ISimulationRun).
 add_library(simulator_orchestrator STATIC
     src/RunMatrixOrchestrator.cpp
@@ -321,6 +370,8 @@ gtest_discover_tests(simulator_loader_test)
 gtest_discover_tests(simulator_work_test)
 gtest_discover_tests(simulator_scoring_test)
 gtest_discover_tests(simulator_orchestrator_test)
+gtest_discover_tests(simulator_report_writers_test)
+gtest_discover_tests(simulator_output_dir_test)
 
 set(SIMULATOR_MAIN_SOURCES
     src/main.cpp
@@ -330,6 +381,10 @@ set(SIMULATOR_MAIN_SOURCES
     src/MockMovement.cpp
     src/SimulationRunImpl.cpp
     src/SimulationRunFactoryImpl.cpp
+    src/io/SimulationOutputYamlWriter.cpp
+    src/io/ComparativeReportWriter.cpp
+    src/io/CompetitiveReportWriter.cpp
+    src/io/OutputDirHelper.cpp
     ${YAML_PARSER_SOURCES}
     ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/RunErrorLog.cpp
@@ -352,6 +407,7 @@ target_link_libraries(simulator_207190406_209543255 PRIVATE
     simulator::registrar
     simulator::orchestrator
     simulator::cli
+    simulator::scoring
     TinyNPY::TinyNPY
     yaml-cpp::yaml-cpp
     Threads::Threads

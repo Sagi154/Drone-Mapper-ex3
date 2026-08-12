@@ -2,7 +2,9 @@
 
 #include <Simulator/ISimulationRun.h>
 
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <utility>
 
 namespace simulator {
@@ -21,6 +23,14 @@ namespace {
     result.output_map_file = output_path;
     result.mission_score   = -1.0;
     return result;
+}
+
+[[nodiscard]] std::filesystem::path outputMapPath(const std::filesystem::path& output_root,
+                                                  const std::string& plugin_filename,
+                                                  std::size_t cell_index) {
+    std::ostringstream padded;
+    padded << std::setw(4) << std::setfill('0') << cell_index;
+    return output_root / (plugin_filename + "_run_" + padded.str() + "_output_map.npy");
 }
 
 } // namespace
@@ -83,8 +93,7 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
             PluginMatrixBinding binding   = plugins[plugin_index];
 
             const std::filesystem::path run_out =
-                output_root / binding.plugin_filename /
-                (std::to_string(cell_index) + "_output_map.npy");
+                outputMapPath(output_root, binding.plugin_filename, cell_index);
 
             if (binding.factory == nullptr || cell.simulation == nullptr ||
                 cell.mission == nullptr || cell.drone == nullptr || cell.lidar == nullptr) {
@@ -104,10 +113,9 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
             threw[flat_index] = 1;
             const std::size_t plugin_index = flat_index / cell_count;
             const std::size_t cell_index   = flat_index % cell_count;
-            table[plugin_index].results[cell_index] =
-                makeFailureResult(cells[cell_index],
-                                  output_root / plugins[plugin_index].plugin_filename /
-                                      (std::to_string(cell_index) + "_output_map.npy"));
+            table[plugin_index].results[cell_index] = makeFailureResult(
+                cells[cell_index],
+                outputMapPath(output_root, plugins[plugin_index].plugin_filename, cell_index));
         });
 
     // Log throws from the main thread only (after join) — avoid concurrent cerr.

@@ -1,12 +1,15 @@
 // SimulationRunImpl.cpp
 // Drives one simulation run.
 //
-// NOTE: Scoring via MapsComparison is deferred. Until that step lands,
-// run() returns mission_score = -1.0 (the "not yet scored" sentinel).
 // Exceptions from runMission() are contained here so the output map can still
-// be saved and the matrix can continue.
+// be saved and the matrix can continue. Scoring uses MapsComparison with a
+// world-space spawn from SimulationCoordUtil.
 
 #include <Simulator/SimulationRunImpl.h>
+
+#include <Simulator/MapsComparison.h>
+
+#include <UserCommon_207190406_209543255/SimulationCoordUtil.h>
 
 #include <stdexcept>
 
@@ -110,8 +113,15 @@ types::SimulationResult SimulationRunImpl::run() {
         }
     }
 
-    // Scoring via MapsComparison is deferred to Y10.
-    result.mission_score = -1.0;
+    // Score only when the mission reached a real terminal state; Error (incl.
+    // the caught runMission()/save exceptions above) stays at -1.
+    if (mission_result.status == common::types::MissionRunStatus::Error) {
+        result.mission_score = -1.0;
+    } else {
+        const common::Position3D spawn =
+            UserCommon_207190406_209543255::worldInitialDronePosition(simulation_config_);
+        result.mission_score = MapsComparison::compare(*hidden_map_, *output_map_, spawn);
+    }
     return result;
 }
 

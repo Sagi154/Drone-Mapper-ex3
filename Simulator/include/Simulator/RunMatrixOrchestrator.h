@@ -50,7 +50,8 @@ public:
     /// Run the full matrix for every plugin binding.
     /// Result table is pre-sized to plugins × cells; each slot is written exactly once.
     /// `num_threads` follows WorkDistributor semantics (≤1 → main only).
-    /// Per-run output paths are `{output_root}/{plugin}/{cell_index}/`.
+    /// Per-run output paths are `{output_root}/{plugin}_run_<NNNN>_output_map.npy`
+    /// (NNNN = zero-padded flat cell index, unique across the whole run matrix).
     [[nodiscard]] static std::vector<PluginMatrixResult> run(
         const std::vector<PluginMatrixBinding>& plugins,
         const types::SimulationCompositionData& composition,
