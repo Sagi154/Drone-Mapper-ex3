@@ -199,6 +199,9 @@ target_include_directories(simulator_scoring PUBLIC
 )
 drone_warnings(simulator_scoring)
 
+# SimulationRunImpl (in test_simulation_run_factory) calls MapsComparison.
+target_link_libraries(test_simulation_run_factory PRIVATE simulator::scoring)
+
 # Run-matrix orchestrator (frozen ISimulationRunFactory / ISimulationRun).
 add_library(simulator_orchestrator STATIC
     src/RunMatrixOrchestrator.cpp
@@ -352,6 +355,7 @@ target_link_libraries(simulator_207190406_209543255 PRIVATE
     simulator::registrar
     simulator::orchestrator
     simulator::cli
+    simulator::scoring
     TinyNPY::TinyNPY
     yaml-cpp::yaml-cpp
     Threads::Threads
