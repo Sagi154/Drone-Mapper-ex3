@@ -202,6 +202,31 @@ drone_warnings(simulator_scoring)
 # SimulationRunImpl (in test_simulation_run_factory) calls MapsComparison.
 target_link_libraries(test_simulation_run_factory PRIVATE simulator::scoring)
 
+# Report YAML writers (comparative / competitive / per-plugin).
+add_library(simulator_report_writers STATIC
+    src/io/SimulationOutputYamlWriter.cpp
+    src/io/ComparativeReportWriter.cpp
+    src/io/CompetitiveReportWriter.cpp
+)
+add_library(simulator::report_writers ALIAS simulator_report_writers)
+target_include_directories(simulator_report_writers PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+)
+target_link_libraries(simulator_report_writers PUBLIC common::common yaml-cpp::yaml-cpp)
+drone_warnings(simulator_report_writers)
+
+add_executable(simulator_report_writers_test
+    tests/test_simulation_output_yaml_writer.cpp
+    tests/test_comparative_report_writer.cpp
+    tests/test_competitive_report_writer.cpp
+)
+target_link_libraries(simulator_report_writers_test PRIVATE
+    simulator::report_writers
+    GTest::gtest_main
+)
+drone_warnings(simulator_report_writers_test)
+
 # Run-matrix orchestrator (frozen ISimulationRunFactory / ISimulationRun).
 add_library(simulator_orchestrator STATIC
     src/RunMatrixOrchestrator.cpp
@@ -324,6 +349,7 @@ gtest_discover_tests(simulator_loader_test)
 gtest_discover_tests(simulator_work_test)
 gtest_discover_tests(simulator_scoring_test)
 gtest_discover_tests(simulator_orchestrator_test)
+gtest_discover_tests(simulator_report_writers_test)
 
 set(SIMULATOR_MAIN_SOURCES
     src/main.cpp
