@@ -290,12 +290,13 @@ ex2's recorded reference ranges from `../Drone-Mapper-ex2/docs/HLD.md` (house_lo
 ~92–96%, small_room ~87–90%, large_out ~80–88%, small_out ~75–89%, house_full ~56–62%) — a large
 drop means the port broke the offset or dtype handling, not the scoring logic itself.
 
-**S9 — Run-matrix orchestrator.** ✅ **DONE** (not wired into `main()` yet — needs Yoav's Y9 factory)
+**S9 — Run-matrix orchestrator.** ✅ **DONE** (wired into `main()` as of the end-to-end executable)
 Depends on: S6 (loaded plugins), S7 (threading), the frozen `simulator::ISimulationRunFactory` /
 `simulator::ISimulationRun` interfaces (already exist — **not** Yoav's concrete classes yet). Given
 loaded plugins and a `simulator::types::SimulationCompositionData`, expand the run matrix and
 dispatch each cell through `ISimulationRunFactory::create(...)` → `ISimulationRun::run()`,
 collecting `simulator::types::SimulationResult`s into the pre-allocated table.
+Per-cell output path (interim, until S11/Y11): `{output_root}/{plugin_filename}/{cell_index}_output_map.npy`.
 Verify: unit test against a hand-written fake `ISimulationRunFactory`/`ISimulationRun` (returns
 canned `SimulationResult`s) and a **hand-built** `SimulationCompositionData` literal — the frozen
 type lets this be written and tested without waiting on Yoav's YAML parser at all. Confirm the
@@ -423,20 +424,22 @@ Verify: unit test with hand-written lambda factories matching the exact frozen s
 dependency on Sagi's real registrar/loader. Confirm the returned `ISimulationRun` is non-null and
 the output map's `MapConfig` reflects the offset-shifted bounds for a house-scenario-shaped input.
 
-**Y10 ⏳ DEFERRED — `SimulationRunImpl`.**
+**Y10 ✅ DONE — `SimulationRunImpl`.**
 Depends on: Y9, S8 (`MapsComparison` signature — stub body is fine to start). Implements
-`simulator::ISimulationRun::run()`: call `missionControl->runMission()`, `save()` the output map,
-score via `MapsComparison`, catch any exception escaping `runMission()` **here** — this is the
-actual catch target for the mandatory `MockMovement` collision scenario (`DroneControl` in Y5 lets
-it propagate; this is where it stops), converting it into a `-1`-scored `SimulationResult` plus an
-immediate log entry rather than propagating into the worker thread. Populate
-`resolution_request_status` (`ACCEPTED`/`IGNORED`/`IGNORED TOO SMALL`) per run.
+`simulator::ISimulationRun::run()`: call `missionControl->runMission()`, `save()` the output map
+(skipped when `output_path` is empty — OQ-Y1), catch any exception escaping `runMission()` **here**
+— this is the actual catch target for the mandatory `MockMovement` collision scenario (`DroneControl`
+in Y5 lets it propagate; this is where it stops), converting it into a `-1`-scored `SimulationResult`
+rather than propagating into the worker thread. Populate `resolution_request_status`
+(`ACCEPTED`/`IGNORED`/`IGNORED TOO SMALL`) per run. Scoring via `MapsComparison::compare()` is still
+deferred (stub returns `-1.0` until S8's full body lands).
 Note: `SimulationResult::mission_results` is declared as a `std::vector` in the frozen
 `SimulationTypes.h` even though `create()` takes a single `mission_config` — the straightforward
 implementation populates it with the single `runMission()` outcome for that run.
 Verify: unit test with a fake `IMissionControl` that throws mid-`runMission()`; confirm
 `SimulationRunImpl::run()` does not propagate the exception further and instead returns a
-`-1`-equivalent result with a logged error.
+`-1`-equivalent result with a logged error. End-to-end smoke against real plugins confirmed
+exception containment + map save on 2026-08-12.
 
 **Y11 ⏳ DEFERRED — Per-run output naming (coordinate with S11).**
 Depends on: Y10, S11's chosen pattern. Whichever of Sagi/Yoav settles the exact per-run
@@ -459,31 +462,33 @@ people compile and test independently.
 | `SimulationRunFactoryImpl` concrete class (S9 ↔ Y9) | Yoav's constructor signature + a compiling `create()` | — | Yoav pushes a compiling `SimulationRunFactoryImpl.h`/`.cpp` with the agreed constructor and a stub `create()` (returns a trivially-succeeding fake run) on day one of Y9, before the real body is finished, so Sagi's orchestrator (S9) always has something concrete to `make_unique` against. |
 | Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | Whoever decides first writes the pattern into `README.md`; the other follows it — no code dependency, just one shared doc. |
 | `Simulator/CMakeLists.txt` final source list | Yoav's file list | Sagi's file list | Add sources incrementally as each item lands rather than merging once at the end; filenames don't collide — layout is **decided** (see §Simulator layout above): core under `Simulator/src/`, I/O under `Simulator/src/io/`, tests under `Simulator/tests/` (+ `fixtures/` for loader stubs). |
-| End-to-end run (both CLI modes, real plugins) | Yoav's `Map3DImpl`/mocks/run-factory | Sagi's loader/CLI/threading/report writer | See the vertical slice below — do this with **minimal** versions of everything, before either side is feature-complete. |
+| End-to-end run (both CLI modes, real plugins) | Yoav's `Map3DImpl`/mocks/run-factory | Sagi's loader/CLI/threading/report writer | ✅ **DONE 2026-08-12** — see vertical slice below. Report writers (S10) and final output naming (S11/Y11) still open. |
 
 ---
 
-## Vertical slice — do this as soon as minimal versions exist, before finishing CLI/YAML/threading
+## Vertical slice — ✅ DONE (2026-08-12)
 
-Waiting until both tracks are "done" to try running the real binary end to end is the single
+Waiting until both tracks are "done" to try running the real binary end to end was the single
 biggest integration-risk item in this plan (dependency-struct shape, `dlopen`/`ENABLE_EXPORTS`
-wiring, and factory plumbing are all new to ex3 and easy to get subtly wrong). Do this the moment
-these exist, in whatever minimal/stub form:
+wiring, and factory plumbing are all new to ex3 and easy to get subtly wrong). Landed as a fuller
+slice than the original "hardcoded one cell" sketch — real CLI + YAML composition + threading were
+already available, so `main.cpp` wired those instead of stubs.
 
-- Sagi: S2 (even a `MappingAlgorithmImpl` that just hovers and finishes after N steps), S5, S6
-  (loader can `dlopen` one `.so` and retrieve one factory).
-- Yoav: Y2 (mocks, even trivial ones that never collide), Y3 (even a fixed tiny in-memory map),
-  Y6 (a `MissionControlImpl` that runs a couple of steps and returns `Completed`), Y9/Y10 (stub
-  `create()`/`run()` is enough).
-- Joint: a minimal `Simulator/CMakeLists.txt` executable target with `ENABLE_EXPORTS ON`, linking
-  `${CMAKE_DL_LIBS}`, and a `main()` that hardcodes one simulation/mission/drone/lidar config (no
-  CLI parsing, no YAML, no threading yet) and calls the loader → run-factory → run path directly.
+**What landed:**
+- `Simulator/src/main.cpp` — `parseSimulationCliArgs` → `parseCompositionFile` → `PluginLoader`
+  (comparative or competition) → `SimulationRunFactoryImpl` bindings → `RunMatrixOrchestrator::run`
+  → summary print → destroy factories → `unloadAll`. Never calls `exit()`.
+- `Simulator/CMakeLists.txt` — `add_executable(simulator_207190406_209543255 ...)` with
+  `ENABLE_EXPORTS ON` and `$<TARGET_OBJECTS:simulator_registration>`.
+- `SimulationRunImpl` — catch `runMission()` exceptions (mandatory `MockMovement` collision target),
+  still attempt map save, return score `-1`.
+- Orchestrator interim map path — `{output_root}/{plugin}/{cell}_output_map.npy`.
 
-Verify (joint): the built `simulator_207190406_209543255` successfully `dlopen`s both real `.so`
-files, runs one mission end to end, and writes one output map without crashing. This is the proof
-that `MissionControlDependencies`/`MappingAlgorithmDependencies`/the registration macros/
-`ENABLE_EXPORTS` are all wired correctly — everything built after this point is filling in CLI
-parsing, YAML parsing, threading, and report formatting around a mechanism already proven to work.
+**Verified jointly against `inputs/sim_compose.yaml` (both CLI modes):** binary exits 0; both real
+`.so`s `dlopen`; 24 `SimulationResult`s produced; output `.npy` maps written. This proves
+`MissionControlDependencies`/`MappingAlgorithmDependencies`/the registration macros/`ENABLE_EXPORTS`
+are wired correctly. Remaining work around this mechanism: S8 scoring body, S10 report YAML, S11/Y11
+naming (replace the temp `simulator_vertical_slice_<epoch>` output root in `main.cpp`).
 
 ---
 
@@ -602,7 +607,6 @@ work and need a decision before those items are implemented.
   **Working resolution (applied in code-review fixes):** `MissionControlImpl` no longer saves the map;
   `SimulationRunImpl` is the sole save owner. The verbose log path for `MissionControlImpl` is derived from
   `output_map_file_` only when that path is non-empty.
-  **Remaining question for Y10/S11:** when the Simulator intentionally wants no on-disk output for a
-  particular run (e.g., dry-run mode or in-process unit tests), the convention should be that an empty
-  `output_path` is passed and `SimulationRunImpl` skips the save silently. Verify this is consistent with
-  whatever naming convention S11 adopts for `OutputDirHelper`.
+  **Resolution confirmed:** empty `output_path` → `SimulationRunImpl` skips the save silently (no
+  `MAP_SAVE_FAILED`). Keep this convention when S11's `OutputDirHelper` lands — pass a real path only
+  when an on-disk map is wanted.
