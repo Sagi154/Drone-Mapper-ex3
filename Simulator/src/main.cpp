@@ -1,12 +1,16 @@
 #include <Simulator/PluginLoader.h>
 #include <Simulator/RunMatrixOrchestrator.h>
 #include <Simulator/SimulationRunFactoryImpl.h>
+#include <Simulator/io/ComparativeReportWriter.h>
+#include <Simulator/io/CompetitiveReportWriter.h>
+#include <Simulator/io/OutputDirHelper.h>
 #include <Simulator/io/SimulationCli.h>
+#include <Simulator/io/SimulationOutputYamlWriter.h>
 #include <Simulator/io/YamlConfigParsers.h>
 
 #include <UserCommon_207190406_209543255/RunErrorLog.h>
+#include <UserCommon_207190406_209543255/TimeFormat.h>
 
-#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -18,13 +22,6 @@ namespace fs = std::filesystem;
 namespace sim_io = simulator::io;
 namespace UC = UserCommon_207190406_209543255;
 
-[[nodiscard]] fs::path makeTempOutputRoot() {
-    const auto now = std::chrono::system_clock::now();
-    const auto seconds =
-        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    return fs::temp_directory_path() / ("simulator_vertical_slice_" + std::to_string(seconds));
-}
-
 } // namespace
 
 int main(int argc, char** argv) {
@@ -35,11 +32,17 @@ int main(int argc, char** argv) {
     }
     const sim_io::SimulationCliArgs& args = cli.args;
 
-    const fs::path output_root = makeTempOutputRoot();
+    const sim_io::OutputDirKind dir_kind = args.mode == sim_io::SimulatorMode::Comparative
+                                               ? sim_io::OutputDirKind::Comparative
+                                               : sim_io::OutputDirKind::Competition;
+    const fs::path base_folder = args.mode == sim_io::SimulatorMode::Comparative
+                                     ? args.mission_control_folder
+                                     : args.algorithms_folder;
+
     std::error_code mkdir_ec;
-    fs::create_directories(output_root, mkdir_ec);
+    const fs::path output_root = sim_io::createOutputDir(base_folder, dir_kind, mkdir_ec);
     if (mkdir_ec) {
-        std::cerr << "error: could not create output directory " << output_root << ": "
+        std::cerr << "error: could not create output directory under " << base_folder << ": "
                   << mkdir_ec.message() << '\n';
         return 0;
     }
@@ -60,6 +63,7 @@ int main(int argc, char** argv) {
     std::vector<simulator::PluginMatrixBinding> bindings;
     // Factories are non-owning per PluginMatrixBinding — keep them alive here.
     std::vector<std::unique_ptr<simulator::SimulationRunFactoryImpl>> factories;
+    std::vector<std::string> failed_plugins;
 
     if (args.mode == sim_io::SimulatorMode::Comparative) {
         const auto algo_outcome = loader.loadAlgorithmSo(args.algorithm);
@@ -71,6 +75,7 @@ int main(int argc, char** argv) {
             loader.loadMissionControlsFromDirectory(args.mission_control_folder);
         for (const auto& name : mc_outcome.errors) {
             std::cerr << "warning: mission control failed to load: " << name << '\n';
+            failed_plugins.push_back(name);
         }
         const auto& algorithm_factory = loader.algorithms().front().factory;
         for (const auto& mc : loader.missionControls()) {
@@ -87,6 +92,7 @@ int main(int argc, char** argv) {
         const auto algo_outcome = loader.loadAlgorithmsFromDirectory(args.algorithms_folder);
         for (const auto& name : algo_outcome.errors) {
             std::cerr << "warning: algorithm failed to load: " << name << '\n';
+            failed_plugins.push_back(name);
         }
         const auto& mission_control_factory = loader.missionControls().front().factory;
         for (const auto& algo : loader.algorithms()) {
@@ -114,6 +120,55 @@ int main(int argc, char** argv) {
         }
         std::cout << plugin_result.plugin_filename << ": " << plugin_result.results.size()
                   << " runs, " << failed << " unscored (score < 0)\n";
+    }
+
+    const std::string generated_at_utc = UC::currentUtcTimestamp();
+    const std::vector<simulator::MatrixCell> cells =
+        simulator::RunMatrixOrchestrator::expand(composition);
+
+    for (const auto& plugin_result : results) {
+        simulator::types::SimulationManagerReport report;
+        report.composition_file = composition.composition_file;
+        report.generated_at_utc = generated_at_utc;
+        report.metric = "maps_comparison_score_0_100";
+        report.score_range = {0.0, 100.0};
+        report.error_score = -1;
+        report.runs = plugin_result.results;
+
+        std::vector<sim_io::SimulationRunYamlEntry> entries;
+        entries.reserve(plugin_result.results.size());
+        for (std::size_t i = 0; i < plugin_result.results.size() && i < cells.size(); ++i) {
+            sim_io::SimulationRunYamlEntry entry;
+            entry.run_id = static_cast<int>(i);
+            entry.simulation_index = cells[i].group_index;
+            entry.mission_index = cells[i].mission_index;
+            entry.drone_index = cells[i].drone_index;
+            entry.lidar_index = cells[i].lidar_index;
+            entry.result = plugin_result.results[i];
+            entries.push_back(entry);
+        }
+
+        sim_io::writeSimulationOutputYaml(
+            output_root / (plugin_result.plugin_filename + "_simulation_output.yaml"), report,
+            entries);
+    }
+
+    if (args.mode == sim_io::SimulatorMode::Comparative) {
+        sim_io::ComparativeReportInput input;
+        input.composition_file = composition.composition_file;
+        input.mission_control_folder = args.mission_control_folder;
+        input.generated_at_utc = generated_at_utc;
+        input.results = results;
+        input.failed_plugins = failed_plugins;
+        sim_io::writeComparativeReport(output_root / "comparative_report.yaml", input);
+    } else {
+        sim_io::CompetitiveReportInput input;
+        input.composition_file = composition.composition_file;
+        input.mission_control = args.mission_control.filename().string();
+        input.generated_at_utc = generated_at_utc;
+        input.results = results;
+        input.failed_plugins = failed_plugins;
+        sim_io::writeCompetitiveReport(output_root / "competitive_report.yaml", input);
     }
 
     std::cout << "output written under: " << output_root << '\n';
