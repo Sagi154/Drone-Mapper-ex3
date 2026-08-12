@@ -1,10 +1,10 @@
 // SimulationRunImpl.cpp
 // Drives one simulation run.
 //
-// NOTE: Scoring via MapsComparison is deferred (Y10). Until that step lands,
+// NOTE: Scoring via MapsComparison is deferred. Until that step lands,
 // run() returns mission_score = -1.0 (the "not yet scored" sentinel).
-// All other behaviour — error propagation, output map saving, mission loop —
-// is complete.
+// Exceptions from runMission() are contained here so the output map can still
+// be saved and the matrix can continue.
 
 #include <Simulator/SimulationRunImpl.h>
 
@@ -73,9 +73,24 @@ types::SimulationResult SimulationRunImpl::run() {
         return result;
     }
 
-    // Let any exception escaping runMission() propagate — it is caught at the
-    // worker-thread boundary by the Simulator (the mandatory collision scenario).
-    const common::types::MissionRunResult mission_result = mission_control_->runMission();
+    // MockMovement wall collisions throw; DroneControl lets them through so this
+    // boundary can contain them, still save the output map, and return score -1.
+    common::types::MissionRunResult mission_result;
+    try {
+        mission_result = mission_control_->runMission();
+    } catch (const std::exception& ex) {
+        mission_result = common::types::MissionRunResult{
+            common::types::MissionRunStatus::Error,
+            0,
+            {common::types::ErrorRef{"MISSION_EXCEPTION", ex.what()}},
+        };
+    } catch (...) {
+        mission_result = common::types::MissionRunResult{
+            common::types::MissionRunStatus::Error,
+            0,
+            {common::types::ErrorRef{"MISSION_EXCEPTION", "unknown exception from runMission"}},
+        };
+    }
     result.mission_results.push_back(mission_result);
     result.output_map_config = output_map_->getMapConfig();
 

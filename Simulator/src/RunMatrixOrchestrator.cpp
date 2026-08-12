@@ -83,7 +83,8 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
             PluginMatrixBinding binding   = plugins[plugin_index];
 
             const std::filesystem::path run_out =
-                output_root / binding.plugin_filename / std::to_string(cell_index);
+                output_root / binding.plugin_filename /
+                (std::to_string(cell_index) + "_output_map.npy");
 
             if (binding.factory == nullptr || cell.simulation == nullptr ||
                 cell.mission == nullptr || cell.drone == nullptr || cell.lidar == nullptr) {
@@ -106,7 +107,7 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
             table[plugin_index].results[cell_index] =
                 makeFailureResult(cells[cell_index],
                                   output_root / plugins[plugin_index].plugin_filename /
-                                      std::to_string(cell_index));
+                                      (std::to_string(cell_index) + "_output_map.npy"));
         });
 
     // Log throws from the main thread only (after join) — avoid concurrent cerr.
