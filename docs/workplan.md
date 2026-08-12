@@ -188,9 +188,8 @@ Verify: port ex2's coordinate-math unit tests; confirm the house scenario's know
 Ordered by dependency. Every item here needs only `common/` (already frozen and complete) plus
 whichever `UserCommon/` item is noted — nothing from Yoav's track.
 
-**Progress (2026-08-05):** S1–S7 and S9 **done**. S8 **done as signature stub** (`compare` returns
-`-1`; real 0–100 BFS scoring still open, needs U4). S10+ blocked on Yoav meeting points /
-remaining items. Branch: `cmake-algorithm-shared-target`. Local builds use `g++-12` (mp-units).
+**Progress (2026-08-13):** S1–S11 **done**. Real BFS scoring, report writers, and collision-checked
+output dirs are wired into `main()`. Branch: `maps-scoring-reports-output-naming`.
 
 **S1 — `Algorithm/CMakeLists.txt`.** ✅ **DONE**
 Depends on: nothing. `SHARED` target, output name `Algorithm_207190406_209543255`, `PREFIX ""`,
@@ -275,20 +274,16 @@ worker count is exactly `min(requested, matrix_size - 1)` main-thread-inclusive 
 `.cursor/rules/threading-model.mdc` (never open a thread with nothing to do); every cell's slot is
 written exactly once; the throwing cell's slot shows the failure without stopping sibling cells.
 
-**S8 — `MapsComparison` (scoring).** ✅ **DONE (signature stub)** — full 0–100 BFS body still open
-Depends on: nothing structurally (needs an `IMap3D&` pair, which a hand-built fake can provide
-before Yoav's real `Map3DImpl` exists). Port
+**S8 — `MapsComparison` (scoring).** ✅ **DONE**
+Depends on: U4 (`SimulationCoordUtil`). Ported
 `../Drone-Mapper-ex2/{include/drone_mapper/MapsComparison.h,src/MapsComparison.cpp}` into
-`Simulator/src/`. 0–100 per-run score, `-1` on failure, reachability filter seeded at the **world**
-spawn position (local spawn + `map_axes_offset`, via `SimulationCoordUtil`, item U4). **Publish the
-function/constructor signature to Yoav as soon as it's decided** — see the meeting-point list below
-— so `SimulationRunImpl` (item Y13) can call it before the scoring logic is fully tuned.
-**Landed for Yoav:** `simulator::MapsComparison::compare(origin, target, spawn) -> double` in
-`Simulator/include/Simulator/MapsComparison.h`; stub body returns `-1.0`. Fill real scoring after U4.
-Verify: port `test_maps_comparison.cpp`. Once Yoav's real map fixtures land, cross-check against
-ex2's recorded reference ranges from `../Drone-Mapper-ex2/docs/HLD.md` (house_lower 100%, large_room
-~92–96%, small_room ~87–90%, large_out ~80–88%, small_out ~75–89%, house_full ~56–62%) — a large
-drop means the port broke the offset or dtype handling, not the scoring logic itself.
+`Simulator/src/` behind the frozen single-target signature
+`simulator::MapsComparison::compare(origin, target, spawn) -> double`. 0–100 per-run score;
+reachability filter seeded at world spawn (`worldInitialDronePosition`). Wired into
+`SimulationRunImpl` for `Completed`/`MaxSteps`; `Error` stays `-1`. `simulator::scoring` linked
+into the executable and `test_simulation_run_factory`.
+Verify: `simulator_scoring_test` (fake `IMap3D`) green — identical/empty/mismatch/sealed-room +
+spawn-aware cases.
 
 **S9 — Run-matrix orchestrator.** ✅ **DONE** (wired into `main()` as of the end-to-end executable)
 Depends on: S6 (loaded plugins), S7 (threading), the frozen `simulator::ISimulationRunFactory` /
@@ -296,34 +291,28 @@ Depends on: S6 (loaded plugins), S7 (threading), the frozen `simulator::ISimulat
 loaded plugins and a `simulator::types::SimulationCompositionData`, expand the run matrix and
 dispatch each cell through `ISimulationRunFactory::create(...)` → `ISimulationRun::run()`,
 collecting `simulator::types::SimulationResult`s into the pre-allocated table.
-Per-cell output path (interim, until S11/Y11): `{output_root}/{plugin_filename}/{cell_index}_output_map.npy`.
+Per-cell output path (S11): `{output_root}/{plugin_filename}_run_<NNNN>_output_map.npy`.
 Verify: unit test against a hand-written fake `ISimulationRunFactory`/`ISimulationRun` (returns
 canned `SimulationResult`s) and a **hand-built** `SimulationCompositionData` literal — the frozen
 type lets this be written and tested without waiting on Yoav's YAML parser at all. Confirm the
 matrix size matches `groups × drone_configs × lidar_configs` for the hand-built literal.
 
-**S10 — Comparative/competitive report writers + per-plugin ex2-style aggregate writer.**
-Depends on: S9's output shape. Two YAML writers matching the exact schemas in
-`.cursor/rules/simulator-cli-and-outputs.mdc`: `comparative_report` (grouped by
-`(total_score, total_steps)` — working assumption, see open questions — sorted by group size
-descending) and `competitive_report` (sorted by `total_score` desc, then `total_steps` asc);
-`errors: [...]` listing `.so` filenames that failed to load or run; `total_score`/`total_steps` as
-the **sum** across all runs for that plugin (working assumption, see open questions). Also port
-`../Drone-Mapper-ex2/src/io/SimulationOutputYamlWriter.cpp` for the per-plugin ex2-style
-`Simulation Result Output File`, adding the new `composition_file` field to
-`SimulationManagerReport`.
-Verify: unit tests with hand-built per-plugin result sets covering a tie on `total_score`, a tie on
-`(total_score, total_steps)` that must group, and one plugin present only in `errors`. Confirm sort
-order and grouping match the constructed expectation exactly.
+**S10 — Comparative/competitive report writers + per-plugin ex2-style aggregate writer.** ✅ **DONE**
+Depends on: S9's output shape. `ComparativeReportWriter` / `CompetitiveReportWriter` /
+`SimulationOutputYamlWriter` under `Simulator/src/io/`, schemas per
+`.cursor/rules/simulator-cli-and-outputs.mdc`. Grouping by `(total_score, total_steps)` sums;
+competitive sort by score desc then steps asc. Called from `main.cpp` after the orchestrator;
+failed load basenames collected into `errors: [...]`.
+Verify: `simulator_report_writers_test` covers tie grouping, competitive sort, and per-plugin
+`score_report` schema (incl. `composition_file`).
 
-**S11 — Output directory + naming.**
-Depends on: S10 (needs to know what files it's naming), U2 (`TimeFormat`). Freshly generated
-`<time>` per run (`<mission_control_folder>/comparative_results_<time>` /
-`<algorithms_folder>/competition_<time>`), collision-checked with an appended counter if the
-directory already exists; a documented, unique, traceable naming pattern for per-run output maps
-and error logs (plugin name + run identity). Document the chosen pattern in `README.md`.
-Verify: call the directory-creation helper twice within the same wall-clock second in a test;
-confirm the second call produces a distinct directory rather than colliding.
+**S11 — Output directory + naming.** ✅ **DONE**
+Depends on: S10, U2 (`TimeFormat`). `OutputDirHelper` creates
+`<mission_control_folder>/comparative_results_<time>` /
+`<algorithms_folder>/competition_<time>` with `_N` collision suffix. Per-run maps:
+`<plugin>_run_NNNN_output_map.npy`. Documented in `README.md` (unblocks Y11).
+Verify: `simulator_output_dir_test` creates two dirs in the same second without colliding;
+end-to-end smoke writes under the named folders for both CLI modes.
 
 ---
 
@@ -425,14 +414,14 @@ dependency on Sagi's real registrar/loader. Confirm the returned `ISimulationRun
 the output map's `MapConfig` reflects the offset-shifted bounds for a house-scenario-shaped input.
 
 **Y10 ✅ DONE — `SimulationRunImpl`.**
-Depends on: Y9, S8 (`MapsComparison` signature — stub body is fine to start). Implements
+Depends on: Y9, S8 (`MapsComparison`). Implements
 `simulator::ISimulationRun::run()`: call `missionControl->runMission()`, `save()` the output map
 (skipped when `output_path` is empty — OQ-Y1), catch any exception escaping `runMission()` **here**
 — this is the actual catch target for the mandatory `MockMovement` collision scenario (`DroneControl`
 in Y5 lets it propagate; this is where it stops), converting it into a `-1`-scored `SimulationResult`
 rather than propagating into the worker thread. Populate `resolution_request_status`
-(`ACCEPTED`/`IGNORED`/`IGNORED TOO SMALL`) per run. Scoring via `MapsComparison::compare()` is still
-deferred (stub returns `-1.0` until S8's full body lands).
+(`ACCEPTED`/`IGNORED`/`IGNORED TOO SMALL`) per run. Scoring via `MapsComparison::compare()` with
+`worldInitialDronePosition` for `Completed`/`MaxSteps`.
 Note: `SimulationResult::mission_results` is declared as a `std::vector` in the frozen
 `SimulationTypes.h` even though `create()` takes a single `mission_config` — the straightforward
 implementation populates it with the single `runMission()` outcome for that run.
@@ -441,10 +430,10 @@ Verify: unit test with a fake `IMissionControl` that throws mid-`runMission()`; 
 `-1`-equivalent result with a logged error. End-to-end smoke against real plugins confirmed
 exception containment + map save on 2026-08-12.
 
-**Y11 ⏳ DEFERRED — Per-run output naming (coordinate with S11).**
-Depends on: Y10, S11's chosen pattern. Whichever of Sagi/Yoav settles the exact per-run
-output-map/error-log filename pattern first documents it in `README.md`; the other's code follows
-that pattern rather than inventing a second one.
+**Y11 ⏳ UNBLOCKED — Per-run output naming (coordinate with S11).**
+Depends on: Y10, S11's chosen pattern (**documented in `README.md` as of 2026-08-13**). Maps already
+use `<plugin>_run_NNNN_output_map.npy`; remaining work is aligning per-run error logs to
+`<plugin>_run_NNNN_error.log`.
 Verify: for a full composition, every emitted filename is unique across the whole run matrix and
 visibly traceable to (plugin, simulation, mission, drone, lidar) or run index by inspection.
 
@@ -457,12 +446,12 @@ people compile and test independently.
 
 | Meeting point | What Sagi needs | What Yoav needs | Smallest unblocking deliverable |
 |---|---|---|---|
-| `MapsComparison` (S8 ↔ Y10) | — | Callable signature | ✅ Stub published: `simulator::MapsComparison::compare(origin, target, spawn) -> double` returns `-1`. Yoav can code `SimulationRunImpl` against it; real scoring body still open (needs U4). |
+| `MapsComparison` (S8 ↔ Y10) | — | Callable signature | ✅ Real BFS body landed 2026-08-13; `SimulationRunImpl` scores `Completed`/`MaxSteps` via `worldInitialDronePosition`. |
 | `MappingAlgorithmFactory`/`MissionControlFactory` handoff (S6 ↔ Y9) | — | The frozen `std::function` types already exist in `common/` | Nothing to build first — both sides just use the exact typedefs from `Common/MappingAlgorithmFactory.h` / `MissionControlFactory.h`. Yoav tests with hand-written lambdas; Sagi's loader supplies the real ones later; no header needs to change hands. |
 | `SimulationRunFactoryImpl` concrete class (S9 ↔ Y9) | Yoav's constructor signature + a compiling `create()` | — | Yoav pushes a compiling `SimulationRunFactoryImpl.h`/`.cpp` with the agreed constructor and a stub `create()` (returns a trivially-succeeding fake run) on day one of Y9, before the real body is finished, so Sagi's orchestrator (S9) always has something concrete to `make_unique` against. |
-| Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | Whoever decides first writes the pattern into `README.md`; the other follows it — no code dependency, just one shared doc. |
+| Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | ✅ S11 documented pattern in `README.md` (2026-08-13): `<plugin>_run_NNNN_{output_map.npy\|error.log}`. Y11 follows it for remaining error-log wiring. |
 | `Simulator/CMakeLists.txt` final source list | Yoav's file list | Sagi's file list | Add sources incrementally as each item lands rather than merging once at the end; filenames don't collide — layout is **decided** (see §Simulator layout above): core under `Simulator/src/`, I/O under `Simulator/src/io/`, tests under `Simulator/tests/` (+ `fixtures/` for loader stubs). |
-| End-to-end run (both CLI modes, real plugins) | Yoav's `Map3DImpl`/mocks/run-factory | Sagi's loader/CLI/threading/report writer | ✅ **DONE 2026-08-12** — see vertical slice below. Report writers (S10) and final output naming (S11/Y11) still open. |
+| End-to-end run (both CLI modes, real plugins) | Yoav's `Map3DImpl`/mocks/run-factory | Sagi's loader/CLI/threading/report writer | ✅ **DONE 2026-08-12** (vertical slice); reports + naming landed 2026-08-13. End-to-end scores still often `-1` when missions terminate as `Error` (spawn/collision) — scorer unit-tested separately. |
 
 ---
 
@@ -487,8 +476,13 @@ already available, so `main.cpp` wired those instead of stubs.
 **Verified jointly against `inputs/sim_compose.yaml` (both CLI modes):** binary exits 0; both real
 `.so`s `dlopen`; 24 `SimulationResult`s produced; output `.npy` maps written. This proves
 `MissionControlDependencies`/`MappingAlgorithmDependencies`/the registration macros/`ENABLE_EXPORTS`
-are wired correctly. Remaining work around this mechanism: S8 scoring body, S10 report YAML, S11/Y11
-naming (replace the temp `simulator_vertical_slice_<epoch>` output root in `main.cpp`).
+are wired correctly.
+
+**Follow-up landed 2026-08-13 on `maps-scoring-reports-output-naming`:** real BFS scoring (S8),
+comparative/competitive/per-plugin report YAML (S10), collision-checked
+`comparative_results_<time>` / `competition_<time>` dirs + flat
+`<plugin>_run_NNNN_output_map.npy` naming documented in `README.md` (S11). Y11 error-log naming
+remains for Yoav.
 
 ---
 
