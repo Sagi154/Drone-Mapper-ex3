@@ -322,7 +322,40 @@ gtest_discover_tests(simulator_work_test)
 gtest_discover_tests(simulator_scoring_test)
 gtest_discover_tests(simulator_orchestrator_test)
 
-# TODO: Build the simulator executable and its private implementation sources.
-# Link the executable with common::common and ${CMAKE_DL_LIBS}, and export the
-# registration-constructor symbols needed by dynamically loaded plugins.
-# Must also link $<TARGET_OBJECTS:simulator_registration> + ENABLE_EXPORTS ON.
+set(SIMULATOR_MAIN_SOURCES
+    src/main.cpp
+    src/Map3DImpl.cpp
+    src/MockGPS.cpp
+    src/MockLidar.cpp
+    src/MockMovement.cpp
+    src/SimulationRunImpl.cpp
+    src/SimulationRunFactoryImpl.cpp
+    ${YAML_PARSER_SOURCES}
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/RunErrorLog.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
+    $<TARGET_OBJECTS:simulator_registration>
+)
+
+add_executable(simulator_207190406_209543255 ${SIMULATOR_MAIN_SOURCES})
+set_target_properties(simulator_207190406_209543255 PROPERTIES ENABLE_EXPORTS ON)
+
+target_include_directories(simulator_207190406_209543255 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
+)
+
+target_link_libraries(simulator_207190406_209543255 PRIVATE
+    common::common
+    simulator::loader
+    simulator::registrar
+    simulator::orchestrator
+    simulator::cli
+    TinyNPY::TinyNPY
+    yaml-cpp::yaml-cpp
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
+)
+
+drone_warnings(simulator_207190406_209543255)
