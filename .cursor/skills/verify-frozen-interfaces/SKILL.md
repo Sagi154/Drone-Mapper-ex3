@@ -11,7 +11,11 @@ explicit, reproducible check instead of eyeballing a diff.
 
 ## 1. Diff against the pristine skeleton
 
-`main` tracks the untouched skeleton copy (see `AGENTS.md`), so compare the working tree against it:
+`main` tracks the untouched skeleton copy (see `AGENTS.md`) — but only as of whenever it was last
+synced. The upstream skeleton repo (`ex_3_skeleton`) can receive amendments after that, which `main`
+won't reflect until someone re-syncs it. If you have any doubt `main` is current, run
+`.cursor/skills/verify-interfaces-vs-skeleton/SKILL.md` instead (it fetches the upstream skeleton itself
+before comparing). Otherwise, compare the working tree against `main`:
 
 ```bash
 git diff --name-status main -- common/ Simulator/common_simulator/ MissionControl/common_mission_control/
@@ -59,3 +63,6 @@ skeleton `main` already contains.
   ex2-skeleton-vs-ex3-skeleton changes, §3/§4 are skeleton-vs-us (our own past deviations to revert)
 - `.cursor/skills/pre-submission-review/SKILL.md` step 2 — the same check, folded into the full
   submission pass
+- `.cursor/skills/verify-interfaces-vs-skeleton/SKILL.md` — a slower, subagent-driven audit against the
+  actual pristine `ex_3_skeleton` checkout instead of `main`; use when you want a from-scratch
+  cross-check independent of git history

@@ -10,6 +10,13 @@ Everything under `common/`, `Simulator/common_simulator/`, and
 `MissionControl/common_mission_control/` is published by the course and used **as-is** (e18). Do not
 change a signature, add a member, add a file, or move a header between these folders.
 
+**Before committing anything that touches these folders, or before submission, verify compliance —
+don't eyeball it:**
+
+- Quick check (git-based, tracks `main`): `.cursor/skills/verify-frozen-interfaces/SKILL.md`.
+- Deep audit (subagent-based, diffs against the actual pristine `ex_3_skeleton` checkout, not just
+  `main`): `.cursor/skills/verify-interfaces-vs-skeleton/SKILL.md`.
+
 Full delta table: `docs/api-delta-ex2-to-ex3.md`. The parts that break ported ex2 code:
 
 ## Include paths and namespaces
