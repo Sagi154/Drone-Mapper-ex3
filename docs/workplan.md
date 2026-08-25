@@ -69,6 +69,7 @@ Simulator/
       OutputDirHelper.cpp                            # S11
   tests/                        # Simulator unit / integration tests
     fixtures/                   # test-only .so stubs for the loader (S6); never shipped
+    manual/                     # Docker whole-system verification scripts (post feature-complete)
   include/Simulator/            # existing
   common_simulator/             # frozen — never touch
   CMakeLists.txt
@@ -490,36 +491,50 @@ landed: `SimulationRunImpl` writes `<plugin>_run_NNNN_error.log` and the YAML wr
 
 ## Full integration & whole-system verification (after both tracks are feature-complete)
 
-**Verified 2026-08-25** — see `docs/integration-verification-report.md`. Scripts live under
-`Simulator/tests/manual/` (Docker: `run_in_docker.sh` / `docker_tsan.sh`). Default-preset CLI,
-collision, threading, CLI failures, isolation, frozen headers, and TSan (0 warnings) passed.
-`-verbose` extra files were not produced on `inputs/sim_compose.yaml` (missions unscored / empty
-map path). All 24 cells still unscored on that composition.
+**Done 2026-08-25** on branch `verify-full-integration-pass` (Docker Desktop course image
+`drone-mapper-ex3-dev`, not host WSL). Full write-up: `docs/integration-verification-report.md`.
+Harness: `Simulator/tests/manual/` (`run_all.sh`, `docker_verify_default.sh`, `docker_tsan.sh`;
+`tsan` preset in `CMakePresets.json`). Composition used: `inputs/sim_compose.yaml` (24 cells).
 
-All of these need both halves; either person can run them, but they can't be run by one person
-alone against a stub.
+| Check | Result |
+|---|---|
+| Both CLI modes (`-comparative` / `-competition`) | **PASS** — artifacts written; all 24 cells unscored (`score < 0`) on this composition (known product issue) |
+| Re-run output-dir collision | **PASS** — distinct `comparative_results_<time>` dirs |
+| `-verbose` on/off | **PARTIAL** — flag wired; no extra verbose files on this composition (Error cells → empty `output_map_file`) |
+| Threading determinism (`num_threads` absent/1/2/8) | **PASS** — reports identical after stripping timestamps / scratch paths |
+| CLI failure modes | **PASS** — usage + all problems named; no crash |
+| Isolation / renamed-copy `.so` | **PASS** — registration undefined in plugins; two copies load cleanly |
+| ThreadSanitizer (`-fsanitize=thread`) | **PASS** — 0 warnings (needs ~8 GB Docker VM RAM, build on container `/tmp`, often `--privileged` + `vm.mmap_rnd_bits=28`) |
+| Frozen interfaces | **PASS** — no diffs under `common/`, `Simulator/common_simulator/`, `MissionControl/common_mission_control/` |
 
-- **Both CLI modes against `inputs/`**: run `-comparative` and `-competition` per the exact
+**Still open after this pass (not verification-harness bugs):**
+
+- Fix or replace `inputs/sim_compose.yaml` so cells complete and score (currently all `-1` / Error).
+- Re-check `-verbose` extra files on a composition that finishes with a real `output_map_file`.
+
+Checklist (kept for re-run / grading prep):
+
+- [x] **Both CLI modes against `inputs/`**: run `-comparative` and `-competition` per the exact
   invocations in `.cursor/skills/pre-submission-review/SKILL.md` §7. Confirm each produces its
   output folder, aggregate report, per-plugin YAML, output maps, and error logs.
-- **Re-run collision check**: run the same mode twice in immediate succession; confirm the second
+- [x] **Re-run collision check**: run the same mode twice in immediate succession; confirm the second
   run's output directory does not collide with the first.
-- **`-verbose` on/off**: confirm `MissionControl`'s verbose output only appears when the flag is
-  passed.
-- **Threading determinism**: run the same composition with `num_threads` absent, `=1`, `=2`, `=8`;
+- [ ] **`-verbose` on/off**: confirm `MissionControl`'s verbose output only appears when the flag is
+  passed. *(wired; needs a completing mission — see PARTIAL above)*
+- [x] **Threading determinism**: run the same composition with `num_threads` absent, `=1`, `=2`, `=8`;
   diff the reports — scores and steps must be identical (ordering-independent fields aside), per
   `.cursor/rules/threading-model.mdc`.
-- **CLI failure modes**: a typo'd argument, a missing `=`, a nonexistent file, and an empty
+- [x] **CLI failure modes**: a typo'd argument, a missing `=`, a nonexistent file, and an empty
   algorithm/mission-control folder — confirm a clean usage + error message naming every problem
   together, never a crash.
-- **Isolation / cross-`.so` check**: `nm -DC --undefined-only` on each `.so` should list the
+- [x] **Isolation / cross-`.so` check**: `nm -DC --undefined-only` on each `.so` should list the
   registration constructor as undefined and nothing else surprising; since another team's plugin
   isn't available, approximate it by loading a **renamed copy of our own** `Algorithm_*.so` under a
   second filename in the same process and confirming `RTLD_LOCAL` keeps the two instances from
   binding to each other's internals.
-- **Thread sanitizer**: one full comparative or competitive run built with `-fsanitize=thread`,
+- [x] **Thread sanitizer**: one full comparative or competitive run built with `-fsanitize=thread`,
   clean.
-- **Frozen-interfaces check**: run `.cursor/skills/verify-frozen-interfaces/SKILL.md` — `git diff`
+- [x] **Frozen-interfaces check**: run `.cursor/skills/verify-frozen-interfaces/SKILL.md` — `git diff`
   and `git status --porcelain` against `common/`, `Simulator/common_simulator/`,
   `MissionControl/common_mission_control/` must both be empty.
 
