@@ -490,6 +490,12 @@ landed: `SimulationRunImpl` writes `<plugin>_run_NNNN_error.log` and the YAML wr
 
 ## Full integration & whole-system verification (after both tracks are feature-complete)
 
+**Verified 2026-08-25** — see `docs/integration-verification-report.md`. Scripts live under
+`Simulator/tests/manual/` (Docker: `run_in_docker.sh` / `docker_tsan.sh`). Default-preset CLI,
+collision, threading, CLI failures, isolation, frozen headers, and TSan (0 warnings) passed.
+`-verbose` extra files were not produced on `inputs/sim_compose.yaml` (missions unscored / empty
+map path). All 24 cells still unscored on that composition.
+
 All of these need both halves; either person can run them, but they can't be run by one person
 alone against a stub.
 
