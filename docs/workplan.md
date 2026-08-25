@@ -430,10 +430,11 @@ Verify: unit test with a fake `IMissionControl` that throws mid-`runMission()`; 
 `-1`-equivalent result with a logged error. End-to-end smoke against real plugins confirmed
 exception containment + map save on 2026-08-12.
 
-**Y11 ⏳ UNBLOCKED — Per-run output naming (coordinate with S11).**
-Depends on: Y10, S11's chosen pattern (**documented in `README.md` as of 2026-08-13**). Maps already
-use `<plugin>_run_NNNN_output_map.npy`; remaining work is aligning per-run error logs to
-`<plugin>_run_NNNN_error.log`.
+**Y11 ✅ DONE — Per-run output naming (coordinate with S11).**
+Depends on: Y10, S11's chosen pattern (**documented in `README.md` as of 2026-08-13**). Maps use
+`<plugin>_run_NNNN_output_map.npy`; error logs use `<plugin>_run_NNNN_error.log` derived from the
+map path. `SimulationRunImpl` opens `RunErrorLog` whenever `output_path` is non-empty and mirrors
+every `ErrorRef` immediately; the per-plugin YAML `error_log_file` field uses the same derivation.
 Verify: for a full composition, every emitted filename is unique across the whole run matrix and
 visibly traceable to (plugin, simulation, mission, drone, lidar) or run index by inspection.
 
@@ -449,7 +450,7 @@ people compile and test independently.
 | `MapsComparison` (S8 ↔ Y10) | — | Callable signature | ✅ Real BFS body landed 2026-08-13; `SimulationRunImpl` scores `Completed`/`MaxSteps` via `worldInitialDronePosition`. |
 | `MappingAlgorithmFactory`/`MissionControlFactory` handoff (S6 ↔ Y9) | — | The frozen `std::function` types already exist in `common/` | Nothing to build first — both sides just use the exact typedefs from `Common/MappingAlgorithmFactory.h` / `MissionControlFactory.h`. Yoav tests with hand-written lambdas; Sagi's loader supplies the real ones later; no header needs to change hands. |
 | `SimulationRunFactoryImpl` concrete class (S9 ↔ Y9) | Yoav's constructor signature + a compiling `create()` | — | Yoav pushes a compiling `SimulationRunFactoryImpl.h`/`.cpp` with the agreed constructor and a stub `create()` (returns a trivially-succeeding fake run) on day one of Y9, before the real body is finished, so Sagi's orchestrator (S9) always has something concrete to `make_unique` against. |
-| Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | ✅ S11 documented pattern in `README.md` (2026-08-13): `<plugin>_run_NNNN_{output_map.npy\|error.log}`. Y11 follows it for remaining error-log wiring. |
+| Per-run output naming (S11 ↔ Y11) | Yoav's per-run artifact names | Sagi's report's expectations of those names | ✅ S11 documented pattern in `README.md` (2026-08-13): `<plugin>_run_NNNN_{output_map.npy\|error.log}`. Y11 emits per-run error logs and fills YAML `error_log_file`. |
 | `Simulator/CMakeLists.txt` final source list | Yoav's file list | Sagi's file list | Add sources incrementally as each item lands rather than merging once at the end; filenames don't collide — layout is **decided** (see §Simulator layout above): core under `Simulator/src/`, I/O under `Simulator/src/io/`, tests under `Simulator/tests/` (+ `fixtures/` for loader stubs). |
 | End-to-end run (both CLI modes, real plugins) | Yoav's `Map3DImpl`/mocks/run-factory | Sagi's loader/CLI/threading/report writer | ✅ **DONE 2026-08-12** (vertical slice); reports + naming landed 2026-08-13. End-to-end scores still often `-1` when missions terminate as `Error` (spawn/collision) — scorer unit-tested separately. |
 
@@ -482,7 +483,8 @@ are wired correctly.
 comparative/competitive/per-plugin report YAML (S10), collision-checked
 `comparative_results_<time>` / `competition_<time>` dirs + flat
 `<plugin>_run_NNNN_output_map.npy` naming documented in `README.md` (S11). Y11 error-log naming
-remains for Yoav.
+landed: `SimulationRunImpl` writes `<plugin>_run_NNNN_error.log` and the YAML writer fills
+`error_log_file`.
 
 ---
 

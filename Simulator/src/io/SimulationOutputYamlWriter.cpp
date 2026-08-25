@@ -1,4 +1,5 @@
 #include <Simulator/io/SimulationOutputYamlWriter.h>
+#include <Simulator/OutputPathUtil.h>
 
 #include <Common/Units.h>
 
@@ -99,8 +100,8 @@ namespace {
     YAML::Node node;
     node["run_id"] = entry.run_id;
     node["output_map_file"] = pathForYaml(output_dir, result.output_map_file);
-    // No per-run error log exists yet (Y11 pending) — errors surface inline via mission_results.
-    node["error_log_file"] = "";
+    node["error_log_file"] = pathForYaml(
+        output_dir, simulator::errorLogPathFromOutputMap(result.output_map_file));
     node["resolution_request_status"] =
         resolutionRequestStatusLabel(result.resolution_request_status);
     node["mission_score"] = result.mission_score;

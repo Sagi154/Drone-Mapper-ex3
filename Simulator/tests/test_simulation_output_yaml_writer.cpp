@@ -9,11 +9,12 @@
 
 namespace {
 
-[[nodiscard]] simulator::types::SimulationResult makeResult(double score, std::size_t steps) {
+[[nodiscard]] simulator::types::SimulationResult makeResult(
+    double score, std::size_t steps, const std::filesystem::path& output_map_file) {
     simulator::types::SimulationResult result;
     result.mission_score = score;
     result.resolution_request_status = simulator::types::ResolutionRequestStatus::Accepted;
-    result.output_map_file = "/tmp/out/plugin/0_output_map.npy";
+    result.output_map_file = output_map_file;
     result.mission_results.push_back(
         common::types::MissionRunResult{common::types::MissionRunStatus::Completed, steps, {}});
     return result;
@@ -36,11 +37,11 @@ TEST(SimulationOutputYamlWriter, WritesExpectedSchema) {
     entry.mission_index = 0;
     entry.drone_index = 1;
     entry.lidar_index = 2;
-    entry.result = makeResult(87.5, 42);
-    entries.push_back(entry);
-
     const std::filesystem::path out =
         std::filesystem::temp_directory_path() / "test_simulation_output_yaml_writer_out.yaml";
+    entry.result = makeResult(87.5, 42, out.parent_path() / "plugin.so_run_0003_output_map.npy");
+    entries.push_back(entry);
+
     simulator::io::writeSimulationOutputYaml(out, report, entries);
 
     const YAML::Node root = YAML::LoadFile(out.string());
@@ -55,6 +56,25 @@ TEST(SimulationOutputYamlWriter, WritesExpectedSchema) {
     EXPECT_EQ(run["config_indices"]["drone"].as<std::size_t>(), 1U);
     EXPECT_EQ(run["config_indices"]["lidar"].as<std::size_t>(), 2U);
     EXPECT_EQ(run["mission_results"][0]["steps"].as<std::size_t>(), 42U);
+    EXPECT_EQ(run["output_map_file"].as<std::string>(), "plugin.so_run_0003_output_map.npy");
+    EXPECT_EQ(run["error_log_file"].as<std::string>(), "plugin.so_run_0003_error.log");
 
+    std::filesystem::remove(out);
+}
+
+TEST(SimulationOutputYamlWriter, EmptyMapPathLeavesErrorLogFileEmpty) {
+    simulator::types::SimulationManagerReport report;
+    report.generated_at_utc = "2026-08-12T10:00:00Z";
+    report.score_range = {0.0, 100.0};
+
+    simulator::io::SimulationRunYamlEntry entry;
+    entry.result.output_map_file.clear();
+    const std::filesystem::path out =
+        std::filesystem::temp_directory_path() / "test_simulation_output_yaml_writer_empty.yaml";
+    simulator::io::writeSimulationOutputYaml(out, report, {entry});
+
+    const YAML::Node run = YAML::LoadFile(out.string())["score_report"]["runs"][0];
+    EXPECT_EQ(run["error_log_file"].as<std::string>(), "");
+    EXPECT_EQ(run["output_map_file"].as<std::string>(), "");
     std::filesystem::remove(out);
 }

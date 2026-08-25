@@ -74,7 +74,7 @@ Inside that directory:
   comparative_report.yaml                    # or competitive_report.yaml
   <plugin>_simulation_output.yaml            # per-plugin ex2-style score_report
   <plugin>_run_NNNN_output_map.npy           # per-run output map (NNNN = zero-padded cell index)
-  <plugin>_run_NNNN_error.log                # per-run error log (planned; not yet emitted)
+  <plugin>_run_NNNN_error.log                # per-run error log
 ```
 
 `NNNN` is the flat cell index from `RunMatrixOrchestrator::expand` (0-based, zero-padded to 4
