@@ -85,6 +85,11 @@ Do not regress these while porting:
   visit dampening, explore-distance cache, path compression) is documented in
   `../Drone-Mapper-ex2/docs/HLD.md` under "Algorithm State Machine". Port it whole; don't re-tune.
 
+The current `MappingAlgorithmFrontier` port still has the Ex2 ALG28 hang: `findPath` (and the other
+BFS helpers) only stop expanding when `isSpherePassable` is false, so `isSpherePassable` → `return true`
+walks an unbounded grid. This is **not** a preserved fix — add a map-volume clip or expansion cap when
+touching the planner. Details: `docs/ex2-grading-handoff.md` §3.
+
 ## 6. Register plugins
 
 If the component is `MappingAlgorithmImpl` or `MissionControlImpl`, add the one registration line at global
