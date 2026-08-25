@@ -2,7 +2,10 @@
 
 Source: instructor feedback for Ex2 (`Drone-Mapper-ex2/207190406_209543255_grading/feedback.txt`),
 the bug index (`ex2_bugs.xlsx`), the grading methodology doc (`Exercise 2 - Grading Explanation.docx`),
-and a diff of the mutated grading sources against our submitted `src/`. Final score: **77.5/100**.
+a diff of the mutated grading sources against our submitted `src/`, and the later timeout reproduction
+(`Drone-Mapper-ex2/207190406_209543255_grading/timeout-verification-results.md`). Original score
+**77.5/100**; after appeal the component and integration timeout penalties were reduced by **10 points**.
+Official score: **87.5/100**.
 
 This is not just a "what to fix" list for ex2's code (that project is done) — it's a list of *patterns*
 that cost us points, so we don't reproduce them in Ex3 with different class/function names.
@@ -39,8 +42,9 @@ Implications for Ex3:
   penalized as heavily as an uncaught bug. Implementing a partial/wrong version of a required check is
   actually *safer than not implementing it at all*, because at least it gives the mutation something to
   break, which our tests can then catch.
-- **A test suite that hangs or crashes on unexpected input is its own liability**, independent of whether
-  the underlying feature is correct (see "Test robustness" below).
+- **A production search that only stops because occupancy is occupied/out-of-bounds will hang if that
+  check is mutated away** (see §3 / ALG28). That is a real liability. A grading report that lists many
+  "timeouts" is not, by itself, proof the suites hung — reproduce before treating it as a code defect.
 
 ## Category-by-category breakdown
 
@@ -127,28 +131,46 @@ Ex2:
   silently — and if we do adapt a local copy for some reason, keep an explicit TODO/reminder to reconcile
   it back before submission.
 
-### 3. Timeouts — capped penalty, but a symptom of a deeper problem
+### 3. Timeouts — almost all were grader false positives; one real hang remains
 
-Our component test suite **timed out on 27 of 28 injected bugs** (effectively every mutation we tested).
-Because the formula caps this penalty (`min(5, timeouts)`), it cost us the same fixed amount whether it
-was 1 timeout or 27 — but that's a lucky break, not something to rely on. A near-universal timeout pattern
-almost certainly means:
+The original `feedback.txt` listed **27 component timeouts** (every mutant except the coverage-only
+ALG29) plus **LID03 as an integration timeout**. Timeout weight in that report is **12.5** (not
+`min(5, timeouts)`). We reproduced the mutants in Docker (2026-08-22;
+`timeout-verification-results.md`) and appealed. The instructor restored **10 points** for those
+component and integration timeouts.
 
-- A test or fixture doesn't terminate deterministically when the code under test behaves slightly
-  differently than expected (e.g. a loop bounded by a sensor/measurement condition that a mutated
-  component no longer satisfies, so it spins forever instead of returning/erroring).
-- Tests may be relying on real timing/sleeps/threads instead of injectable/mockable clocks or bounded
-  iteration counts.
+What the reproduction actually showed:
+
+- **26 of 27** listed component "timeouts" are **not hangs**. Suites finish in well under a second
+  (simulation ~0.6s). They either **FAIL** (tests catch the bug) or **PASS** (tests miss it). They still
+  finish under a 12-core CPU hog.
+- **LID03 integration** (the only integration timeout in `feedback.txt`) is also not a hang: FAIL in
+  3.25s isolated, 12.92s under load — both under the assignment's 1-minute cap.
+- **ALG28 is a genuine hang.** `drone_mapper_algorithm_tests` was killed at 30s in isolation and again
+  under load. gdb: a single thread stuck in `MappingAlgorithmFrontier::findPath` →
+  `std::unordered_map::find`, from `MappingAlgorithm_FinishesWhenNoFrontierRemains`. The mutation
+  makes `isSpherePassable` always `return true`, so BFS has no occupancy/out-of-bounds bound and walks
+  an unbounded integer grid. Load is irrelevant; it hangs either way.
+
+The earlier draft of this section inferred a systemic test-fixture problem (wait-for-condition loops,
+real sleeps) from the 27-timeout list. That diagnosis was **wrong**. Do not "harden every test against
+hangs" on the back of the original report.
 
 **Lesson for Ex3:**
-- Any loop that depends on "wait until condition C from a dependency/mock" must have a hard iteration
-  cap or timeout guard, so a misbehaving dependency produces a **failing assertion**, not a hang.
-- Prefer deterministic mocks/fakes over real timing wherever a test's correctness depends on some
-  external condition eventually becoming true.
-- Add timeouts at the test-framework level (e.g. per-test timeout) as a safety net so a single bad
-  interaction fails fast and loud instead of hanging the whole suite.
-- Before submitting, deliberately try "breaking" a few of our own components (flip a condition, skip a
-  step) and confirm the tests **fail with a clear message**, not hang.
+- **Bound every BFS/search independently of occupancy.** `findPath` (and the other frontier helpers)
+  currently stop expanding a neighbour when `isSpherePassable` is false. Occupied / OutOfBounds is what
+  keeps the grid finite. If that check is mutated to always-passable — exactly what ALG28 injects —
+  the visited-set still grows without limit because new keys are generated forever. Clip neighbour keys
+  to the map's voxel volume, or cap expansions at map-cell count, so a broken passability check yields
+  "no path" rather than a hang. The Ex3 port of `MappingAlgorithmFrontier` still has this hang; add the
+  bound when touching the planner, don't re-tune around it.
+- A grading "timeout" is not proof of a hang. Reproduce with a wall-clock `timeout` around the **same
+  suite the report named** before changing product code or tests.
+- Per-test / ctest timeouts are still a useful safety net for the *real* hang class (ALG28), so a
+  single unbounded search fails fast instead of eating the whole suite. They would not have fixed the
+  26 false positives, because those suites already finished.
+- Before submitting, invert a passability/occupancy check in the planner and confirm the algorithm
+  tests **fail or return**, not hang. That is the mutation the grader actually used.
 
 ### 4. Coverage targets — landed almost exactly on target, don't assume we'll be this lucky again
 
@@ -184,8 +206,14 @@ and stop," it's a floor, and exceeding it is straightforwardly rewarded with no 
    ourselves (null checks, out-of-range checks, empty-collection checks).
 4. **Before submission, do our own mini mutation pass.** Pick a handful of the riskiest conditionals
    (direction flips, off-by-one bounds, min/max swaps, priority/ranking comparisons, status-dependent
-   branches) in the actual code, invert them locally, and confirm a test fails. This mirrors exactly what
-   the grader does and is the cheapest way to estimate our real coverage before submitting.
-5. **Don't let a passing build hide a hanging test.** Always run the full test suite with a wall-clock
-   timeout locally (e.g. via CI or a test-runner flag) so a hang is caught before submission, not
-   discovered in the grading report.
+   branches, occupancy/passability) in the actual code, invert them locally, and confirm a test fails
+   **without hanging**. This mirrors exactly what the grader does and is the cheapest way to estimate
+   our real coverage before submitting. ALG28 is the template: `isSpherePassable` → `return true`.
+5. **Reproduce a reported timeout before treating it as a hang.** Ex2's report listed 27 component
+   timeouts; 26 of them finished in well under a second as FAIL or PASS. Contesting the false
+   positives recovered 10 points. Keep the raw reproduction notes in
+   `../Drone-Mapper-ex2/207190406_209543255_grading/timeout-verification-results.md` rather than
+   copying the table here.
+6. **Do still run the suite under a wall-clock timeout** (CI or a test-runner flag). That is how we
+   distinguished ALG28 from the false positives, and it is the only cheap way to catch an unbounded
+   search before submission.

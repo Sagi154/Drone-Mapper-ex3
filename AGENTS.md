@@ -46,6 +46,7 @@ imitate blindly. Deadline: **Sep 6, 2026, 23:30**.
 | `docs/review-error-codes.md` | AdvCpp rubric codes (`e*`, `b*`) — no ex3-specific guideline published yet |
 | `docs/known-issues-guidelines.md` | Optional Known Issues excel — grade-neutral-or-better to submit |
 | `docs/open-questions.md` | Genuine ambiguities with a working assumption each — check the forum |
+| `docs/ex2-grading-handoff.md` | Lessons from the Ex2 grade (appealed to **87.5/100**) — frozen-API drift, obsolete bugs, and the ALG28 unbounded-BFS hang; not a plan for sequencing Ex3 |
 | `context/` | Assignment docx/pdf sources |
 
 ## Hard rules (see `.cursor/rules/` for the full versions)
