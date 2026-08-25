@@ -4,17 +4,15 @@ TAU Advanced Topics in Programming, Assignment 3. Splits ex2's monolithic simula
 separately built projects — `simulator_<ids>` executable that `dlopen`s an `Algorithm_<ids>.so` and a
 `MissionControl_<ids>.so` — and adds multithreaded comparative/competitive run modes.
 
-**Status:** joint setup complete (students.txt filled, baseline build verified, `Simulator/` subfolder
-layout materialised — see `docs/workplan.md` §Joint setup completed). Individual tracks in progress:
-Sagi → Algorithm + Simulator runtime shell (S1+); Yoav → MissionControl + Simulator world & data (U1+).
-Ex2's finished implementation in `../Drone-Mapper-ex2` is the reference to port from — not a spec to
-imitate blindly. Deadline: **Sep 6, 2026, 23:30**.
+**Status:** implementation is feature-complete enough for a full instructor-doc audit
+(`docs/assignment-compliance-pickup.md` — **start there**). Remaining work is compliance and
+submission docs, not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
 ## Start here
 
 1. Read `.cursor/rules/project-context.mdc` (always applies) and `docs/assignment3-checklist.md`.
-2. Read `docs/workplan.md` for the current work breakdown between Sagi and Yoav, ownership of
-   `UserCommon/`, and the explicit points where one of us waits on the other.
+2. Read `docs/assignment-compliance-pickup.md` for where we left off, then `docs/workplan.md` for
+   the historical Sagi/Yoav split (do not restart that split unless the pickup file says so).
 3. Before git branches, commits, or PRs: `git-workflow.mdc`.
 4. Before touching a published header: `frozen-interfaces.mdc` and `docs/api-delta-ex2-to-ex3.md` —
    ex2 code does not compile as-is (moved headers, changed namespaces, changed types).
@@ -32,18 +30,22 @@ imitate blindly. Deadline: **Sep 6, 2026, 23:30**.
 | `plugin-loading-and-registration` | Implementing or debugging `dlopen`/registration/`dlclose` |
 | `pre-submission-review` | Checking the 5-folder/ID-naming submission structure before zipping |
 | `verify-frozen-interfaces` | Confirming `common/` (and the other frozen folders) weren't touched |
+| `gather-instructor-context` | Extracting / re-diffing Assignment 3 from `context/` via subagents (docx/pdf win over `docs/`) |
+| `populate-known-issues` | Adding a row to `docs/known-issues.md` (optional excel export later) |
 
 ## Key docs
 
 | Path | Purpose |
 |------|---------|
-| `docs/workplan.md` | Concrete work items split between Sagi and Yoav, ordered by dependency, with explicit hand-off points and the smallest deliverable that unblocks each one |
+| `docs/assignment-compliance-pickup.md` | Where to pick up: instructor-doc audit verdict and ordered remaining work |
+| `docs/workplan.md` | Historical work items split between Sagi and Yoav (see pickup file first) |
 | `docs/assignment3-checklist.md` | Mandatory requirements, condensed from the assignment docx |
 | `docs/api-delta-ex2-to-ex3.md` | Header/type/namespace deltas between the ex2 and ex3 skeletons — **and** where our own `Drone-Mapper-ex2` deviated from the frozen ex2 headers itself (those need reverting, not porting) |
 | `docs/component-placement.md` | Which ex2 file goes in which of the 5 folders, and why |
 | `docs/error-handling-matrix.md` | Mandatory + optional fault-handling table (course staff PDF) |
 | `docs/map3d-contract.md` | `.npy` dtype rules (maps are **mixed** `int8`/`uint8`), world↔voxel mapping |
 | `docs/review-error-codes.md` | AdvCpp rubric codes (`e*`, `b*`) — no ex3-specific guideline published yet |
+| `docs/known-issues.md` | Working Known Issues rows (excel export is a later zip step) |
 | `docs/known-issues-guidelines.md` | Optional Known Issues excel — grade-neutral-or-better to submit |
 | `docs/open-questions.md` | Genuine ambiguities with a working assumption each — check the forum |
 | `docs/ex2-grading-handoff.md` | Lessons from the Ex2 grade (appealed to **87.5/100**) — frozen-API drift, obsolete bugs, and the ALG28 unbounded-BFS hang; not a plan for sequencing Ex3 |

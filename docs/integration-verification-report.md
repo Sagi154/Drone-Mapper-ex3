@@ -32,11 +32,14 @@ After raising the WSL2 VM to 8 GB (`.wslconfig`), TSan completed.
 - Command: `./Simulator/tests/manual/check_verbose.sh`
 - Result: file lists for off vs on were the same shape (reports, `*_error.log`, some
   `*_output_map.npy`, `startup_error.log`). No extra `*.verbose.txt` files.
-- Cause: `MissionControlImpl` only writes verbose output when `verbose` is set **and**
-  `output_map_file` is non-empty. Error/unscored cells often skip a usable map path.
-- Verdict: **FAIL as a user-visible extra-file check** on this composition. The flag is wired;
-  this input matrix does not exercise the verbose file path. Re-check on a composition that
-  completes with a real `output_map_file`.
+- Cause: two stacked gaps. (1) `main.cpp` never reads `args.verbose`;
+  `SimulationRunFactoryImpl` hardcodes `MissionControlDependencies.verbose = false`, so
+  MissionControl never sees the flag. (2) Even after that is wired, `MissionControlImpl`
+  only writes `*.verbose.txt` when `verbose` is set **and** `output_map_file` is non-empty;
+  Error/unscored cells on this composition often have no usable map path.
+- Verdict: **FAIL**. The CLI parses `-verbose` but the flag is **not** wired through to
+  MissionControl. Re-check after passing `args.verbose` into the factory constructor, on a
+  composition that completes with a real `output_map_file`.
 
 ## 4. Threading determinism (absent / 1 / 2 / 8)
 
@@ -82,6 +85,9 @@ After raising the WSL2 VM to 8 GB (`.wslconfig`), TSan completed.
 
 - House/`sim_compose.yaml` cells still all score `-1` / unscored — pre-existing, not introduced by
   this pass.
-- `-verbose` extra files not observed on this composition; confirm on a completing mission.
+- `-verbose` is parsed but never passed into `MissionControlDependencies` (`SimulationRunFactoryImpl`
+  hardcodes `false`). Wire it, then re-check extra files on a completing mission.
+- If every folder `.so` fails to load, `main.cpp` returns without writing `errors: [...]` in the
+  aggregate report.
 - TSan on Docker Desktop needs ~8 GB VM RAM, compile on Linux disk (not `C:\` bind mount), and
   often `--privileged` for ASLR. Documented in `Simulator/tests/manual/docker_tsan.sh`.
