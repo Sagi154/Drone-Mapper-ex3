@@ -121,6 +121,7 @@ set(SIMULATOR_CORE_SOURCES
 
 add_executable(test_simulation_run_factory
     tests/test_simulation_run_factory.cpp
+    tests/test_simulation_run_impl.cpp
     ${SIMULATOR_CORE_SOURCES}
 )
 
