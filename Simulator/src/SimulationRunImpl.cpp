@@ -8,10 +8,14 @@
 #include <Simulator/SimulationRunImpl.h>
 
 #include <Simulator/MapsComparison.h>
+#include <Simulator/OutputPathUtil.h>
 
+#include <UserCommon_207190406_209543255/RunErrorLog.h>
 #include <UserCommon_207190406_209543255/SimulationCoordUtil.h>
 
+#include <memory>
 #include <stdexcept>
+#include <vector>
 
 namespace simulator {
 
@@ -25,6 +29,16 @@ namespace {
         return types::ResolutionRequestStatus::Accepted;
     }
     return types::ResolutionRequestStatus::Ignored;
+}
+
+void logErrors(UserCommon_207190406_209543255::RunErrorLog* log,
+               const std::vector<common::types::ErrorRef>& errors) {
+    if (log == nullptr) {
+        return;
+    }
+    for (const auto& error : errors) {
+        log->log(error);
+    }
 }
 
 } // namespace
@@ -66,7 +80,14 @@ types::SimulationResult SimulationRunImpl::run() {
     result.resolution_request_status =
         resolutionStatus(mission_config_.output_mapping_resolution_factor);
 
+    std::unique_ptr<UserCommon_207190406_209543255::RunErrorLog> error_log;
+    if (!output_map_file_.empty()) {
+        error_log = std::make_unique<UserCommon_207190406_209543255::RunErrorLog>(
+            errorLogPathFromOutputMap(output_map_file_));
+    }
+
     if (!startup_errors_.empty()) {
+        logErrors(error_log.get(), startup_errors_);
         result.mission_score = -1.0;
         result.mission_results.push_back(common::types::MissionRunResult{
             common::types::MissionRunStatus::Error,
@@ -95,6 +116,7 @@ types::SimulationResult SimulationRunImpl::run() {
         };
     }
     result.mission_results.push_back(mission_result);
+    logErrors(error_log.get(), mission_result.errors);
     result.output_map_config = output_map_->getMapConfig();
 
     if (!output_map_file_.empty()) {
@@ -103,10 +125,12 @@ types::SimulationResult SimulationRunImpl::run() {
         try {
             output_map_->save(output_map_file_);
         } catch (const std::exception& ex) {
+            const common::types::ErrorRef save_error{"MAP_SAVE_FAILED", ex.what()};
+            logErrors(error_log.get(), {save_error});
             result.mission_results.push_back(common::types::MissionRunResult{
                 common::types::MissionRunStatus::Error,
                 0,
-                {common::types::ErrorRef{"MAP_SAVE_FAILED", ex.what()}},
+                {save_error},
             });
             result.mission_score = -1.0;
             return result;

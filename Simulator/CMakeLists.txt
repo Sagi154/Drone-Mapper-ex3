@@ -121,6 +121,7 @@ set(SIMULATOR_CORE_SOURCES
 
 add_executable(test_simulation_run_factory
     tests/test_simulation_run_factory.cpp
+    tests/test_simulation_run_impl.cpp
     ${SIMULATOR_CORE_SOURCES}
 )
 
@@ -226,6 +227,17 @@ target_link_libraries(simulator_report_writers_test PRIVATE
     GTest::gtest_main
 )
 drone_warnings(simulator_report_writers_test)
+
+add_executable(simulator_output_path_util_test
+    tests/test_output_path_util.cpp
+)
+target_include_directories(simulator_output_path_util_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(simulator_output_path_util_test PRIVATE
+    GTest::gtest_main
+)
+drone_warnings(simulator_output_path_util_test)
 
 # Collision-checked output directory helper.
 add_library(simulator_output_dir STATIC
@@ -372,6 +384,7 @@ gtest_discover_tests(simulator_scoring_test)
 gtest_discover_tests(simulator_orchestrator_test)
 gtest_discover_tests(simulator_report_writers_test)
 gtest_discover_tests(simulator_output_dir_test)
+gtest_discover_tests(simulator_output_path_util_test)
 
 set(SIMULATOR_MAIN_SOURCES
     src/main.cpp
