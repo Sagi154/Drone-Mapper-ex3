@@ -3,6 +3,9 @@
 From `context/Known Issues.docx`. **Optional but grade-improving** — submit as an exported Excel file
 alongside the assignment. The staff provide a Google Sheet template to clone.
 
+Working rows (markdown, not the excel): `docs/known-issues.md`.
+Agent skill for adding/updating rows: `.cursor/skills/populate-known-issues/SKILL.md`.
+
 ## Why it is worth filling in
 
 - A documented known issue costs **no more** points than the same undocumented issue, and for small
@@ -13,6 +16,8 @@ alongside the assignment. The staff provide a Google Sheet template to clone.
 - It doubles as our own TODO list for the next iteration.
 
 Fill it in **English**. Questions go to the Moodle Ex 3 forum.
+
+**Do not treat Ex1 leftovers in `context/Submission Guidelines - Advanced Topics Assignments - 2026B.docx` as Ex3 gaps.** That file still describes `drone_mapper`, `map_output.txt`, three `original_output` folders, and zip `ID1_ID2.zip`. Assignment 3’s own docx wins for zip name (`ex3_<id1>_<id2>.zip`), CLI, `students.txt`, and the 5-folder layout. Compiler flags, HLD PDF, readme names/IDs, no binaries, and forum-approved libs still apply.
 
 ## Required columns
 
