@@ -203,4 +203,8 @@ one blank line in `sim_compose.yaml`), plus three new files:
   still reference `.npy`, so `.cw` is a visualization aid, not an input format. See
   `docs/open-questions.md`.
 
-No spawn positions or boundaries changed since the ex2 Jul 2026 sync, so all ex2 tuning results carry over.
+Ex3 `inputs/` was byte-identical to ex2's vendored instructor set at skeleton import time, but
+**house spawn was still wrong until 2026-08-26**: `house_simulation.yaml` had `height_cm: 10`
+(world z 160) while ex2's Jul 2026 sync used a passable spawn. Fixed locally to `height_cm: 150`
+(world z 300) on branch `fix-default-composition-scoring` — do not assume ex3 inputs matched ex2
+spawn tuning out of the box.
