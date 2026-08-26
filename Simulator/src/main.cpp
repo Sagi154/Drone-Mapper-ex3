@@ -104,6 +104,28 @@ int main(int argc, char** argv) {
 
     if (bindings.empty()) {
         std::cerr << "error: no plugins loaded successfully — nothing to run\n";
+        const std::string generated_at_utc = UC::currentUtcTimestamp();
+        if (args.mode == sim_io::SimulatorMode::Comparative) {
+            sim_io::ComparativeReportInput input;
+            input.composition_file = composition.composition_file;
+            input.mission_control_folder = args.mission_control_folder;
+            input.generated_at_utc = generated_at_utc;
+            input.results = {};
+            input.failed_plugins = failed_plugins;
+            sim_io::writeComparativeReport(output_root / "comparative_report.yaml", input);
+        } else {
+            sim_io::CompetitiveReportInput input;
+            input.composition_file = composition.composition_file;
+            input.mission_control = args.mission_control.filename().string();
+            input.generated_at_utc = generated_at_utc;
+            input.results = {};
+            input.failed_plugins = failed_plugins;
+            sim_io::writeCompetitiveReport(output_root / "competitive_report.yaml", input);
+        }
+        std::cout << "output written under: " << output_root << '\n';
+        bindings.clear();
+        factories.clear();
+        loader.unloadAll();
         return 0;
     }
 
