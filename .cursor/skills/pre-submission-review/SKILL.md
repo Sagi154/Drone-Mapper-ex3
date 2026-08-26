@@ -47,9 +47,9 @@ Confirm against `students.txt` (fill in the real IDs — the skeleton ships `TOD
 - [ ] Simulator executable: `simulator_<id1>_<id2>`
 - [ ] Algorithm shared object: `Algorithm_<id1>_<id2>.so` (no `lib` prefix)
 - [ ] MissionControl shared object: `MissionControl_<id1>_<id2>.so` (no `lib` prefix)
-- [ ] Algorithm code lives in `namespace Algorithm_<id1>_<id2>`
-- [ ] MissionControl code lives in `namespace MissionControl_<id1>_<id2>`
-- [ ] UserCommon code lives in `namespace UserCommon_<id1>_<id2>`
+- [ ] Algorithm code lives in `namespace algorithm_<id1>_<id2>`
+- [ ] MissionControl code lives in `namespace mission_control_<id1>_<id2>`
+- [ ] UserCommon code lives in `namespace user_common_<id1>_<id2>`
 - [ ] `REGISTER_MAPPING_ALGORITHM(MappingAlgorithmImpl_<id1>_<id2>)` and
       `REGISTER_MISSION_CONTROL(MissionControlImpl_<id1>_<id2>)` appear at global scope, once each
 - [ ] Zip file itself: `ex3_<id1>_<id2>.zip`

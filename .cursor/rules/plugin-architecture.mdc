@@ -14,9 +14,9 @@ graded as submission compliance (e18) or crash behavior.
 | Project | Artifact | Namespace for our code |
 |---------|----------|------------------------|
 | `Simulator` | executable `simulator_207190406_209543255` | `simulator` |
-| `Algorithm` | `Algorithm_207190406_209543255.so` (no `lib` prefix) | `Algorithm_207190406_209543255` |
-| `MissionControl` | `MissionControl_207190406_209543255.so` (no `lib` prefix) | `MissionControl_207190406_209543255` |
-| `UserCommon` | none — compiled into each consumer | `UserCommon_207190406_209543255` |
+| `Algorithm` | `Algorithm_207190406_209543255.so` (no `lib` prefix) | `algorithm_207190406_209543255` |
+| `MissionControl` | `MissionControl_207190406_209543255.so` (no `lib` prefix) | `mission_control_207190406_209543255` |
+| `UserCommon` | none — compiled into each consumer | `user_common_207190406_209543255` |
 
 The `.so` name and the namespace must both carry both student IDs so several teams' plugins can be loaded
 into one process. Suppress CMake's `lib` prefix with `set_target_properties(... PREFIX "")`.

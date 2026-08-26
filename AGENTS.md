@@ -5,9 +5,10 @@ separately built projects — `simulator_<ids>` executable that `dlopen`s an `Al
 `MissionControl_<ids>.so` — and adds multithreaded comparative/competitive run modes.
 
 **Status:** implementation is feature-complete enough for a full instructor-doc audit
-(`docs/assignment-compliance-pickup.md` — **start there**). `-verbose` wiring and empty-folder
-`errors:` reporting are done; remaining work is default-composition scoring and submission docs
-(README, HLD), not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
+(`docs/assignment-compliance-pickup.md` — **start there**). `-verbose` wiring, empty-folder
+`errors:` reporting, and snake_case plugin/UserCommon namespaces are done; remaining work is
+default-composition scoring and submission docs (README, HLD), not the Sagi/Yoav track split.
+Deadline: **Sep 6, 2026, 23:30**.
 
 ## Start here
 

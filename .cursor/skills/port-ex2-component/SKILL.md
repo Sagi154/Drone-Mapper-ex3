@@ -42,7 +42,7 @@ Full table in `docs/api-delta-ex2-to-ex3.md`. The mechanical pass:
 | `#include <drone_mapper/ISimulation*.h>`, `types/SimulationTypes.h` | `#include <Simulator/...>` |
 | `#include <drone_mapper/IDroneControl.h>` | `#include <MissionControl/IDroneControl.h>` |
 | `namespace drone_mapper` | `common` / `simulator` / `mission_control` for published types |
-| our own classes | wrap in `Algorithm_207190406_209543255`, `MissionControl_207190406_209543255`, or `UserCommon_207190406_209543255` |
+| our own classes | wrap in `algorithm_207190406_209543255`, `mission_control_207190406_209543255`, or `user_common_207190406_209543255` |
 | bare `types::` | `common::types::` or `simulator::types::` |
 
 `Common/Types.h` no longer pulls in the simulation types — a file that used `types::SimulationConfigData`

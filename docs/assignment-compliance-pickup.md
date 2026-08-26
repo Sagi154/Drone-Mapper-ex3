@@ -22,10 +22,9 @@ chat). Working Known Issues rows: `docs/known-issues.md`. Integration smoke:
 ## Verdict
 
 The implementation **does not currently follow the assignment with zero deviation**. Plugin
-layout, CLI shape, threading, registration, frozen headers, `-verbose` wiring, and all-folder
-`errors:` reporting match the instructor docs. One default-scenario failure, a **namespace
-casing mismatch** vs the refreshed Assignment 3 docx (2026-08-26 forum download), and two
-submission-doc gaps do not.
+layout, CLI shape, threading, registration, frozen headers, `-verbose` wiring, all-folder
+`errors:` reporting, and snake_case plugin/UserCommon namespaces match the instructor docs. One
+default-scenario failure and two submission-doc gaps do not.
 
 Highest-leverage next work is below.
 
@@ -39,12 +38,10 @@ Highest-leverage next work is below.
    runs — the scorer is not the failure. After this lands, re-run
    `Simulator/tests/manual/check_verbose.sh` on a completing cell for the file-list check
    (`*.verbose.txt` only appears when `-verbose` is set).
-2. **Align plugin / UserCommon namespaces to snake_case** (see Must fix §2 below). Forum
-   Assignment 3 update; `.so` / exe names stay PascalCase-prefixed.
-3. **Rewrite `README.md`** (remove skeleton placeholder; names + IDs, cmake presets, both CLI
+2. **Rewrite `README.md`** (remove skeleton placeholder; names + IDs, cmake presets, both CLI
    lines, `.so`/exe names, keep the output-naming section). **Add HLD PDF** at zip-root
    (e14/e15).
-4. **Export Known Issues excel** only at zip time: copy `docs/known-issues.md` into the staff
+3. **Export Known Issues excel** only at zip time: copy `docs/known-issues.md` into the staff
    Google Sheet clone. Agent skill: `.cursor/skills/populate-known-issues/SKILL.md`.
 
 ---
@@ -63,6 +60,14 @@ Highest-leverage next work is below.
   `writeComparativeReport` / `writeCompetitiveReport` with empty `results` and filled
   `failed_plugins`. Evidence: `Simulator/src/main.cpp` empty-`bindings` branch. Integration:
   `Simulator/tests/manual/check_all_folder_plugins_fail.sh`.
+- **Snake_case plugin / UserCommon namespaces.** Code and include path use
+  `algorithm_207190406_209543255`, `mission_control_207190406_209543255`,
+  `user_common_207190406_209543255` (include dir `UserCommon/include/user_common_…/`). `.so` /
+  exe / CMake target names unchanged. Evidence: Algorithm / MissionControl / UserCommon sources;
+  Docker: full `ctest` green, `nm` Registration symbols present, comparative CLI loads plugins.
+  Docs/rules swept: `docs/assignment3-checklist.md`, `docs/component-placement.md`,
+  `.cursor/rules/project-context.mdc`, `.cursor/rules/plugin-architecture.mdc`,
+  `.cursor/skills/pre-submission-review/SKILL.md`, `.cursor/skills/port-ex2-component/SKILL.md`.
 
 ---
 
@@ -73,42 +78,15 @@ Highest-leverage next work is below.
 AdvCpp: happy flow must finish on provided default scenarios. CLI modes run and write reports;
 every cell stays `mission_score < 0`. See `docs/integration-verification-report.md`.
 
-### 2. Namespace names — snake_case (Assignment 3 forum update, 2026-08-26)
-
-`context/Advanced Topics TAU 2026B - Assignment 3.docx` was replaced with the course-forum
-download. Diff vs the prior copy: **only** the required C++ namespace spellings changed
-(`.so` / executable names unchanged).
-
-| Artifact | Required now (assignment) | Current tree (deviates) |
-|----------|---------------------------|-------------------------|
-| Algorithm namespace | `algorithm_207190406_209543255` | `Algorithm_207190406_209543255` |
-| MissionControl namespace | `mission_control_207190406_209543255` | `MissionControl_207190406_209543255` |
-| UserCommon namespace | `user_common_207190406_209543255` | `UserCommon_207190406_209543255` |
-| Algorithm `.so` | `Algorithm_207190406_209543255.so` | already matches |
-| MissionControl `.so` | `MissionControl_207190406_209543255.so` | already matches |
-| Simulator exe | `simulator_207190406_209543255` | already matches |
-
-**Verify / fix before submit:**
-
-- Rename every `namespace Algorithm_*` / `MissionControl_*` / `UserCommon_*` (and matching
-  `using` / qualifiers / include-path folder names that encode the namespace) to the snake_case
-  forms above.
-- Rebuild both `.so`s and the simulator; confirm `REGISTER_*` still resolves and comparative /
-  competitive CLI still load plugins.
-- Sweep stale PascalCase namespace claims in `docs/assignment3-checklist.md`,
-  `docs/component-placement.md`, `.cursor/rules/project-context.mdc`, and
-  `.cursor/skills/pre-submission-review/SKILL.md` once the code matches.
-- This supersedes the old “Not deviations” note that treated skeleton lowercase namespaces as
-  a staff contradiction — the Assignment 3 docx now matches that casing.
-
 ---
 
 ## Passes (no deviation from the assignment text)
 
 - Five folders; ID-suffixed `simulator_207190406_209543255`, `Algorithm_*.so`,
-  `MissionControl_*.so`; `REGISTER_*` at global scope; `PREFIX ""`;
+  `MissionControl_*.so`; namespaces `algorithm_*` / `mission_control_*` / `user_common_*`;
+  `REGISTER_*` at global scope; `PREFIX ""`;
   registration `.cpp` only in Simulator; `ENABLE_EXPORTS`; `dlclose` after destroying plugin
-  objects; no reload; `RTLD_LOCAL`. *(Namespaces: see Must fix §2 — not yet snake_case.)*
+  objects; no reload; `RTLD_LOCAL`.
 - Frozen `common/`, `Simulator/common_simulator/`, `MissionControl/common_mission_control/` —
   no diff vs `main`.
 - CLI: `-comparative` / `-competition`, any order, usage lists **all** missing/unsupported
