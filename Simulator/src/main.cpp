@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         const auto& algorithm_factory = loader.algorithms().front().factory;
         for (const auto& mc : loader.missionControls()) {
             factories.push_back(std::make_unique<simulator::SimulationRunFactoryImpl>(
-                algorithm_factory, mc.factory));
+                algorithm_factory, mc.factory, args.verbose));
             bindings.push_back({mc.filename, factories.back().get()});
         }
     } else {
@@ -97,13 +97,35 @@ int main(int argc, char** argv) {
         const auto& mission_control_factory = loader.missionControls().front().factory;
         for (const auto& algo : loader.algorithms()) {
             factories.push_back(std::make_unique<simulator::SimulationRunFactoryImpl>(
-                algo.factory, mission_control_factory));
+                algo.factory, mission_control_factory, args.verbose));
             bindings.push_back({algo.filename, factories.back().get()});
         }
     }
 
     if (bindings.empty()) {
         std::cerr << "error: no plugins loaded successfully — nothing to run\n";
+        const std::string generated_at_utc = UC::currentUtcTimestamp();
+        if (args.mode == sim_io::SimulatorMode::Comparative) {
+            sim_io::ComparativeReportInput input;
+            input.composition_file = composition.composition_file;
+            input.mission_control_folder = args.mission_control_folder;
+            input.generated_at_utc = generated_at_utc;
+            input.results = {};
+            input.failed_plugins = failed_plugins;
+            sim_io::writeComparativeReport(output_root / "comparative_report.yaml", input);
+        } else {
+            sim_io::CompetitiveReportInput input;
+            input.composition_file = composition.composition_file;
+            input.mission_control = args.mission_control.filename().string();
+            input.generated_at_utc = generated_at_utc;
+            input.results = {};
+            input.failed_plugins = failed_plugins;
+            sim_io::writeCompetitiveReport(output_root / "competitive_report.yaml", input);
+        }
+        std::cout << "output written under: " << output_root << '\n';
+        bindings.clear();
+        factories.clear();
+        loader.unloadAll();
         return 0;
     }
 

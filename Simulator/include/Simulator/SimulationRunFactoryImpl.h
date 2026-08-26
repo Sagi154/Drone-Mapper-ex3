@@ -14,7 +14,8 @@ namespace simulator {
 class SimulationRunFactoryImpl final : public ISimulationRunFactory {
 public:
     SimulationRunFactoryImpl(common::MappingAlgorithmFactory algorithm_factory,
-                              common::MissionControlFactory   mission_control_factory);
+                              common::MissionControlFactory   mission_control_factory,
+                              bool                            verbose);
 
     [[nodiscard]] std::unique_ptr<ISimulationRun> create(
         const types::SimulationConfigData&    simulation_config,
@@ -26,6 +27,7 @@ public:
 private:
     common::MappingAlgorithmFactory  algorithm_factory_;
     common::MissionControlFactory    mission_control_factory_;
+    bool                             verbose_ = false;
 };
 
 } // namespace simulator

@@ -73,6 +73,19 @@ struct FakeMissionControl final : public common::IMissionControl {
     };
 }
 
+struct CapturedMcDeps {
+    bool verbose = false;
+};
+
+[[nodiscard]] static common::MissionControlFactory makeCapturingMissionControlFactory(
+    CapturedMcDeps& sink) {
+    return [&sink](common::MissionControlDependencies deps)
+               -> std::unique_ptr<common::IMissionControl> {
+        sink.verbose = deps.verbose;
+        return std::make_unique<FakeMissionControl>(deps);
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Helpers to create a tiny .npy hidden map on disk
 // ---------------------------------------------------------------------------
@@ -111,9 +124,48 @@ TEST(SimulationRunFactory, CreateReturnsNonNull) {
     mission.gps_resolution                   = 10.0 * common::cm;
     mission.output_mapping_resolution_factor = 1.0;
 
-    simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory()};
+    simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory(),
+                                                false};
     auto run = factory.create(sim, mission, {}, {}, tmp / "output.npy");
     EXPECT_NE(run, nullptr);
+
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+}
+
+TEST(SimulationRunFactory, PassesVerboseTrueToMissionControl) {
+    const fs::path tmp = fs::temp_directory_path() / "srf_verbose_true";
+    const fs::path map_path = writeTinyHiddenMap(tmp, 10, 10, 10);
+
+    simulator::types::SimulationConfigData sim{};
+    sim.map_filename = map_path;
+    sim.map_resolution = 10.0 * common::cm;
+
+    CapturedMcDeps captured;
+    simulator::SimulationRunFactoryImpl factory{
+        makeAlgorithmFactory(), makeCapturingMissionControlFactory(captured), true};
+    auto run = factory.create(sim, {}, {}, {}, tmp / "output.npy");
+    EXPECT_NE(run, nullptr);
+    EXPECT_TRUE(captured.verbose);
+
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+}
+
+TEST(SimulationRunFactory, PassesVerboseFalseToMissionControl) {
+    const fs::path tmp = fs::temp_directory_path() / "srf_verbose_false";
+    const fs::path map_path = writeTinyHiddenMap(tmp, 10, 10, 10);
+
+    simulator::types::SimulationConfigData sim{};
+    sim.map_filename = map_path;
+    sim.map_resolution = 10.0 * common::cm;
+
+    CapturedMcDeps captured;
+    simulator::SimulationRunFactoryImpl factory{
+        makeAlgorithmFactory(), makeCapturingMissionControlFactory(captured), false};
+    auto run = factory.create(sim, {}, {}, {}, tmp / "output.npy");
+    EXPECT_NE(run, nullptr);
+    EXPECT_FALSE(captured.verbose);
 
     std::error_code ec;
     fs::remove_all(tmp, ec);
@@ -152,7 +204,8 @@ TEST(SimulationRunFactory, OutputMapConfigReflectsOffset_HouseScenarioShape) {
     mission.mission_bounds.min_height =   0.0 * common::z_extent[common::cm];
     mission.mission_bounds.max_height =  60.0 * common::z_extent[common::cm];
 
-    simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory()};
+    simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory(),
+                                                false};
     auto run = factory.create(sim, mission, {}, {}, tmp / "output.npy");
     ASSERT_NE(run, nullptr);
 
@@ -175,7 +228,8 @@ TEST(SimulationRunFactory, MissingMapFileStillReturnsNonNullRun) {
     sim.map_filename   = "/no/such/map.npy";
     sim.map_resolution = 10.0 * common::cm;
 
-    simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory()};
+    simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory(),
+                                                false};
     auto run = factory.create(sim, {}, {}, {}, "/tmp/srf_missing.npy");
     EXPECT_NE(run, nullptr);
 

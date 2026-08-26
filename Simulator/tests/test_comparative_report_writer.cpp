@@ -54,3 +54,25 @@ TEST(ComparativeReportWriter, GroupsTiedResultsAndListsErrors) {
 
     std::filesystem::remove(out);
 }
+
+TEST(ComparativeReportWriter, EmptyResultsStillListsFailedPlugins) {
+    simulator::io::ComparativeReportInput input;
+    input.composition_file = "sim_compose.yaml";
+    input.mission_control_folder = "mission_controls";
+    input.generated_at_utc = "2026-08-26T00:00:00Z";
+    input.results = {};
+    input.failed_plugins = {"bad_mc.so"};
+
+    const std::filesystem::path out =
+        std::filesystem::temp_directory_path() / "test_comparative_empty_errors.yaml";
+    simulator::io::writeComparativeReport(out, input);
+
+    const YAML::Node report = YAML::LoadFile(out.string())["comparative_report"];
+    ASSERT_TRUE(report);
+    ASSERT_TRUE(report["results_summary"].IsSequence());
+    EXPECT_EQ(report["results_summary"].size(), 0U);
+    ASSERT_EQ(report["errors"].size(), 1U);
+    EXPECT_EQ(report["errors"][0].as<std::string>(), "bad_mc.so");
+
+    std::filesystem::remove(out);
+}
