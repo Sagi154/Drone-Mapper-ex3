@@ -15,4 +15,4 @@ docker run --rm -v "$ROOT:/data" -w /data minlag/mermaid-cli \
 # Strip mermaid fences for pandoc (images already embedded via markdown image links).
 # Pandoc reads docs/HLD.md; resource path includes docs/ so hld/*.png resolve.
 docker run --rm -v "$ROOT:/data" -w /data/docs pandoc/latex \
-  HLD.md -o /data/HLD.pdf --resource-path=. -f markdown -t pdf
+  HLD.md -o /data/HLD.pdf --resource-path=. -f markdown -t pdf --pdf-engine=xelatex

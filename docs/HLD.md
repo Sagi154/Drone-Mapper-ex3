@@ -59,7 +59,7 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   Pre-sizes the result table; each slot is written exactly once.
 
 - **`WorkDistributor`** — Schedules cell indices across threads. `num_threads` absent or
-  `1` → main thread only. `N ≥ 2` → up to `N` worker threads (capped at cell count);
+  `1` → main thread only. `N >= 2` → up to `N` worker threads (capped at cell count);
   main joins. Wraps per-cell work in `try`/`catch` so a plugin throw cannot terminate
   the process.
 
@@ -300,7 +300,7 @@ output map when possible, assigns score `-1`, and lets the run matrix continue.
 |-----|----------|
 | `num_threads` absent | Main thread runs all cells |
 | `num_threads=1` | Main thread runs all cells |
-| `num_threads=N` (N ≥ 2) | Up to N worker threads plus the main thread (workers capped at cell count) |
+| `num_threads=N` (N >= 2) | Up to N worker threads plus the main thread (workers capped at cell count) |
 
 All `.so` files are loaded on the main thread before workers start. Each matrix cell
 creates fresh plugin instances via the stored factories — instances are never shared or
@@ -322,5 +322,5 @@ and reads voxel occupancy for planning only — it never mutates the map. All sc
 go through `DroneControlImpl` → `ScanResultToVoxels` → output `Map3DImpl`.
 
 After the mission, `SimulationRunImpl` calls `MapsComparison` to score the output map
-against the hidden map. World ↔ voxel conversion and axis offsets are centralized in
+against the hidden map. World <-> voxel conversion and axis offsets are centralized in
 `user_common_207190406_209543255::SimulationCoordUtil`.
