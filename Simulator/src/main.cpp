@@ -8,8 +8,8 @@
 #include <Simulator/io/SimulationOutputYamlWriter.h>
 #include <Simulator/io/YamlConfigParsers.h>
 
-#include <UserCommon_207190406_209543255/RunErrorLog.h>
-#include <UserCommon_207190406_209543255/TimeFormat.h>
+#include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/TimeFormat.h>
 
 #include <filesystem>
 #include <iostream>
@@ -20,7 +20,7 @@ namespace {
 
 namespace fs = std::filesystem;
 namespace sim_io = simulator::io;
-namespace UC = UserCommon_207190406_209543255;
+namespace UC = user_common_207190406_209543255;
 
 } // namespace
 

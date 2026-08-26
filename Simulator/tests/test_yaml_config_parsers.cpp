@@ -8,7 +8,7 @@
 #include <Simulator/io/PathResolver.h>
 #include <Simulator/SimulationTypes.h>
 
-#include <UserCommon_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/RunErrorLog.h>
 
 #include <gtest/gtest.h>
 
@@ -22,7 +22,7 @@ namespace fs = std::filesystem;
 using namespace common;
 using namespace common::types;
 using namespace simulator;
-using namespace UserCommon_207190406_209543255;
+using namespace user_common_207190406_209543255;
 
 // ---------------------------------------------------------------------------
 // Helpers

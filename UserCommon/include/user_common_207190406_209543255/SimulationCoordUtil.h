@@ -3,7 +3,7 @@
 #include <Common/IMap3D.h>
 #include <Simulator/SimulationTypes.h>
 
-namespace UserCommon_207190406_209543255 {
+namespace user_common_207190406_209543255 {
 
 /// Mission-local initial pose from YAML is shifted by `map_offset.z` to hidden-map world Z.
 [[nodiscard]] common::Position3D worldInitialDronePosition(
@@ -14,4 +14,4 @@ namespace UserCommon_207190406_209543255 {
                                         common::PhysicalLength radius,
                                         const common::Position3D& center);
 
-} // namespace UserCommon_207190406_209543255
+} // namespace user_common_207190406_209543255

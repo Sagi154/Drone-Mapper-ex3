@@ -1,6 +1,6 @@
 #include <Simulator/io/OutputDirHelper.h>
 
-#include <UserCommon_207190406_209543255/TimeFormat.h>
+#include <user_common_207190406_209543255/TimeFormat.h>
 
 namespace simulator::io {
 
@@ -15,7 +15,7 @@ namespace {
 std::filesystem::path createOutputDir(const std::filesystem::path& base_folder,
                                       OutputDirKind kind, std::error_code& ec) {
     ec.clear();
-    const std::string timestamp = UserCommon_207190406_209543255::currentUtcTimestamp();
+    const std::string timestamp = user_common_207190406_209543255::currentUtcTimestamp();
     const std::string prefix = prefixFor(kind);
 
     std::filesystem::path candidate = base_folder / (prefix + timestamp);

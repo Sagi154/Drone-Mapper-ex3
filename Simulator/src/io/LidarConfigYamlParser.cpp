@@ -4,7 +4,7 @@
 
 namespace simulator::io {
 
-namespace UC = UserCommon_207190406_209543255;
+namespace UC = user_common_207190406_209543255;
 
 UC::ConfigParseResult<common::types::LidarConfigData>
 parseLidarConfig(const std::filesystem::path& path, UC::IRunErrorLog& log) {

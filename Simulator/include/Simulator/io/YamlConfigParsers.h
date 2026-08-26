@@ -1,7 +1,7 @@
 #pragma once
 
-#include <UserCommon_207190406_209543255/ConfigParseResult.h>
-#include <UserCommon_207190406_209543255/IRunErrorLog.h>
+#include <user_common_207190406_209543255/ConfigParseResult.h>
+#include <user_common_207190406_209543255/IRunErrorLog.h>
 
 #include <Common/types/DroneTypes.h>
 #include <Common/types/LidarTypes.h>
@@ -16,24 +16,24 @@ namespace simulator::io {
 /// Missing files and parse errors are logged via IRunErrorLog and reflected
 /// in the result — callers should inspect result.ok and result.errors.
 
-[[nodiscard]] UserCommon_207190406_209543255::ConfigParseResult<common::types::DroneConfigData>
+[[nodiscard]] user_common_207190406_209543255::ConfigParseResult<common::types::DroneConfigData>
 parseDroneConfig(const std::filesystem::path& path,
-                 UserCommon_207190406_209543255::IRunErrorLog& log);
+                 user_common_207190406_209543255::IRunErrorLog& log);
 
-[[nodiscard]] UserCommon_207190406_209543255::ConfigParseResult<common::types::LidarConfigData>
+[[nodiscard]] user_common_207190406_209543255::ConfigParseResult<common::types::LidarConfigData>
 parseLidarConfig(const std::filesystem::path& path,
-                 UserCommon_207190406_209543255::IRunErrorLog& log);
+                 user_common_207190406_209543255::IRunErrorLog& log);
 
-[[nodiscard]] UserCommon_207190406_209543255::ConfigParseResult<common::types::MissionConfigData>
+[[nodiscard]] user_common_207190406_209543255::ConfigParseResult<common::types::MissionConfigData>
 parseMissionConfig(const std::filesystem::path& path,
-                   UserCommon_207190406_209543255::IRunErrorLog& log);
+                   user_common_207190406_209543255::IRunErrorLog& log);
 
-[[nodiscard]] UserCommon_207190406_209543255::ConfigParseResult<simulator::types::SimulationConfigData>
+[[nodiscard]] user_common_207190406_209543255::ConfigParseResult<simulator::types::SimulationConfigData>
 parseSimulationConfig(const std::filesystem::path& path,
-                      UserCommon_207190406_209543255::IRunErrorLog& log);
+                      user_common_207190406_209543255::IRunErrorLog& log);
 
-[[nodiscard]] UserCommon_207190406_209543255::ConfigParseResult<simulator::types::SimulationCompositionData>
+[[nodiscard]] user_common_207190406_209543255::ConfigParseResult<simulator::types::SimulationCompositionData>
 parseCompositionFile(const std::filesystem::path& path,
-                     UserCommon_207190406_209543255::IRunErrorLog& log);
+                     user_common_207190406_209543255::IRunErrorLog& log);
 
 } // namespace simulator::io

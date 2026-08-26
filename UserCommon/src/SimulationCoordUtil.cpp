@@ -1,8 +1,8 @@
-#include <UserCommon_207190406_209543255/SimulationCoordUtil.h>
+#include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
 #include <cmath>
 
-namespace UserCommon_207190406_209543255 {
+namespace user_common_207190406_209543255 {
 
 namespace {
 
@@ -63,4 +63,4 @@ bool isDroneSpawnPassable(const common::IMap3D& hidden_map,
     return !sphereCollides(hidden_map, center, radius);
 }
 
-} // namespace UserCommon_207190406_209543255
+} // namespace user_common_207190406_209543255
