@@ -1,0 +1,26 @@
+sequenceDiagram
+    actor User
+    participant Main as simulator main
+    participant Loader as PluginLoader
+    participant Reg as PluginRegistrar
+    participant Orch as RunMatrixOrchestrator
+    participant Factory as SimulationRunFactoryImpl
+    participant Run as SimulationRunImpl
+    participant MC as MissionControlImpl_207190406_209543255
+    participant Score as MapsComparison
+
+    User->>Main: -comparative simulation=... mission_control_folder=... algorithm=...
+    Main->>Loader: loadAlgorithmSo + loadMissionControlsFromDirectory
+    Loader->>Reg: REGISTER_* static ctors fill pending factories
+    Main->>Orch: expand composition to cells
+    loop each cell x each MissionControl binding
+        Orch->>Factory: create(sim, mission, drone, lidar, algorithm factory, mc factory, ...)
+        Factory->>Run: wire maps, mocks, plugins
+        Orch->>Run: run()
+        Run->>MC: runMission()
+        MC-->>Run: MissionRunResult
+        Run->>Score: compare(hidden, output)
+        Run-->>Orch: SimulationResult (score, steps, paths)
+    end
+    Main->>Main: write comparative_report.yaml + per-plugin YAML
+    Main->>Loader: destroy plugin objects then unloadAll / dlclose

@@ -1,60 +1,85 @@
-# Assignment 3 - Drone Mapper
+# Drone Mapper — Assignment 3
 
-This is the core skeleton for assignment 3. You should update this README file.
+**Authors:** Sagi Eisenberg (207190406), Yoav Naaman (209543255)
 
-Use the lowercase project namespaces `common`, `algorithm`, `mission_control`, and `simulator` in your implementation.
+TAU Advanced Topics in Programming (2026B). Three separately built projects: a
+`simulator_<ids>` executable that `dlopen`s `Algorithm_<ids>.so` and
+`MissionControl_<ids>.so`.
 
-## Provided file tree
+| Artifact | Name |
+|----------|------|
+| Executable | `simulator_207190406_209543255` |
+| Algorithm plugin | `Algorithm_207190406_209543255.so` |
+| MissionControl plugin | `MissionControl_207190406_209543255.so` |
 
-```text
-.
-|-- .devcontainer/...
-|-- Algorithm/
-|   |-- CMakeLists.txt
-|   |-- include/Algorithm/
-|   `-- src/
-|-- MissionControl/
-|   |-- CMakeLists.txt
-|   |-- common_mission_control/include/MissionControl/IDroneControl.h
-|   |-- include/MissionControl/
-|   `-- src/
-|-- Simulator/
-|   |-- CMakeLists.txt
-|   |-- common_simulator/include/Simulator/
-|   |   |-- ISimulation.h
-|   |   |-- ISimulationRun.h
-|   |   |-- ISimulationRunFactory.h
-|   |   `-- SimulationTypes.h
-|   |-- include/Simulator/
-|   `-- src/
-|-- common/
-|   |-- CMakeLists.txt
-|   `-- include/Common/
-|       |-- types/
-|       |   |-- DroneTypes.h
-|       |   |-- LidarTypes.h
-|       |   |-- MapTypes.h
-|       |   `-- MissionTypes.h
-|       |-- IDroneMovement.h
-|       |-- IGPS.h
-|       |-- ILidar.h
-|       |-- IMap3D.h
-|       |-- IMappingAlgorithm.h
-|       |-- IMissionControl.h
-|       |-- IMutableMap3D.h
-|       |-- MappingAlgorithmFactory.h
-|       |-- MappingAlgorithmRegistration.h
-|       |-- MissionControlFactory.h
-|       |-- MissionControlRegistration.h
-|       |-- Types.h
-|       `-- Units.h
-|-- .gitignore
-|-- CMakeLists.txt
-|-- CMakePresets.json
-|-- README.md
-|-- students.txt
-|-- vcpkg-configuration.json
-`-- vcpkg.json
+Plugin / UserCommon **namespaces** (code): `algorithm_207190406_209543255`,
+`mission_control_207190406_209543255`, `user_common_207190406_209543255`.
+
+## Build
+
+Requires Docker image `drone-mapper-ex3-dev` (or an equivalent Linux + vcpkg + Ninja
+environment with `VCPKG_ROOT` set). Dependencies come from `vcpkg.json` via the
+CMake toolchain — no manual `apt`/`pip` library installs.
+
+```bash
+cmake --preset default
+cmake --build --preset default
+```
+
+Outputs land under `build/default/`:
+
+- `build/default/Simulator/simulator_207190406_209543255`
+- `build/default/Algorithm/Algorithm_207190406_209543255.so`
+- `build/default/MissionControl/MissionControl_207190406_209543255.so`
+
+Optional ThreadSanitizer preset: `cmake --preset tsan` / `cmake --build --preset tsan`.
+
+## Run
+
+Arguments may appear in any order. The `=` sign has no spaces around it.
+
+### Comparative mode
+
+```bash
+./simulator_207190406_209543255 -comparative \
+  simulation=<composition.yaml> \
+  mission_control_folder=<folder_with_MissionControl_*.so> \
+  algorithm=<Algorithm_*.so> \
+  [num_threads=<N>] \
+  [-verbose]
+```
+
+### Competition mode
+
+```bash
+./simulator_207190406_209543255 -competition \
+  simulation=<composition.yaml> \
+  mission_control=<MissionControl_*.so> \
+  algorithms_folder=<folder_with_Algorithm_*.so> \
+  [num_threads=<N>] \
+  [-verbose]
+```
+
+`num_threads` absent or `1`: work runs on the main thread only. `N >= 2`: `N` worker
+threads plus the main thread. `-verbose` enables MissionControl verbose files.
+
+Example (from the repo root, after build), using the provided composition:
+
+```bash
+BUILD=build/default
+SCRATCH=/tmp/ex3_mc
+mkdir -p "$SCRATCH"
+cp "$BUILD/MissionControl/MissionControl_207190406_209543255.so" "$SCRATCH/"
+"$BUILD/Simulator/simulator_207190406_209543255" -comparative \
+  simulation=inputs/sim_compose.yaml \
+  mission_control_folder="$SCRATCH" \
+  algorithm="$BUILD/Algorithm/Algorithm_207190406_209543255.so"
+```
+
+## Tests
+
+```bash
+ctest --test-dir build/default --output-on-failure
 ```
 
 ## Output naming
