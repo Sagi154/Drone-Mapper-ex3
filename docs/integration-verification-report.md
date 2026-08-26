@@ -81,13 +81,20 @@ After raising the WSL2 VM to 8 GB (`.wslconfig`), TSan completed.
 - Result: empty.
 - Verdict: **PASS**
 
+## Update 2026-08-26 (default composition scoring)
+
+After `house_simulation.yaml` spawn fix (`height_cm` 10→150) on branch
+`fix-default-composition-scoring`: `SPAWN_NOT_PASSABLE` cleared; **4 house cells `Completed` with
+`mission_score` 100**; 20 cells still Error / `MISSION_EXCEPTION`. AdvCpp happy-flow bar met.
+`check_verbose.sh` file-list passes on a completing cell. Full `ctest` 85/85 green. The 2026-08-25
+smoke results below remain the baseline for that run; see `docs/assignment-compliance-pickup.md`
+for current status.
+
 ## Open follow-ups
 
-- House/`sim_compose.yaml` cells still all score `-1` / unscored — pre-existing, not introduced by
-  this pass.
-- `-verbose` is parsed but never passed into `MissionControlDependencies` (`SimulationRunFactoryImpl`
-  hardcodes `false`). Wire it, then re-check extra files on a completing mission.
-- If every folder `.so` fails to load, `main.cpp` returns without writing `errors: [...]` in the
-  aggregate report.
+- ~~20/24 `sim_compose.yaml` cells Error / `MISSION_EXCEPTION`.~~ **Resolved 2026-08-27:**
+  comparative 24/24 `COMPLETED`, all scores ≥ 0, `MISSION_EXCEPTION` 0 (~276s). See
+  `docs/known-issues.md` row 2 and
+  `docs/superpowers/specs/2026-08-27-wall-collision-recovery-and-planner-design.md`.
 - TSan on Docker Desktop needs ~8 GB VM RAM, compile on Linux disk (not `C:\` bind mount), and
   often `--privileged` for ASLR. Documented in `Simulator/tests/manual/docker_tsan.sh`.

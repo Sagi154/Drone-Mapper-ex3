@@ -89,7 +89,7 @@ public:
 
     common::types::MovementResult advance(PhysicalLength /*distance*/) override {
         if (throw_on_advance_) {
-            throw std::runtime_error("wall collision");
+            throw std::runtime_error(advance_throw_message_);
         }
         if (!advance_ok_) {
             return {false, "Movement failed."};
@@ -103,6 +103,8 @@ public:
 
     bool throw_on_advance_ = false;
     bool advance_ok_ = true;
+    std::string advance_throw_message_ =
+        "advance: destination blocked by obstacle or map boundary";
 };
 
 class ScriptedAlgorithm final : public common::IMappingAlgorithm {
@@ -257,9 +259,11 @@ TEST(DroneControl, ReturnsErrorWhenMovementExceedsDroneLimits) {
     EXPECT_NE(result.message.find("limits"), std::string::npos);
 }
 
-TEST(DroneControl, CollisionExceptionEscapesStep) {
+TEST(DroneControl, CollisionBlockedThrowContinues) {
     Fixture fixture;
     fixture.movement.throw_on_advance_ = true;
+    fixture.movement.advance_throw_message_ =
+        "advance: destination blocked by obstacle or map boundary";
 
     const auto mission = defaultMission();
     const auto lidar_cfg = defaultLidar();
@@ -287,9 +291,42 @@ TEST(DroneControl, CollisionExceptionEscapesStep) {
         algorithm,
     };
 
-    EXPECT_THROW(
-        { (void)control.step(); },
-        std::runtime_error);
+    const auto result = control.step();
+    EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
+}
+
+TEST(DroneControl, NonRecoverableThrowEscapesStep) {
+    Fixture fixture;
+    fixture.movement.throw_on_advance_ = true;
+    fixture.movement.advance_throw_message_ = "unexpected movement failure";
+
+    const auto mission = defaultMission();
+    const auto lidar_cfg = defaultLidar();
+    const auto drone_cfg = defaultDrone();
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{mission, lidar_cfg, drone_cfg, fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 10.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(),
+        defaultMission(),
+        defaultLidar(),
+        fixture.lidar,
+        fixture.gps,
+        fixture.movement,
+        fixture.output_map,
+        algorithm,
+    };
+
+    EXPECT_THROW({ (void)control.step(); }, std::runtime_error);
 }
 
 TEST(DroneControl, ExecutesScanThenContinues) {

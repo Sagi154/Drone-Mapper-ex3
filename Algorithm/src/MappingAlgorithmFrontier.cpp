@@ -8,6 +8,7 @@
 #include <limits>
 #include <queue>
 #include <unordered_map>
+#include <utility>
 
 namespace algorithm_207190406_209543255::detail {
 
@@ -23,6 +24,19 @@ using common::z_extent;
 namespace {
 
 constexpr int kInf = std::numeric_limits<int>::max();
+constexpr int kEmptyTraversalCost = 1;
+constexpr int kUnmappedTraversalCost = 4;
+
+struct CostKeyGreater {
+    [[nodiscard]] bool operator()(const std::pair<int, GridKey>& a,
+                                  const std::pair<int, GridKey>& b) const noexcept {
+        return a.first > b.first;
+    }
+};
+
+using CostQueue = std::priority_queue<std::pair<int, GridKey>,
+                                      std::vector<std::pair<int, GridKey>>,
+                                      CostKeyGreater>;
 
 struct Offset {
     int dx;
@@ -61,6 +75,13 @@ constexpr Offset kOffsets[6] = {
 [[nodiscard]] bool isBlockedCell(const BlockedCells& blocked,
                                  const GridKey& key) {
     return blocked.find(key) != blocked.end();
+}
+
+[[nodiscard]] int traversalCost(const IMap3D& map, const Position3D& cell) {
+    if (occupancyAt(map, cell) == types::VoxelOccupancy::Unmapped) {
+        return kUnmappedTraversalCost;
+    }
+    return kEmptyTraversalCost;
 }
 
 [[nodiscard]] bool isSpherePassable(const IMap3D& map,
@@ -334,21 +355,23 @@ FrontierPathResult MappingAlgorithmFrontier::findPath(
     }
 
     ParentMap parent_of;
-    GridIntMap depth_of;
-    std::queue<GridKey> queue;
+    GridIntMap cost_of;
+    CostQueue queue;
     parent_of[start_key] = start_key;
-    depth_of[start_key] = 0;
-    queue.push(start_key);
+    cost_of[start_key] = 0;
+    queue.push({0, start_key});
 
-    // Pick the reachable frontier with best value density: unmapped_neighbours / path_steps.
+    // Pick the reachable frontier with best value density: unmapped_neighbours / path_cost.
     GridKey best_key = start_key;
     double best_score = -1.0;
-    int best_depth = kInf;
+    int best_cost = kInf;
 
     while (!queue.empty()) {
-        const GridKey current = queue.front();
+        const auto [current_cost, current] = queue.top();
         queue.pop();
-        const int current_depth = depth_of.at(current);
+        if (current_cost > cost_of.at(current)) {
+            continue;
+        }
         const Position3D current_pt = keyToPoint(current, config);
 
         if (!(current == start_key) && isFrontier(map, current_pt, radius_cm, step)) {
@@ -382,11 +405,11 @@ FrontierPathResult MappingAlgorithmFrontier::findPath(
                 }
                 if (value > 0) {
                     const double score =
-                        static_cast<double>(value) / static_cast<double>(current_depth);
+                        static_cast<double>(value) / static_cast<double>(current_cost);
                     if (score > best_score ||
-                        (score == best_score && current_depth < best_depth)) {
+                        (score == best_score && current_cost < best_cost)) {
                         best_score = score;
-                        best_depth = current_depth;
+                        best_cost = current_cost;
                         best_key = current;
                     }
                 }
@@ -395,16 +418,24 @@ FrontierPathResult MappingAlgorithmFrontier::findPath(
 
         for (const Offset& off : kOffsets) {
             const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            if (parent_of.contains(neighbour)) {
-                continue;
-            }
             const Position3D neighbour_pt = keyToPoint(neighbour, config);
             if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
                 continue;
             }
+            // Once an Empty-reachable frontier exists, skip expanding further into
+            // Unmapped space. Soft Unmapped cost still applies when no frontier has
+            // been found yet (Unmapped remains the only way to reach one).
+            if (best_score >= 0.0 &&
+                occupancyAt(map, neighbour_pt) == types::VoxelOccupancy::Unmapped) {
+                continue;
+            }
+            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
+            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
+                continue;
+            }
             parent_of[neighbour] = current;
-            depth_of[neighbour] = current_depth + 1;
-            queue.push(neighbour);
+            cost_of[neighbour] = new_cost;
+            queue.push({new_cost, neighbour});
         }
     }
 
@@ -443,13 +474,18 @@ FrontierPathResult MappingAlgorithmFrontier::findPathTo(
     }
 
     ParentMap parent_of;
-    std::queue<GridKey> queue;
+    GridIntMap cost_of;
+    CostQueue queue;
     parent_of[start_key] = start_key;
-    queue.push(start_key);
+    cost_of[start_key] = 0;
+    queue.push({0, start_key});
 
     while (!queue.empty()) {
-        const GridKey current = queue.front();
+        const auto [current_cost, current] = queue.top();
         queue.pop();
+        if (current_cost > cost_of.at(current)) {
+            continue;
+        }
 
         if (current == goal_key) {
             return reconstructPath(start_key, goal_key, parent_of, config);
@@ -457,15 +493,17 @@ FrontierPathResult MappingAlgorithmFrontier::findPathTo(
 
         for (const Offset& off : kOffsets) {
             const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            if (parent_of.contains(neighbour)) {
-                continue;
-            }
             const Position3D neighbour_pt = keyToPoint(neighbour, config);
             if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
                 continue;
             }
+            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
+            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
+                continue;
+            }
             parent_of[neighbour] = current;
-            queue.push(neighbour);
+            cost_of[neighbour] = new_cost;
+            queue.push({new_cost, neighbour});
         }
     }
 
@@ -488,44 +526,47 @@ FrontierPathResult MappingAlgorithmFrontier::findFarthestPath(
     }
 
     ParentMap parent_of;
-    GridIntMap depth;
-    std::queue<GridKey> queue;
+    GridIntMap cost_of;
+    CostQueue queue;
     parent_of[start_key] = start_key;
-    depth[start_key] = 0;
-    queue.push(start_key);
+    cost_of[start_key] = 0;
+    queue.push({0, start_key});
 
     GridKey best_goal = start_key;
-    int best_depth = -1;
+    int best_cost = -1;
 
     while (!queue.empty()) {
-        const GridKey current = queue.front();
+        const auto [current_cost, current] = queue.top();
         queue.pop();
-        const int current_depth = depth.at(current);
+        if (current_cost > cost_of.at(current)) {
+            continue;
+        }
         const Position3D current_pt = keyToPoint(current, config);
 
         if (!(current == start_key) && isFrontier(map, current_pt, radius_cm, step)) {
-            if (current_depth > best_depth) {
-                best_depth = current_depth;
+            if (current_cost > best_cost) {
+                best_cost = current_cost;
                 best_goal = current;
             }
         }
 
         for (const Offset& off : kOffsets) {
             const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            if (parent_of.contains(neighbour)) {
-                continue;
-            }
             const Position3D neighbour_pt = keyToPoint(neighbour, config);
             if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
                 continue;
             }
+            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
+            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
+                continue;
+            }
             parent_of[neighbour] = current;
-            depth[neighbour] = current_depth + 1;
-            queue.push(neighbour);
+            cost_of[neighbour] = new_cost;
+            queue.push({new_cost, neighbour});
         }
     }
 
-    if (best_depth >= 0) {
+    if (best_cost >= 0) {
         return reconstructPath(start_key, best_goal, parent_of, config);
     }
 
@@ -563,20 +604,22 @@ FrontierPathResult MappingAlgorithmFrontier::findExplorePath(
     const GridIntMap& unknown_dist = *dist_cache;
 
     ParentMap parent_of;
-    GridIntMap depth;
-    std::queue<GridKey> queue;
+    GridIntMap cost_of;
+    CostQueue queue;
     parent_of[start_key] = start_key;
-    depth[start_key] = 0;
-    queue.push(start_key);
+    cost_of[start_key] = 0;
+    queue.push({0, start_key});
 
     GridKey best_key = start_key;
     int best_unknown_steps = kInf;
-    int best_path_steps = kInf;
+    int best_path_cost = kInf;
 
     while (!queue.empty()) {
-        const GridKey current = queue.front();
+        const auto [path_cost, current] = queue.top();
         queue.pop();
-        const int path_steps = depth.at(current);
+        if (path_cost > cost_of.at(current)) {
+            continue;
+        }
 
         const auto dist_it = unknown_dist.find(current);
         const int unknown_steps = (dist_it == unknown_dist.end()) ? kInf : dist_it->second;
@@ -584,25 +627,26 @@ FrontierPathResult MappingAlgorithmFrontier::findExplorePath(
         if (!(current == start_key) && unknown_steps < best_unknown_steps) {
             best_key = current;
             best_unknown_steps = unknown_steps;
-            best_path_steps = path_steps;
+            best_path_cost = path_cost;
         } else if (!(current == start_key) && unknown_steps == best_unknown_steps &&
-                   path_steps < best_path_steps) {
+                   path_cost < best_path_cost) {
             best_key = current;
-            best_path_steps = path_steps;
+            best_path_cost = path_cost;
         }
 
         for (const Offset& off : kOffsets) {
             const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            if (parent_of.contains(neighbour)) {
-                continue;
-            }
             const Position3D neighbour_pt = keyToPoint(neighbour, config);
             if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
                 continue;
             }
+            const int new_cost = path_cost + traversalCost(map, neighbour_pt);
+            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
+                continue;
+            }
             parent_of[neighbour] = current;
-            depth[neighbour] = path_steps + 1;
-            queue.push(neighbour);
+            cost_of[neighbour] = new_cost;
+            queue.push({new_cost, neighbour});
         }
     }
 

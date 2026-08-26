@@ -248,3 +248,35 @@ TEST(MappingAlgorithm, FrontierNoUnmappedWhenFullyMappedEmpty) {
 
     EXPECT_FALSE(detail::hasAnyNotMappedInBounds(map));
 }
+
+// What: start-to-goal routing with a short Unmapped corridor and a longer Empty detour.
+// Expected: weighted path search prefers the Empty route over the Unmapped shortcut.
+TEST(MappingAlgorithm, FrontierPrefersEmptyOverUnmappedPath) {
+    const ct::MapConfig config = makeNarrowCorridorConfig();
+    Map map{{11, 3, 3}, config};
+
+    // Empty detours on y=0 and y=2; middle row y=1 stays Unmapped except endpoints.
+    fillEmptyBox(map, 0, 10, 0, 0, 0, 2, config);
+    fillEmptyBox(map, 0, 10, 2, 2, 0, 2, config);
+    const Position3D start = pointCm(0, 1, 1);
+    const Position3D goal  = pointCm(5, 1, 1);
+    map.set(start, ct::VoxelOccupancy::Empty);
+    map.set(goal, ct::VoxelOccupancy::Empty);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const detail::FrontierPathResult result =
+        frontier.findPathTo(map, start, goal, 0.0 * cm);
+
+    ASSERT_TRUE(result.found);
+    ASSERT_FALSE(result.path.empty());
+    EXPECT_EQ(result.path.back().x.force_numerical_value_in(cm), 5.0);
+
+    for (const Position3D& waypoint : result.path) {
+        const double y = waypoint.y.force_numerical_value_in(cm);
+        const double x = waypoint.x.force_numerical_value_in(cm);
+        if (y >= 0.9 && y <= 1.1 && x >= 1.0 && x <= 4.0) {
+            EXPECT_NE(map.atVoxel(waypoint), ct::VoxelOccupancy::Unmapped)
+                << "path should avoid the Unmapped corridor at y=1";
+        }
+    }
+}

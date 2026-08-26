@@ -105,9 +105,8 @@ MappingAlgorithmImpl_207190406_209543255::~MappingAlgorithmImpl_207190406_209543
 MappingAlgorithmImpl_207190406_209543255::MappingAlgorithmImpl_207190406_209543255(
     common::MappingAlgorithmDependencies dependencies)
     : common::IMappingAlgorithm(dependencies), impl_(std::make_unique<Impl>()) {
-    // Mid-path scanning only for tight step budgets (large_room); full matrix runs
-    // showed it regresses large_out when enabled globally.
-    impl_->enable_scan_during_travel = mission_config_.max_steps <= 500;
+    // Always scan during travel so long max_steps missions map walls before walking into them.
+    impl_->enable_scan_during_travel = true;
 }
 
 void MappingAlgorithmImpl_207190406_209543255::ensurePlanningReady() {

@@ -62,7 +62,7 @@ handling still apply.
 
 | Map | Used by | Notes |
 |-----|---------|-------|
-| `scenario_house.npy` | `house_simulation.yaml` | `map_axes_offset.height_offset: 150`; spawn `height_cm: 10` → world z 160 |
+| `scenario_house.npy` | `house_simulation.yaml` | `map_axes_offset.height_offset: 150`; spawn `height_cm: 150` → world z 300 |
 | `scenario_small.npy` | `small_simulation_room.yaml`, `small_simulation_out.yaml` | |
 | `scenario_big.npy` | `large_simulation_room.yaml`, `large_simulation_out.yaml` | |
 

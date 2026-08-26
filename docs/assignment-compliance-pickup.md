@@ -23,8 +23,9 @@ chat). Working Known Issues rows: `docs/known-issues.md`. Integration smoke:
 
 The implementation **does not currently follow the assignment with zero deviation**. Plugin
 layout, CLI shape, threading, registration, frozen headers, `-verbose` wiring, all-folder
-`errors:` reporting, and snake_case plugin/UserCommon namespaces match the instructor docs. One
-default-scenario failure and two submission-doc gaps do not.
+`errors:` reporting, and snake_case plugin/UserCommon namespaces match the instructor docs.
+Default composition `inputs/sim_compose.yaml` is **24/24 `COMPLETED` with `mission_score >= 0`**
+(wall-collision recovery + planner improvements). Two submission-doc gaps remain (README/HLD).
 
 Highest-leverage next work is below.
 
@@ -32,30 +33,40 @@ Highest-leverage next work is below.
 
 ## Next session — do these in order
 
-1. **Get at least one provided composition cell to `Completed` / `MaxSteps` with a real score.**
-   `inputs/sim_compose.yaml` is 24/24 Error (`SPAWN_NOT_PASSABLE` / `MISSION_EXCEPTION`). AdvCpp
-   happy-flow on default scenarios is a large `b04` risk. Unit tests already score Completed
-   runs — the scorer is not the failure. After this lands, re-run
-   `Simulator/tests/manual/check_verbose.sh` on a completing cell for the file-list check
-   (`*.verbose.txt` only appears when `-verbose` is set).
-2. **Rewrite `README.md`** (remove skeleton placeholder; names + IDs, cmake presets, both CLI
+1. **Rewrite `README.md`** (remove skeleton placeholder; names + IDs, cmake presets, both CLI
    lines, `.so`/exe names, keep the output-naming section). **Add HLD PDF** at zip-root
    (e14/e15).
-3. **Export Known Issues excel** only at zip time: copy `docs/known-issues.md` into the staff
+2. **Export Known Issues excel** only at zip time: copy `docs/known-issues.md` into the staff
    Google Sheet clone. Agent skill: `.cursor/skills/populate-known-issues/SKILL.md`.
 
 ---
 
+## Fixed 2026-08-27
+
+- **Default composition scoring (full matrix).** `inputs/sim_compose.yaml` comparative:
+  **24/24 `COMPLETED`**, `mission_score >= 0`, `MISSION_EXCEPTION` 0, wall-clock ~276s (8 threads).
+  Design: `docs/superpowers/specs/2026-08-27-wall-collision-recovery-and-planner-design.md`.
+  Changes: house spawn `height_cm` 150; `DroneControlImpl` catches recoverable MockMovement
+  throws → Continue; `kMaxMovingStallTicks = 2`; scan-during-travel always on; Dijkstra soft
+  Unmapped cost (Empty=1, Unmapped=4) with early stop once an Empty-reachable frontier exists.
+  Evidence: MissionControl / Algorithm sources + `CollisionBlockedThrowContinues` /
+  `FrontierPrefersEmptyOverUnmappedPath`.
+
 ## Fixed 2026-08-26
 
+- **Default composition scoring (partial).** Before: `inputs/sim_compose.yaml` was 24/24 Error — 8
+  `SPAWN_NOT_PASSABLE` (house, `height_cm: 10`), 16 `MISSION_EXCEPTION`. Fix:
+  `inputs/simulation/house_simulation.yaml` `height_cm` 10→150 (world z 300). After: `SPAWN_NOT_PASSABLE`
+  = 0; **4 house cells `Completed` with `mission_score` 100**; 20 cells still Error /
+  `MISSION_EXCEPTION` (superseded 2026-08-27 — now 24/24).
 - **`-verbose` reaches MissionControl.** `SimulationRunFactoryImpl` takes a required `bool verbose`
   ctor arg; `main.cpp` passes `args.verbose`; `create` sets `MissionControlDependencies.verbose`
   from that member (frozen `ISimulationRunFactory::create` unchanged). Evidence:
   `Simulator/include/Simulator/SimulationRunFactoryImpl.h`,
   `Simulator/src/SimulationRunFactoryImpl.cpp`, `Simulator/src/main.cpp`. Unit proof:
   `SimulationRunFactory.PassesVerboseTrueToMissionControl` /
-  `PassesVerboseFalseToMissionControl`. File-list `check_verbose.sh` still waits on a completing
-  composition (item 1 above) — `SPAWN_NOT_PASSABLE` skips `runMission()` before verbose write.
+  `PassesVerboseFalseToMissionControl`. File-list `check_verbose.sh`: `*.verbose.txt` appears with
+  `-verbose`, absent without (verified on a completing house cell).
 - **All-folder-plugin load failure writes `errors:`.** Empty-`bindings` path still calls
   `writeComparativeReport` / `writeCompetitiveReport` with empty `results` and filled
   `failed_plugins`. Evidence: `Simulator/src/main.cpp` empty-`bindings` branch. Integration:
@@ -73,10 +84,8 @@ Highest-leverage next work is below.
 
 ## Must fix (mandatory assignment / AdvCpp)
 
-### 1. Default composition never completes
-
-AdvCpp: happy flow must finish on provided default scenarios. CLI modes run and write reports;
-every cell stays `mission_score < 0`. See `docs/integration-verification-report.md`.
+*(Default composition full matrix scored — see Fixed 2026-08-27. Remaining must-fix items are
+submission docs: README + HLD.)*
 
 ---
 
@@ -98,8 +107,8 @@ every cell stays `mission_score < 0`. See `docs/integration-verification-report.
 - Threading: absent/`1` = main only; `N>=2` = N workers plus main; cap unused threads;
   recreate plugin instances per cell.
 - Mandatory Common-issues pair: algorithm will not plan through known `Occupied`;
-  `MockMovement` throws on a real-map wall; `SimulationRunImpl` catches. (`DroneControlImpl`
-  deliberately does **not** catch — listed in Known Issues as “developed in a different way”.)
+  `MockMovement` throws on a real-map wall; `DroneControlImpl` catches recoverable
+  `blocked`/`boundary` throws → Continue; `SimulationRunImpl` remains the backstop.
 - No `new`/`delete` in production sources; C++20 + `-Wall -Wextra -Werror -pedantic`;
   `students.txt` filled; `UserCommon/` has no build file.
 - `MapsComparison` is a real 0–100 BFS scorer (the CMake “stub returns -1” comment is stale).
@@ -134,10 +143,10 @@ is explicitly allowed.
 
 ## Known Issues (working file, not the excel)
 
-`docs/known-issues.md` — staff example-table columns. Row 2 (default composition) is
-**FIX BEFORE SUBMIT**. Rows 5–14 are skipped optional Common-issues PDF scenarios (one row
-each). English only. At zip time, copy into the Google Sheet and export `.xlsx` to the zip
-root — do not submit the markdown.
+`docs/known-issues.md` — staff example-table columns. Row 2 (and 17–18) record the 2026-08-27
+wall-recovery / planner fix that scored the full 24/24 matrix — kept for audit trail, not open
+bugs. Rows 5–14 are skipped optional Common-issues PDF scenarios (one row each). English only. At
+zip time, copy into the Google Sheet and export `.xlsx` to the zip root — do not submit the markdown.
 
 ---
 
