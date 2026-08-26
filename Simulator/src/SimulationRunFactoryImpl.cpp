@@ -116,9 +116,11 @@ namespace UC = UserCommon_207190406_209543255;
 
 SimulationRunFactoryImpl::SimulationRunFactoryImpl(
     common::MappingAlgorithmFactory  algorithm_factory,
-    common::MissionControlFactory    mission_control_factory)
+    common::MissionControlFactory    mission_control_factory,
+    bool                             verbose)
     : algorithm_factory_(std::move(algorithm_factory)),
-      mission_control_factory_(std::move(mission_control_factory)) {}
+      mission_control_factory_(std::move(mission_control_factory)),
+      verbose_(verbose) {}
 
 std::unique_ptr<ISimulationRun>
 SimulationRunFactoryImpl::create(const types::SimulationConfigData&      simulation_config,
@@ -181,7 +183,7 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData&      simulat
         .output_map        = *output_map,
         .mapping_algorithm = *mapping_algorithm,
         .output_map_file   = output_path,
-        .verbose           = false,
+        .verbose           = verbose_,
     });
 
     return std::make_unique<SimulationRunImpl>(

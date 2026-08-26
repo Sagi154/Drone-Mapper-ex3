@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         const auto& algorithm_factory = loader.algorithms().front().factory;
         for (const auto& mc : loader.missionControls()) {
             factories.push_back(std::make_unique<simulator::SimulationRunFactoryImpl>(
-                algorithm_factory, mc.factory));
+                algorithm_factory, mc.factory, args.verbose));
             bindings.push_back({mc.filename, factories.back().get()});
         }
     } else {
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
         const auto& mission_control_factory = loader.missionControls().front().factory;
         for (const auto& algo : loader.algorithms()) {
             factories.push_back(std::make_unique<simulator::SimulationRunFactoryImpl>(
-                algo.factory, mission_control_factory));
+                algo.factory, mission_control_factory, args.verbose));
             bindings.push_back({algo.filename, factories.back().get()});
         }
     }
