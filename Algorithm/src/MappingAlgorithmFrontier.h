@@ -11,7 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace Algorithm_207190406_209543255::detail {
+namespace algorithm_207190406_209543255::detail {
 
 struct GridKey {
     int qx = 0;
@@ -120,4 +120,4 @@ public:
 
 [[nodiscard]] std::size_t countUnmappedInBounds(const common::IMap3D& map);
 
-} // namespace Algorithm_207190406_209543255::detail
+} // namespace algorithm_207190406_209543255::detail

@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace detail = Algorithm_207190406_209543255::detail;
+namespace detail = algorithm_207190406_209543255::detail;
 using Map        = AlgorithmTest::FakeMap3D;
 
 namespace {

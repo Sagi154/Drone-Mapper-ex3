@@ -13,7 +13,7 @@
 #include <optional>
 #include <utility>
 
-namespace Algorithm_207190406_209543255 {
+namespace algorithm_207190406_209543255 {
 
 namespace types = common::types;
 using common::Orientation;
@@ -477,9 +477,9 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(con
     return cmd;
 }
 
-} // namespace Algorithm_207190406_209543255
+} // namespace algorithm_207190406_209543255
 
 
 using MappingAlgorithmImpl_207190406_209543255 =
-    Algorithm_207190406_209543255::MappingAlgorithmImpl_207190406_209543255;
+    algorithm_207190406_209543255::MappingAlgorithmImpl_207190406_209543255;
 REGISTER_MAPPING_ALGORITHM(MappingAlgorithmImpl_207190406_209543255);
