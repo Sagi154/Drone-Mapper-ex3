@@ -61,7 +61,7 @@ private:
 
     std::unique_ptr<Impl> impl_;
 
-    static constexpr int kMaxMovingStallTicks = 8;
+    static constexpr int kMaxMovingStallTicks = 2;
 };
 
 } // namespace algorithm_207190406_209543255
