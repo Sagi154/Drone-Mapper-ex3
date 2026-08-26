@@ -5,6 +5,7 @@
 #include "BeamMath.hpp"
 
 #include <cmath>
+#include <exception>
 #include <utility>
 
 namespace mission_control_207190406_209543255 {
@@ -214,18 +215,30 @@ common::types::DroneStepResult DroneControlImpl::step() {
             };
         }
 
-        // Wall collisions from MockMovement throw — do not catch here; SimulationRunImpl catches.
-        const common::types::MovementResult movement_result =
-            executeMovement(movement_, *command.movement);
-        if (!movement_result) {
-            if (isRecoverableMovementFailure(movement_result.message)) {
-                ++step_index_;
-                return common::types::DroneStepResult{common::types::DroneStepStatus::Continue, {}};
+        try {
+            const common::types::MovementResult movement_result =
+                executeMovement(movement_, *command.movement);
+            if (!movement_result) {
+                if (isRecoverableMovementFailure(movement_result.message)) {
+                    ++step_index_;
+                    return common::types::DroneStepResult{
+                        common::types::DroneStepStatus::Continue, {}};
+                }
+                return common::types::DroneStepResult{
+                    common::types::DroneStepStatus::Error,
+                    movement_result.message.empty() ? "Movement failed."
+                                                    : movement_result.message,
+                };
             }
-            return common::types::DroneStepResult{
-                common::types::DroneStepStatus::Error,
-                movement_result.message.empty() ? "Movement failed." : movement_result.message,
-            };
+        } catch (const std::exception& ex) {
+            // MockMovement throws on wall/boundary; recover like a false MovementResult.
+            // Non-recoverable exceptions rethrow for SimulationRunImpl.
+            if (isRecoverableMovementFailure(ex.what())) {
+                ++step_index_;
+                return common::types::DroneStepResult{
+                    common::types::DroneStepStatus::Continue, {}};
+            }
+            throw;
         }
     }
 
