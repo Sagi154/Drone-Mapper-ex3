@@ -143,10 +143,10 @@ is explicitly allowed.
 
 ## Known Issues (working file, not the excel)
 
-`docs/known-issues.md` — staff example-table columns. Row 2 documents the remaining 20/24
-`MISSION_EXCEPTION` cells (4 house + 16 non-house); no longer **FIX BEFORE SUBMIT**. Rows 5–14
-are skipped optional Common-issues PDF scenarios (one row each). English only. At zip time,
-copy into the Google Sheet and export `.xlsx` to the zip root — do not submit the markdown.
+`docs/known-issues.md` — staff example-table columns. Row 2 (and 17–18) record the 2026-08-27
+wall-recovery / planner fix that scored the full 24/24 matrix — kept for audit trail, not open
+bugs. Rows 5–14 are skipped optional Common-issues PDF scenarios (one row each). English only. At
+zip time, copy into the Google Sheet and export `.xlsx` to the zip root — do not submit the markdown.
 
 ---
 

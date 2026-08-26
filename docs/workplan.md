@@ -1,8 +1,8 @@
 # Ex3 Work Plan — Sagi & Yoav
 
-**Where to pick up:** `docs/assignment-compliance-pickup.md` (updated 2026-08-26). The three
-projects are built; default composition partially scores (4/24 house cells Completed, score 100;
-20 still `MISSION_EXCEPTION`). Remaining work is submission docs (README, HLD). `-verbose`
+**Where to pick up:** `docs/assignment-compliance-pickup.md` (updated 2026-08-27). The three
+projects are built; default composition `inputs/sim_compose.yaml` scores **24/24 Completed**
+(`mission_score >= 0`). Remaining work is submission docs (README, HLD). `-verbose`
 wiring, empty-folder `errors:` report, and `check_verbose.sh` file-list are done. Do not restart from
 joint-setup or the S/Y item list below unless that file says so.
 
@@ -366,13 +366,12 @@ Depends on: U4 (`SimulationCoordUtil`, if bounds math is needed), Y4. Implements
 state → `algorithm.nextStep(state, latest_scan)` → validate movement → execute movement → scan →
 `ScanResultToVoxels` → `output_map.set(...)` → return `DroneStepResult`. `IDroneControl.h` does
 `using namespace common;` inside `namespace mission_control` — don't rely on that leaking into
-files that don't include it directly. For the mandatory collision scenario: `DroneControl` must
-**not** swallow the exception `MockMovement` throws — let it propagate out of `step()` (the actual
-catch happens at the Simulator run boundary, item Y8/S7, not here).
+files that don't include it directly. *(Historical note: early plan said do not catch MockMovement
+throws here. **Updated 2026-08-27:** recoverable `blocked`/`boundary` throws are caught in
+`DroneControlImpl` → Continue; SimulationRun remains the backstop — see Known Issues row 17.)*
 Verify: port `test_drone_control.cpp` with hand-written fakes for `ILidar`/`IGPS`/`IDroneMovement`/
 `IMutableMap3D`/`IMappingAlgorithm` — no dependency on Sagi's real `MappingAlgorithmImpl` or Yoav's
-own `MockMovement`. Confirm a fake `IDroneMovement` that throws on `advance()` produces an
-exception that is observable escaping `DroneControl::step()` in the test, not swallowed.
+own `MockMovement`. Confirm recoverable throws Continue and non-recoverable still escape `step()`.
 
 **Y6 ✅ DONE — Port `MissionControlImpl`.**
 Depends on: Y5. Constructed from `common::MissionControlDependencies` (by value) — builds its own

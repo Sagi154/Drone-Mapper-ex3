@@ -38,5 +38,8 @@ Thumbs.db
 # Logs
 *.log
 
+# Agent / SDD local scratch (briefs, compose copies, reports)
+.superpowers/
+
 # Generated simulation files
 simulation_output.yaml
