@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-namespace MissionControl_207190406_209543255 {
+namespace mission_control_207190406_209543255 {
 
 namespace {
 
@@ -100,4 +100,4 @@ common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMissi
     return result;
 }
 
-} // namespace MissionControl_207190406_209543255
+} // namespace mission_control_207190406_209543255

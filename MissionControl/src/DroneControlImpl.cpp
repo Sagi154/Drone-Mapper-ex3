@@ -7,7 +7,7 @@
 #include <cmath>
 #include <utility>
 
-namespace MissionControl_207190406_209543255 {
+namespace mission_control_207190406_209543255 {
 
 namespace {
 
@@ -237,4 +237,4 @@ common::types::DroneState DroneControlImpl::state() const {
     return common::types::DroneState{gps_.position(), gps_.heading(), step_index_};
 }
 
-} // namespace MissionControl_207190406_209543255
+} // namespace mission_control_207190406_209543255

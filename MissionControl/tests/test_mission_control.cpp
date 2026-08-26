@@ -139,7 +139,7 @@ TEST(MissionControl, CompletesWhenAlgorithmFinishes) {
 
     const auto output_file =
         std::filesystem::temp_directory_path() / "mc_completed_output.npy";
-    MissionControl_207190406_209543255::MissionControlImpl_207190406_209543255 control{
+    mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
         common::MissionControlDependencies{
             mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
     };
@@ -175,7 +175,7 @@ TEST(MissionControl, HitsMaxSteps) {
     };
 
     const auto output_file = std::filesystem::temp_directory_path() / "mc_max_steps.npy";
-    MissionControl_207190406_209543255::MissionControlImpl_207190406_209543255 control{
+    mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
         common::MissionControlDependencies{
             mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
     };
@@ -205,7 +205,7 @@ TEST(MissionControl, VerboseWritesExtraFile) {
 
     const auto output_file = std::filesystem::temp_directory_path() / "mc_verbose_output.npy";
     const auto verbose_file = std::filesystem::path(output_file.string() + ".verbose.txt");
-    MissionControl_207190406_209543255::MissionControlImpl_207190406_209543255 control{
+    mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
         common::MissionControlDependencies{
             mission, drone, lidar, gps, movement, output, algorithm, output_file, true},
     };
@@ -238,7 +238,7 @@ TEST(MissionControl, VerboseOffWritesNoExtraFile) {
     std::error_code ec;
     std::filesystem::remove(verbose_file, ec);
 
-    MissionControl_207190406_209543255::MissionControlImpl_207190406_209543255 control{
+    mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
         common::MissionControlDependencies{
             mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
     };

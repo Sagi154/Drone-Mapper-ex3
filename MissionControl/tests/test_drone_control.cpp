@@ -181,7 +181,7 @@ TEST(DroneControl, FirstStepPassesNullScanToAlgorithm) {
         }},
     };
 
-    MissionControl_207190406_209543255::DroneControlImpl control{
+    mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
         defaultMission(),
         defaultLidar(),
@@ -210,7 +210,7 @@ TEST(DroneControl, ReturnsCompletedWhenAlgorithmFinishes) {
         }},
     };
 
-    MissionControl_207190406_209543255::DroneControlImpl control{
+    mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
         defaultMission(),
         defaultLidar(),
@@ -241,7 +241,7 @@ TEST(DroneControl, ReturnsErrorWhenMovementExceedsDroneLimits) {
         }},
     };
 
-    MissionControl_207190406_209543255::DroneControlImpl control{
+    mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
         defaultMission(),
         defaultLidar(),
@@ -276,7 +276,7 @@ TEST(DroneControl, CollisionExceptionEscapesStep) {
         }},
     };
 
-    MissionControl_207190406_209543255::DroneControlImpl control{
+    mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
         defaultMission(),
         defaultLidar(),
@@ -311,7 +311,7 @@ TEST(DroneControl, ExecutesScanThenContinues) {
         },
     };
 
-    MissionControl_207190406_209543255::DroneControlImpl control{
+    mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
         defaultMission(),
         defaultLidar(),
