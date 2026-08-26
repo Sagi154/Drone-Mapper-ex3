@@ -16,6 +16,7 @@ fi
 "${ROOT}/check_verbose.sh" "${BUILD_DIR}"
 "${ROOT}/check_threading.sh" "${BUILD_DIR}"
 "${ROOT}/check_cli_failures.sh" "${BUILD_DIR}"
+"${ROOT}/check_all_folder_plugins_fail.sh" "${BUILD_DIR}"
 "${ROOT}/check_isolation.sh" "${BUILD_DIR}"
 
 echo "run_all.sh: all default-preset checks finished"
