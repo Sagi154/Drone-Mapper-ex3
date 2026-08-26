@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant MC as MissionControlImpl_207190406_209543255
+    participant DC as DroneControlImpl
+    participant Algo as MappingAlgorithmImpl_207190406_209543255
+    participant GPS as MockGPS
+    participant Move as MockMovement
+    participant Lidar as MockLidar
+    participant Map as output Map3DImpl
+
+    loop until Finished / MaxSteps / Error
+        MC->>DC: step()
+        DC->>GPS: position() / heading()
+        DC->>Algo: nextStep(state, latest_scan)
+        Algo-->>DC: MappingStepCommand
+        alt recoverable wall throw from Move
+            DC->>Move: advance/elevate
+            Move-->>DC: throw blocked/boundary
+            DC-->>DC: Continue (no scan write)
+        else normal movement
+            DC->>Move: rotate/advance/elevate
+            DC->>Lidar: scan(orientations)
+            DC->>Map: set voxels from scan
+        end
+        DC-->>MC: DroneStepResult
+    end

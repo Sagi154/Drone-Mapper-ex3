@@ -1,0 +1,102 @@
+classDiagram
+    direction TB
+
+    class main {
+      +parse CLI
+      +load plugins
+      +RunMatrixOrchestrator.run
+      +write reports
+      +dlclose
+    }
+
+    class PluginLoader {
+      +loadAlgorithmSo(path) LoadedAlgorithmPlugin
+      +loadMissionControlSo(path) LoadedMissionControlPlugin
+      +unloadAll()
+    }
+
+    class PluginRegistrar {
+      +setPendingAlgorithmFactory(factory)
+      +setPendingMissionControlFactory(factory)
+      +takePendingAlgorithmFactory()
+      +takePendingMissionControlFactory()
+    }
+
+    class RunMatrixOrchestrator {
+      +expand(composition) cells
+      +run(bindings, cells, threads) results
+    }
+
+    class WorkDistributor {
+      +distribute(tasks, num_threads)
+    }
+
+    class SimulationRunFactoryImpl {
+      +create(...) ISimulationRun
+    }
+
+    class SimulationRunImpl {
+      +run() SimulationResult
+    }
+
+    class Map3DImpl
+    class MockGPS
+    class MockLidar
+    class MockMovement
+    class MapsComparison
+
+    class MissionControlImpl_207190406_209543255 {
+      +runMission() MissionRunResult
+    }
+
+    class DroneControlImpl {
+      +step() DroneStepResult
+      +state() DroneState
+    }
+
+    class MappingAlgorithmImpl_207190406_209543255 {
+      +nextStep(state, scan) MappingStepCommand
+    }
+
+    class IMissionControl
+    class IDroneControl
+    class IMappingAlgorithm
+    class IMap3D
+    class IMutableMap3D
+    class ILidar
+    class IGPS
+    class IDroneMovement
+    class ISimulationRun
+    class ISimulationRunFactory
+
+    main --> PluginLoader
+    main --> PluginRegistrar
+    main --> RunMatrixOrchestrator
+    RunMatrixOrchestrator --> WorkDistributor
+    RunMatrixOrchestrator --> SimulationRunFactoryImpl
+    SimulationRunFactoryImpl ..|> ISimulationRunFactory
+    SimulationRunFactoryImpl --> SimulationRunImpl
+    SimulationRunImpl ..|> ISimulationRun
+    SimulationRunImpl --> Map3DImpl
+    SimulationRunImpl --> MockGPS
+    SimulationRunImpl --> MockLidar
+    SimulationRunImpl --> MockMovement
+    SimulationRunImpl --> MapsComparison
+    SimulationRunImpl --> IMissionControl
+    SimulationRunImpl --> IMappingAlgorithm
+    MissionControlImpl_207190406_209543255 ..|> IMissionControl
+    MissionControlImpl_207190406_209543255 --> DroneControlImpl
+    DroneControlImpl ..|> IDroneControl
+    DroneControlImpl --> IMappingAlgorithm
+    DroneControlImpl --> ILidar
+    DroneControlImpl --> IGPS
+    DroneControlImpl --> IDroneMovement
+    DroneControlImpl --> IMutableMap3D
+    MappingAlgorithmImpl_207190406_209543255 ..|> IMappingAlgorithm
+    MappingAlgorithmImpl_207190406_209543255 --> IMap3D
+    Map3DImpl ..|> IMutableMap3D
+    IMutableMap3D --|> IMap3D
+    MockLidar ..|> ILidar
+    MockGPS ..|> IGPS
+    MockMovement ..|> IDroneMovement
+    PluginLoader ..> PluginRegistrar : registration ctors
