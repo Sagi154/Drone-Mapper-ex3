@@ -2,7 +2,8 @@
 
 **Where to pick up:** `docs/assignment-compliance-pickup.md` (updated 2026-08-27). The three
 projects are built; default composition `inputs/sim_compose.yaml` scores **24/24 Completed**
-(`mission_score >= 0`). Remaining work is submission docs (README, HLD). `-verbose`
+(`mission_score >= 0`). Submission `README.md` and root `HLD.pdf` done 2026-08-27; remaining work
+is Known Issues excel at zip time and packaging. `-verbose`
 wiring, empty-folder `errors:` report, and `check_verbose.sh` file-list are done. Do not restart from
 joint-setup or the S/Y item list below unless that file says so.
 
@@ -515,7 +516,7 @@ Harness: `Simulator/tests/manual/` (`run_all.sh`, `docker_verify_default.sh`, `d
 **Still open after this pass (not verification-harness bugs):** see
 `docs/assignment-compliance-pickup.md` for the ordered queue. Short list:
 
-- Rewrite `README.md` and add the HLD PDF.
+- (Done 2026-08-27) Submission `README.md` rewrite and root `HLD.pdf`.
 - (Done 2026-08-27) Full `sim_compose.yaml` matrix scored — wall collision recovery + planner.
 
 Checklist (kept for re-run / grading prep):
@@ -551,13 +552,10 @@ Checklist (kept for re-run / grading prep):
 
 - **`students.txt`**: **done** — `Sagi Eisenberg, 207190406` / `Yoav Naaman, 209543255`. Keep it
   free of `TODO:` before packaging.
-- **`README.md`**: rewrite with the actual build presets, binary/`.so` names, both CLI invocations,
-  and the output-map/error-log naming pattern agreed in the meeting-points table. Either person,
-  once the naming stabilizes (after S11/Y11).
-- **HLD as PDF**, in the submission root: class/sequence diagrams reflecting the real three-project
-  plugin architecture (not ex2's monolith) — each person diagrams their own component, one person
-  assembles and exports the final PDF. Keep it in sync with the code as it lands, not written once
-  at the end from memory (graded e14/e15).
+- **`README.md`**: **done 2026-08-27** — build presets, binary/`.so` names, both CLI invocations,
+  author names/IDs, and output-map/error-log naming in zip-root `README.md`.
+- **HLD as PDF**, in the submission root: **done 2026-08-27** — root `HLD.pdf` with class/sequence
+  diagrams for the three-project plugin architecture (AdvCpp e14/e15); source `docs/HLD.md`.
 - **`bonus.txt`** — only if actually claiming a bonus (most likely candidate: Sagi's lazy
   load-once/unload-when-unused `.so` loading, built only after the mandatory eager-load path from
   S6 is solid). Points at real files/line numbers if written.

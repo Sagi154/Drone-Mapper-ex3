@@ -6,8 +6,9 @@ separately built projects — `simulator_<ids>` executable that `dlopen`s an `Al
 
 **Status:** implementation is feature-complete enough for a full instructor-doc audit
 (`docs/assignment-compliance-pickup.md` — **start there**). Default composition
-`inputs/sim_compose.yaml` scores **24/24 Completed** with `mission_score >= 0`. Remaining work is
-README/HLD and Known Issues excel export, not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
+`inputs/sim_compose.yaml` scores **24/24 Completed** with `mission_score >= 0`. Submission
+`README.md` and root `HLD.pdf` are done (2026-08-27). Remaining work is Known Issues excel export
+at zip time and pre-submission packaging, not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
 ## Start here
 

@@ -25,7 +25,9 @@ The implementation **does not currently follow the assignment with zero deviatio
 layout, CLI shape, threading, registration, frozen headers, `-verbose` wiring, all-folder
 `errors:` reporting, and snake_case plugin/UserCommon namespaces match the instructor docs.
 Default composition `inputs/sim_compose.yaml` is **24/24 `COMPLETED` with `mission_score >= 0`**
-(wall-collision recovery + planner improvements). Two submission-doc gaps remain (README/HLD).
+(wall-collision recovery + planner improvements). Submission README and root `HLD.pdf` are present.
+Remaining gap before Sep 6: zip-time Known Issues excel export and pre-submission packaging
+(re-diff assignment docx if forum changed).
 
 Highest-leverage next work is below.
 
@@ -33,16 +35,22 @@ Highest-leverage next work is below.
 
 ## Next session — do these in order
 
-1. **Rewrite `README.md`** (remove skeleton placeholder; names + IDs, cmake presets, both CLI
-   lines, `.so`/exe names, keep the output-naming section). **Add HLD PDF** at zip-root
-   (e14/e15).
-2. **Export Known Issues excel** only at zip time: copy `docs/known-issues.md` into the staff
-   Google Sheet clone. Agent skill: `.cursor/skills/populate-known-issues/SKILL.md`.
+1. **Export Known Issues excel** at zip time: copy `docs/known-issues.md` into the staff Google
+   Sheet clone and export `.xlsx` to the zip root. Agent skill:
+   `.cursor/skills/populate-known-issues/SKILL.md`.
+2. **Pre-submission packaging:** run `.cursor/skills/pre-submission-review/SKILL.md` end to end,
+   then zip `ex3_207190406_209543255.zip` (no binaries; include `README.md`, `HLD.pdf`,
+   `students.txt`, five folders, root build file).
 
 ---
 
 ## Fixed 2026-08-27
 
+- **Submission README + root HLD PDF.** `README.md` rewritten with author names/IDs, `cmake --preset
+  default` build/run, both CLI invocations, `.so`/exe names, and the existing output-naming section.
+  Root `HLD.pdf` (AdvCpp e14/e15) with class and sequence diagrams for the three-project plugin
+  layout; editable source `docs/HLD.md`, render script `scripts/render_hld_pdf.sh`. Evidence:
+  `README.md`, `HLD.pdf`, `docs/known-issues.md` rows 3–4 (resolved).
 - **Default composition scoring (full matrix).** `inputs/sim_compose.yaml` comparative:
   **24/24 `COMPLETED`**, `mission_score >= 0`, `MISSION_EXCEPTION` 0, wall-clock ~276s (8 threads).
   Design: `docs/superpowers/specs/2026-08-27-wall-collision-recovery-and-planner-design.md`.
@@ -84,8 +92,8 @@ Highest-leverage next work is below.
 
 ## Must fix (mandatory assignment / AdvCpp)
 
-*(Default composition full matrix scored — see Fixed 2026-08-27. Remaining must-fix items are
-submission docs: README + HLD.)*
+*(Default composition full matrix scored and submission README/HLD delivered — see Fixed 2026-08-27.
+No open mandatory code or doc gaps before zip packaging.)*
 
 ---
 
@@ -117,9 +125,8 @@ submission docs: README + HLD.)*
 
 ## Not ready for the zip (required docs)
 
-- `README.md` still has the skeleton placeholder (no names/IDs, no build/CLI). Output naming
-  is already documented.
-- No HLD PDF in the repo root.
+*(README and HLD PDF done 2026-08-27 — see Fixed. Remaining zip-root items: Known Issues `.xlsx`
+if submitting the optional excel; `bonus.txt` only if claiming bonus.)*
 
 ---
 
@@ -143,10 +150,10 @@ is explicitly allowed.
 
 ## Known Issues (working file, not the excel)
 
-`docs/known-issues.md` — staff example-table columns. Row 2 (and 17–18) record the 2026-08-27
-wall-recovery / planner fix that scored the full 24/24 matrix — kept for audit trail, not open
-bugs. Rows 5–14 are skipped optional Common-issues PDF scenarios (one row each). English only. At
-zip time, copy into the Google Sheet and export `.xlsx` to the zip root — do not submit the markdown.
+`docs/known-issues.md` — staff example-table columns. Rows 2, 3–4, and 17–18 record 2026-08-27
+fixes (full matrix, README, HLD) — kept for audit trail, not open bugs. Rows 5–14 are skipped
+optional Common-issues PDF scenarios (one row each). English only. At zip time, copy into the Google
+Sheet and export `.xlsx` to the zip root — do not submit the markdown.
 
 ---
 
