@@ -1,9 +1,9 @@
 # Ex3 Work Plan — Sagi & Yoav
 
-**Where to pick up:** `docs/assignment-compliance-pickup.md` (audit of 2026-08-25). The three
-projects are built; remaining work is assignment compliance (`-verbose` wiring, empty-folder
-`errors:` report, default-composition scores) and submission docs (README, HLD). Do not restart
-from joint-setup or the S/Y item list below unless that file says so.
+**Where to pick up:** `docs/assignment-compliance-pickup.md` (updated 2026-08-26). The three
+projects are built; remaining work is default-composition scores and submission docs (README,
+HLD). `-verbose` wiring and empty-folder `errors:` report are done. Do not restart from
+joint-setup or the S/Y item list below unless that file says so.
 
 Concrete work items only — what to build, port, wire up, or verify. Grounded in `AGENTS.md`,
 `docs/assignment3-checklist.md`, `docs/component-placement.md`, `docs/api-delta-ex2-to-ex3.md`,
@@ -505,7 +505,7 @@ Harness: `Simulator/tests/manual/` (`run_all.sh`, `docker_verify_default.sh`, `d
 |---|---|
 | Both CLI modes (`-comparative` / `-competition`) | **PASS** — artifacts written; all 24 cells unscored (`score < 0`) on this composition (known product issue) |
 | Re-run output-dir collision | **PASS** — distinct `comparative_results_<time>` dirs |
-| `-verbose` on/off | **FAIL** — CLI parses the flag; it is never passed to MissionControl (hardcoded `false` in `SimulationRunFactoryImpl`). See `docs/assignment-compliance-pickup.md`. |
+| `-verbose` on/off | **PASS (unit)** — flag reaches `MissionControlDependencies` via `SimulationRunFactoryImpl` ctor; `check_verbose.sh` file-list still blocked by default-composition Errors (`SPAWN_NOT_PASSABLE` skips `runMission`). See `docs/assignment-compliance-pickup.md`. |
 | Threading determinism (`num_threads` absent/1/2/8) | **PASS** — reports identical after stripping timestamps / scratch paths |
 | CLI failure modes | **PASS** — usage + all problems named; no crash |
 | Isolation / renamed-copy `.so` | **PASS** — registration undefined in plugins; two copies load cleanly |
@@ -515,8 +515,6 @@ Harness: `Simulator/tests/manual/` (`run_all.sh`, `docker_verify_default.sh`, `d
 **Still open after this pass (not verification-harness bugs):** see
 `docs/assignment-compliance-pickup.md` for the ordered queue. Short list:
 
-- Wire `-verbose` through `SimulationRunFactoryImpl` (not frozen `ISimulationRunFactory`).
-- Write aggregate `errors: [...]` when every folder `.so` fails to load.
 - Fix or replace `inputs/sim_compose.yaml` so cells complete and score (currently all `-1` / Error).
 - Rewrite `README.md` and add the HLD PDF.
 
@@ -527,9 +525,9 @@ Checklist (kept for re-run / grading prep):
   output folder, aggregate report, per-plugin YAML, output maps, and error logs.
 - [x] **Re-run collision check**: run the same mode twice in immediate succession; confirm the second
   run's output directory does not collide with the first.
-- [ ] **`-verbose` on/off**: confirm `MissionControl`'s verbose output only appears when the flag is
-  passed. *(not wired — `args.verbose` never reaches the factory; see
-  `docs/assignment-compliance-pickup.md`)*
+- [x] **`-verbose` on/off**: flag reaches `MissionControlDependencies` (unit:
+  `PassesVerboseTrue/False`). File-list `check_verbose.sh` still waits on a completing
+  composition cell — see `docs/assignment-compliance-pickup.md`.
 - [x] **Threading determinism**: run the same composition with `num_threads` absent, `=1`, `=2`, `=8`;
   diff the reports — scores and steps must be identical (ordering-independent fields aside), per
   `.cursor/rules/threading-model.mdc`.
