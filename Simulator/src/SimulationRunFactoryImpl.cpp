@@ -16,8 +16,8 @@
 #include <Simulator/MockMovement.h>
 #include <Simulator/SimulationRunImpl.h>
 
-#include <UserCommon_207190406_209543255/RunErrorLog.h>
-#include <UserCommon_207190406_209543255/SimulationCoordUtil.h>
+#include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
 #include <TinyNPY.h>
 
@@ -34,7 +34,7 @@ namespace {
 
 using namespace common;
 using namespace common::types;
-namespace UC = UserCommon_207190406_209543255;
+namespace UC = user_common_207190406_209543255;
 
 [[nodiscard]] bool isUnsetBoundaries(const MappingBounds& bounds) {
     return bounds.min_x == 0.0 * x_extent[cm] && bounds.max_x == 0.0 * x_extent[cm] &&

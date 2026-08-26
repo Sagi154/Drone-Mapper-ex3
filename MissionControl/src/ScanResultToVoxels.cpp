@@ -2,7 +2,7 @@
 
 #include "BeamMath.hpp"
 
-namespace MissionControl_207190406_209543255 {
+namespace mission_control_207190406_209543255 {
 namespace {
 
 using common::Orientation;
@@ -115,4 +115,4 @@ void ScanResultToVoxels::applyToMap(common::IMutableMap3D& output_map,
     }
 }
 
-} // namespace MissionControl_207190406_209543255
+} // namespace mission_control_207190406_209543255

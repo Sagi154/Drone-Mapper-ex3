@@ -1,12 +1,12 @@
 #pragma once
 
-#include <UserCommon_207190406_209543255/IRunErrorLog.h>
+#include <user_common_207190406_209543255/IRunErrorLog.h>
 
 #include <Common/types/MissionTypes.h>
 #include <filesystem>
 #include <fstream>
 
-namespace UserCommon_207190406_209543255 {
+namespace user_common_207190406_209543255 {
 
 class RunErrorLog final : public IRunErrorLog {
 public:
@@ -19,4 +19,4 @@ private:
     std::ofstream stream_;
 };
 
-} // namespace UserCommon_207190406_209543255
+} // namespace user_common_207190406_209543255

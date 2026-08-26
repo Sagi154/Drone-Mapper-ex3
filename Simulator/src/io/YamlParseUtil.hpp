@@ -1,6 +1,6 @@
 #pragma once
 
-#include <UserCommon_207190406_209543255/IRunErrorLog.h>
+#include <user_common_207190406_209543255/IRunErrorLog.h>
 
 #include <Common/Types.h>
 #include <Common/types/MapTypes.h>
@@ -14,12 +14,12 @@
 namespace simulator::io::detail {
 
 [[nodiscard]] std::optional<YAML::Node> loadYamlFile(const std::filesystem::path& path,
-                                                      UserCommon_207190406_209543255::IRunErrorLog& log,
+                                                      user_common_207190406_209543255::IRunErrorLog& log,
                                                       const std::string& context);
 
 [[nodiscard]] YAML::Node configRoot(const YAML::Node& root, const char* wrapper_key);
 
-void logRecoverable(UserCommon_207190406_209543255::IRunErrorLog& log,
+void logRecoverable(user_common_207190406_209543255::IRunErrorLog& log,
                     const std::string& code,
                     const std::string& message);
 

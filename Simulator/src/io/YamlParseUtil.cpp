@@ -7,14 +7,14 @@ namespace simulator::io::detail {
 using namespace common;
 using namespace common::types;
 
-void logRecoverable(UserCommon_207190406_209543255::IRunErrorLog& log,
+void logRecoverable(user_common_207190406_209543255::IRunErrorLog& log,
                     const std::string& code,
                     const std::string& message) {
     log.log({code, message});
 }
 
 std::optional<YAML::Node> loadYamlFile(const std::filesystem::path& path,
-                                        UserCommon_207190406_209543255::IRunErrorLog& log,
+                                        user_common_207190406_209543255::IRunErrorLog& log,
                                         const std::string& context) {
     if (!std::filesystem::exists(path)) {
         std::ostringstream msg;

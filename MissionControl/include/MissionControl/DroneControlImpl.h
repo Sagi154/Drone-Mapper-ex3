@@ -8,7 +8,7 @@
 #include <Common/IMappingAlgorithm.h>
 #include <Common/IMutableMap3D.h>
 
-namespace MissionControl_207190406_209543255 {
+namespace mission_control_207190406_209543255 {
 
 /// Executes one drone step: algorithm command, movement, scan, and voxel fusion.
 class DroneControlImpl final : public mission_control::IDroneControl {
@@ -39,4 +39,4 @@ private:
     std::size_t step_index_ = 0;
 };
 
-} // namespace MissionControl_207190406_209543255
+} // namespace mission_control_207190406_209543255

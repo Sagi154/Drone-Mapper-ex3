@@ -1,9 +1,9 @@
-#include <UserCommon_207190406_209543255/RunErrorLog.h>
-#include <UserCommon_207190406_209543255/TimeFormat.h>
+#include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/TimeFormat.h>
 
 #include <utility>
 
-namespace UserCommon_207190406_209543255 {
+namespace user_common_207190406_209543255 {
 
 RunErrorLog::RunErrorLog(std::filesystem::path log_path)
     : log_path_(std::move(log_path)) {
@@ -24,4 +24,4 @@ void RunErrorLog::log(const common::types::ErrorRef& error) {
     stream_.flush();
 }
 
-} // namespace UserCommon_207190406_209543255
+} // namespace user_common_207190406_209543255

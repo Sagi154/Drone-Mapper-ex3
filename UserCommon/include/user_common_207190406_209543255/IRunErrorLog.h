@@ -8,7 +8,7 @@ namespace common::types {
 struct ErrorRef;
 } // namespace common::types
 
-namespace UserCommon_207190406_209543255 {
+namespace user_common_207190406_209543255 {
 
 class IRunErrorLog {
 public:
@@ -17,4 +17,4 @@ public:
     virtual void log(const common::types::ErrorRef& error) = 0;
 };
 
-} // namespace UserCommon_207190406_209543255
+} // namespace user_common_207190406_209543255

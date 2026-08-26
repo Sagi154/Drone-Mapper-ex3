@@ -9,7 +9,7 @@
 
 #include <limits>
 
-namespace MissionControl_207190406_209543255::beam_math {
+namespace mission_control_207190406_209543255::beam_math {
 
 namespace mp = common::mp;
 namespace si = common::si;
@@ -58,4 +58,4 @@ using common::Position3D;
     };
 }
 
-} // namespace MissionControl_207190406_209543255::beam_math
+} // namespace mission_control_207190406_209543255::beam_math

@@ -1,11 +1,11 @@
-#include <UserCommon_207190406_209543255/ConfigParseResult.h>
+#include <user_common_207190406_209543255/ConfigParseResult.h>
 
 #include <gtest/gtest.h>
 
 namespace {
 
-UserCommon_207190406_209543255::ConfigParseResult<int> parseIntStub(bool succeed) {
-    UserCommon_207190406_209543255::ConfigParseResult<int> result;
+user_common_207190406_209543255::ConfigParseResult<int> parseIntStub(bool succeed) {
+    user_common_207190406_209543255::ConfigParseResult<int> result;
     if (succeed) {
         result.ok = true;
         result.value = 42;

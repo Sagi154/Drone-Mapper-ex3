@@ -44,8 +44,9 @@ Placement decisions for every ported ex2 file: `docs/component-placement.md`.
 
 Student IDs `207190406` and `209543255` appear in every artifact name and in our namespaces:
 `simulator_207190406_209543255`, `Algorithm_207190406_209543255.so`,
-`MissionControl_207190406_209543255.so`, namespaces `Algorithm_207190406_209543255`,
-`MissionControl_207190406_209543255`, `UserCommon_207190406_209543255`, zip `ex3_207190406_209543255.zip`.
+`MissionControl_207190406_209543255.so`, namespaces `algorithm_207190406_209543255`,
+`mission_control_207190406_209543255`, `user_common_207190406_209543255`, zip
+`ex3_207190406_209543255.zip`.
 
 ## Hard constraints
 

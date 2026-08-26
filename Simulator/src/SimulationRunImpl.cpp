@@ -10,8 +10,8 @@
 #include <Simulator/MapsComparison.h>
 #include <Simulator/OutputPathUtil.h>
 
-#include <UserCommon_207190406_209543255/RunErrorLog.h>
-#include <UserCommon_207190406_209543255/SimulationCoordUtil.h>
+#include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
 #include <memory>
 #include <stdexcept>
@@ -31,7 +31,7 @@ namespace {
     return types::ResolutionRequestStatus::Ignored;
 }
 
-void logErrors(UserCommon_207190406_209543255::RunErrorLog* log,
+void logErrors(user_common_207190406_209543255::RunErrorLog* log,
                const std::vector<common::types::ErrorRef>& errors) {
     if (log == nullptr) {
         return;
@@ -80,9 +80,9 @@ types::SimulationResult SimulationRunImpl::run() {
     result.resolution_request_status =
         resolutionStatus(mission_config_.output_mapping_resolution_factor);
 
-    std::unique_ptr<UserCommon_207190406_209543255::RunErrorLog> error_log;
+    std::unique_ptr<user_common_207190406_209543255::RunErrorLog> error_log;
     if (!output_map_file_.empty()) {
-        error_log = std::make_unique<UserCommon_207190406_209543255::RunErrorLog>(
+        error_log = std::make_unique<user_common_207190406_209543255::RunErrorLog>(
             errorLogPathFromOutputMap(output_map_file_));
     }
 
@@ -143,7 +143,7 @@ types::SimulationResult SimulationRunImpl::run() {
         result.mission_score = -1.0;
     } else {
         const common::Position3D spawn =
-            UserCommon_207190406_209543255::worldInitialDronePosition(simulation_config_);
+            user_common_207190406_209543255::worldInitialDronePosition(simulation_config_);
         result.mission_score = MapsComparison::compare(*hidden_map_, *output_map_, spawn);
     }
     return result;

@@ -54,6 +54,123 @@ tests that confirm what we already built rather than what the spec actually dema
 unconsciously encode our own working assumptions (from `docs/open-questions.md`) as if they were
 requirements.
 
+`ex_3_skeleton` is a sibling folder to this repo and already ships its own `context/` copy, so a
+Cursor window opened at `ex_3_skeleton` root is naturally, physically isolated — no exclusion
+rules needed, it simply cannot see this repo.
+
+**Source priority for that isolated agent** (revised from the first draft): the skeleton is
+ground truth for anything it actually defines — published header signatures under `common/`,
+`Simulator/common_simulator/`, `MissionControl/common_mission_control/`, plus its root
+`CMakeLists.txt` / `CMakePresets.json` / `README.md` (build structure, artifact naming pattern).
+The docx governs everything the skeleton does **not** encode: CLI argument semantics,
+output/report YAML formats, threading rules, error-handling requirements, submission zip
+contents. When both cover the same thing and disagree, the skeleton wins and the agent should
+flag the conflict rather than silently preferring the docx's prose.
+
+**The catalog targets a built submission zip, not the skeleton repo.** The agent must be told
+explicitly that the eventual test target is an unzipped, built **submission** (5 folders, 4 build
+files, `students.txt`, `README.md` — a filled-in copy of this skeleton), not `ex_3_skeleton`
+itself, and that it doesn't know real student IDs — every test invocation and filename in the
+catalog must use `<ids>` / `<algorithm_so>` / `<mission_control_so>` placeholders exactly as the
+assignment doc itself does, never a concrete name. Naming/ID wiring is a Phase B concern.
+
+**No `.cursor/skills` exist inside `ex_3_skeleton`** (confirmed empty), so the isolated agent
+cannot invoke this repo's `gather-instructor-context` skill by name. Inline the equivalent
+instruction directly in the prompt instead: dispatch one extraction subagent per source document
+(or per short PDF pair) in parallel, each returning a structured partial catalog with quotes and
+IDs, then synthesize into the single final document. Don't invoke the brainstorming skill for this
+— it's a fully-specified, deterministic extraction task, not ambiguous creative work needing
+back-and-forth.
+
+#### Phase A prompt (paste into the isolated `ex_3_skeleton` window)
+
+```text
+You are extracting a black-box grading test catalog for a course assignment. Do NOT write or
+modify any code. Do NOT look outside this workspace folder — everything you need is here.
+
+IMPORTANT CONTEXT: this catalog will eventually be used to test a graded SUBMISSION ZIP, not this
+skeleton repo. A submission is this skeleton's structure filled in by some team: 5 folders
+(Simulator/, Algorithm/, MissionControl/, common/ as-is, UserCommon/), 4 build files, students.txt,
+README.md, unzipped and built with the submitting team's own build system, producing an executable
+named simulator_<their_ids> that dlopens Algorithm_<their_ids>.so and MissionControl_<their_ids>.so
+from wherever the CLI points. You do not know real IDs — describe every test invocation and
+filename generically using <ids> / <algorithm_so> / <mission_control_so> placeholders exactly as
+the assignment doc itself does, never hardcode a concrete name.
+
+Sources and priority:
+1. HIGHEST for anything they actually define: the header files under common/,
+   Simulator/common_simulator/, MissionControl/common_mission_control/ (published, frozen
+   interfaces every team builds against as-is), plus this skeleton's root CMakeLists.txt,
+   CMakePresets.json, and README.md (build structure, executable/artifact naming pattern,
+   folder layout). These are the actual compiled/build-time ground truth, more reliable than
+   the docx's prose for anything they cover.
+2. context/Advanced Topics TAU 2026B - Assignment 3.docx — governs everything the skeleton does
+   NOT encode: CLI argument semantics, output/report YAML formats, threading rules, error-handling
+   requirements, submission zip contents. This is a zip; extract word/document.xml text rather
+   than trusting any summary. It was in DRAFT mode and its last section is literally "[TBD]" —
+   note that.
+3. context/Common issues and handling.pdf — mandatory vs optional runtime fault table.
+4. context/Structuring the project.pdf — where mocks/registration live, project boundaries.
+
+When the skeleton and the docx conflict on something the skeleton actually defines (e.g. exact
+header signatures, namespace of published interfaces), the skeleton wins and you should flag the
+conflict rather than silently picking the docx's wording.
+
+Ignore: Assignment 1/2 docx, Exercise 2 Review Guideline.docx, Submission Guidelines docx (it
+describes a different, older exercise — flag anything relevant from it separately, don't merge it
+in), AdvCpp Review Guideline.docx / Error Code Key.xlsx (that's manual human code review, not
+something a runtime test can check — list it in a separate "not testable by a runtime suite"
+section instead of skipping it silently).
+
+Approach: given the number of source documents, dispatch one extraction subagent per document (or
+per short PDF pair, e.g. Common issues + Structuring the project together) in parallel, in the
+same turn. Each subagent gets the absolute path to its one document and returns a structured
+partial catalog (quotes, tentative IDs, classification) without looking at anything else. Then
+synthesize all partial catalogs yourself into the single final markdown document below. Do not
+dispatch subagents to write or modify code, and do not let them look outside this workspace.
+
+Task: produce an exhaustive TEST CATALOG for the Simulator's runtime, CLI, and file-output
+behavior — the parts a grader could check by unzipping a submission, building it, running the
+resulting executable, and inspecting its output, without reading that team's source code. For
+every requirement you find that is objectively, mechanically observable this way, write one
+catalog entry with:
+
+- ID (e.g. CLI-01, OUT-03, ERR-02, THREAD-01, PLUGIN-01)
+- Verbatim or near-verbatim quote of the requirement from its source
+- Exact test setup: what CLI invocation / input files / folder state to construct (using <ids>
+  placeholders, never concrete names)
+- Exact expected observable outcome: stdout/stderr content expectations, exit behavior, files
+  created (names, locations, formats), YAML field names and structure, sort order, log line
+  format — quote field names and CLI flag syntax verbatim, don't paraphrase them
+- Classification: MANDATORY / OPTIONAL (bracketed args, "may") / BONUS / GENUINELY UNSPECIFIED
+  (the doc requires an outcome but never defines the exact metric/rule — e.g. scoring formula,
+  what makes two mission control results "the same") — for unspecified ones, describe only the
+  observable SHAPE/CONTRACT you can test (e.g. "results_summary is sorted descending by group
+  size" — testable) without inventing the missing definition
+
+Also produce a short separate list of:
+- Contradictions or ambiguities between sources (quote both conflicting passages, and say which
+  source should win per the priority rules above)
+- Anything left to "your decision" per the docx (e.g. exact usage/error text) — note a test can
+  only check these loosely (e.g. "usage text is printed and mentions the missing arg name"), not
+  exact wording
+- Requirements that are graded but NOT testable by running a built binary — build-time/structural
+  things (folder layout, no `new`/`delete`, frozen headers unchanged vs this skeleton, no binaries
+  in the zip, students.txt/README present) — list separately, since checking these means
+  inspecting the unzipped submission tree/source, not running it
+- Requirements that only make sense once you assume a specific submission's build system exists
+  (e.g. "run the root build file") — note that a generic tester needs to discover/invoke whatever
+  build tooling the submission provides, since it may differ per team
+
+Do not guess at anything the assignment doesn't specify. If unsure whether something is mandatory,
+quote the exact sentence and mark it "ambiguous" rather than picking a side.
+
+Output as a single markdown document with the sections: Mandatory CLI/runtime behaviors, Optional/
+bonus behaviors, Genuinely unspecified (shape-only tests), Static/structural checks on the unzipped
+submission (not runtime-testable), Not testable by any automated suite (manual review items),
+Contradictions/ambiguities found across sources.
+```
+
 ### Phase B — wiring pass, necessarily implementation-aware
 
 Isolation can't extend to *execution*: someone has to know our binary is

@@ -1,5 +1,5 @@
-#include <UserCommon_207190406_209543255/RunErrorLog.h>
-#include <UserCommon_207190406_209543255/TimeFormat.h>
+#include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/TimeFormat.h>
 
 #include <gtest/gtest.h>
 
@@ -31,11 +31,11 @@ namespace {
 TEST(TimeFormat, FixedTimePointProducesExpectedIso8601String) {
     // 2000-01-01 00:00:00 UTC = Unix epoch + 946684800s
     const auto tp = std::chrono::system_clock::from_time_t(946684800);
-    EXPECT_EQ(UserCommon_207190406_209543255::formatUtcTimestamp(tp), "2000-01-01T00:00:00Z");
+    EXPECT_EQ(user_common_207190406_209543255::formatUtcTimestamp(tp), "2000-01-01T00:00:00Z");
 }
 
 TEST(TimeFormat, CurrentTimestampMatchesIso8601Format) {
-    const std::string ts = UserCommon_207190406_209543255::currentUtcTimestamp();
+    const std::string ts = user_common_207190406_209543255::currentUtcTimestamp();
     EXPECT_TRUE(matchesIso8601Utc(ts)) << "Unexpected format: " << ts;
 }
 
@@ -44,7 +44,7 @@ TEST(RunErrorLog, WritesStructuredLineAndFlushesImmediately) {
         std::filesystem::temp_directory_path() / "uc_run_error_log_flush_test.log";
 
     {
-        UserCommon_207190406_209543255::RunErrorLog logger{log_path};
+        user_common_207190406_209543255::RunErrorLog logger{log_path};
         logger.log({"TEST_ERROR_CODE", "user-facing message"});
         // Readable from disk before the logger is destroyed (no explicit close/flush by caller).
         const auto lines = readAllLines(log_path);
@@ -64,7 +64,7 @@ TEST(RunErrorLog, CreatesParentDirectoryIfMissing) {
     const std::filesystem::path log_path =
         std::filesystem::temp_directory_path() / "uc_run_error_log_nested" / "deep" / "error.log";
 
-    UserCommon_207190406_209543255::RunErrorLog logger{log_path};
+    user_common_207190406_209543255::RunErrorLog logger{log_path};
     logger.log({"DIR_TEST", "created nested log path"});
 
     EXPECT_TRUE(std::filesystem::exists(log_path));
@@ -79,7 +79,7 @@ TEST(RunErrorLog, AppendsMultipleEntries) {
         std::filesystem::temp_directory_path() / "uc_run_error_log_append_test.log";
 
     {
-        UserCommon_207190406_209543255::RunErrorLog logger{log_path};
+        user_common_207190406_209543255::RunErrorLog logger{log_path};
         logger.log({"FIRST", "first message"});
         logger.log({"SECOND", "second message"});
     }

@@ -20,7 +20,7 @@
 #include <tuple>
 #include <vector>
 
-namespace Algo = Algorithm_207190406_209543255;
+namespace Algo = algorithm_207190406_209543255;
 using Impl    = Algo::MappingAlgorithmImpl_207190406_209543255;
 using Map     = AlgorithmTest::FakeMap3D;
 

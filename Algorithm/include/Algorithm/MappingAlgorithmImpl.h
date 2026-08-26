@@ -6,7 +6,7 @@
 #include <optional>
 #include <vector>
 
-namespace Algorithm_207190406_209543255 {
+namespace algorithm_207190406_209543255 {
 
 /// 26-direction scan batch + density-scored BFS frontier cleanup.
 /// Each nextStep emits at most one scan orientation or one movement command.
@@ -64,4 +64,4 @@ private:
     static constexpr int kMaxMovingStallTicks = 8;
 };
 
-} // namespace Algorithm_207190406_209543255
+} // namespace algorithm_207190406_209543255

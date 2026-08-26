@@ -8,7 +8,7 @@
 #include <memory>
 #include <filesystem>
 
-namespace MissionControl_207190406_209543255 {
+namespace mission_control_207190406_209543255 {
 
 class MissionControlImpl_207190406_209543255 final : public common::IMissionControl {
 public:
@@ -23,4 +23,4 @@ private:
     std::unique_ptr<DroneControlImpl> drone_control_;
 };
 
-} // namespace MissionControl_207190406_209543255
+} // namespace mission_control_207190406_209543255

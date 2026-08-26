@@ -80,7 +80,7 @@ and compiles the `.cpp` files it needs. That means a `UserCommon` translation un
 into the simulator **and** into a `.so`. Keep it small, dependency-light, and free of mutable global
 state so duplicate copies cannot disagree.
 
-All our `UserCommon` code goes in `namespace UserCommon_207190406_209543255`.
+All our `UserCommon` code goes in `namespace user_common_207190406_209543255`.
 
 ## Namespaces
 
@@ -89,15 +89,13 @@ All our `UserCommon` code goes in `namespace UserCommon_207190406_209543255`.
 | Course-published `common/` headers | `common`, `common::types` |
 | Course-published `Simulator/common_simulator/` | `simulator`, `simulator::types` |
 | Course-published `MissionControl/common_mission_control/` | `mission_control` |
-| Our algorithm code | `Algorithm_207190406_209543255` |
-| Our mission control code | `MissionControl_207190406_209543255` |
-| Our shared code | `UserCommon_207190406_209543255` |
+| Our algorithm code | `algorithm_207190406_209543255` |
+| Our mission control code | `mission_control_207190406_209543255` |
+| Our shared code | `user_common_207190406_209543255` |
 | Our simulator code | `simulator` (not ID-suffixed — the executable is not dynamically loaded) |
 
-The skeleton `README.md` also mentions lowercase `algorithm` / `mission_control` project namespaces,
-which conflicts with the assignment's ID-suffixed requirement. See `docs/open-questions.md`; until it is
-resolved, follow the assignment doc (ID-suffixed) because that is what prevents symbol collisions when
-two teams' `.so` files are loaded together.
+Assignment 3 (2026-08-26 forum refresh) requires these ID-suffixed namespaces in **snake_case**.
+`.so` / executable basenames stay PascalCase-prefixed (`Algorithm_*.so`, etc.).
 
 ## Interfaces stay where the course put them
 

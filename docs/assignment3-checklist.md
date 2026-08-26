@@ -48,9 +48,9 @@ With IDs `207190406` and `209543255`:
 | Simulator executable | `simulator_207190406_209543255` |
 | Algorithm shared object | `Algorithm_207190406_209543255.so` |
 | Mission control shared object | `MissionControl_207190406_209543255.so` |
-| Algorithm namespace | `Algorithm_207190406_209543255` |
-| Mission control namespace | `MissionControl_207190406_209543255` |
-| UserCommon namespace | `UserCommon_207190406_209543255` |
+| Algorithm namespace | `algorithm_207190406_209543255` |
+| Mission control namespace | `mission_control_207190406_209543255` |
+| UserCommon namespace | `user_common_207190406_209543255` |
 | Submission zip | `ex3_207190406_209543255.zip` |
 
 `students.txt` in the skeleton still has `TODO:` placeholders — fill it in.

@@ -1,4 +1,4 @@
-#include <UserCommon_207190406_209543255/SimulationCoordUtil.h>
+#include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
 #include <gtest/gtest.h>
 
@@ -62,7 +62,7 @@ TEST(SimulationCoordUtil, WorldInitialDronePosition_HouseScenarioOffset) {
         Position3D{0.0 * x_extent[cm], 0.0 * y_extent[cm], 150.0 * z_extent[cm]};
 
     const Position3D world =
-        UserCommon_207190406_209543255::worldInitialDronePosition(simulation);
+        user_common_207190406_209543255::worldInitialDronePosition(simulation);
     EXPECT_DOUBLE_EQ(world.x.numerical_value_in(cm), 150.0);
     EXPECT_DOUBLE_EQ(world.y.numerical_value_in(cm), 200.0);
     EXPECT_DOUBLE_EQ(world.z.numerical_value_in(cm), 160.0);
@@ -76,7 +76,7 @@ TEST(SimulationCoordUtil, WorldInitialDronePosition_UnchangedWhenOffsetZero) {
         Position3D{0.0 * x_extent[cm], 0.0 * y_extent[cm], 0.0 * z_extent[cm]};
 
     const Position3D world =
-        UserCommon_207190406_209543255::worldInitialDronePosition(simulation);
+        user_common_207190406_209543255::worldInitialDronePosition(simulation);
     EXPECT_EQ(world.x, simulation.initial_drone_position.x);
     EXPECT_EQ(world.y, simulation.initial_drone_position.y);
     EXPECT_EQ(world.z, simulation.initial_drone_position.z);
@@ -86,14 +86,14 @@ TEST(SimulationCoordUtil, IsDroneSpawnPassable_EmptyMapInBounds) {
     FakeMap3D map{emptyRoomConfig(), VoxelOccupancy::Empty};
     const Position3D center{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
     const PhysicalLength radius = 5.0 * cm;
-    EXPECT_TRUE(UserCommon_207190406_209543255::isDroneSpawnPassable(map, radius, center));
+    EXPECT_TRUE(user_common_207190406_209543255::isDroneSpawnPassable(map, radius, center));
 }
 
 TEST(SimulationCoordUtil, IsDroneSpawnPassable_OccupiedRejects) {
     FakeMap3D map{emptyRoomConfig(), VoxelOccupancy::Occupied};
     const Position3D center{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
     const PhysicalLength radius = 5.0 * cm;
-    EXPECT_FALSE(UserCommon_207190406_209543255::isDroneSpawnPassable(map, radius, center));
+    EXPECT_FALSE(user_common_207190406_209543255::isDroneSpawnPassable(map, radius, center));
 }
 
 TEST(SimulationCoordUtil, IsDroneSpawnPassable_OutOfBoundsRejects) {
@@ -101,5 +101,5 @@ TEST(SimulationCoordUtil, IsDroneSpawnPassable_OutOfBoundsRejects) {
     // Near the edge so the sphere samples outside bounds
     const Position3D center{1.0 * x_extent[cm], 1.0 * y_extent[cm], 1.0 * z_extent[cm]};
     const PhysicalLength radius = 20.0 * cm;
-    EXPECT_FALSE(UserCommon_207190406_209543255::isDroneSpawnPassable(map, radius, center));
+    EXPECT_FALSE(user_common_207190406_209543255::isDroneSpawnPassable(map, radius, center));
 }

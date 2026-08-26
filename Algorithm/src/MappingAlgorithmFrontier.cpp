@@ -9,7 +9,7 @@
 #include <queue>
 #include <unordered_map>
 
-namespace Algorithm_207190406_209543255::detail {
+namespace algorithm_207190406_209543255::detail {
 
 namespace types = common::types;
 using common::IMap3D;
@@ -812,4 +812,4 @@ PlanningDiagnostics MappingAlgorithmFrontier::diagnose(
     return diag;
 }
 
-} // namespace Algorithm_207190406_209543255::detail
+} // namespace algorithm_207190406_209543255::detail
