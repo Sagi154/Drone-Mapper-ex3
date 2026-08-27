@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Confirms two runs launched immediately after each other never reuse an output directory.
+# OUT-01: output-dir collision — two back-to-back runs must not reuse the same output directory.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"

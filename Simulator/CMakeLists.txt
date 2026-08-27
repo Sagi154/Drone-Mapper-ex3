@@ -334,6 +334,16 @@ set_target_properties(valid_mission_control_plugin PROPERTIES
 target_link_libraries(valid_mission_control_plugin PRIVATE common::common)
 drone_warnings(valid_mission_control_plugin)
 
+add_library(faulty_wall_algorithm_plugin SHARED
+    tests/fixtures/faulty_wall_algorithm_plugin.cpp
+)
+set_target_properties(faulty_wall_algorithm_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(faulty_wall_algorithm_plugin PRIVATE common::common)
+drone_warnings(faulty_wall_algorithm_plugin)
+
 add_executable(simulator_loader_test
     tests/test_plugin_loader.cpp
     $<TARGET_OBJECTS:simulator_registration>
@@ -433,3 +443,4 @@ target_link_libraries(simulator_207190406_209543255 PRIVATE
 )
 
 drone_warnings(simulator_207190406_209543255)
+add_dependencies(simulator_207190406_209543255 faulty_wall_algorithm_plugin)
