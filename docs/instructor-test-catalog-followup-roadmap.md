@@ -1,7 +1,9 @@
 # Instructor test-catalog follow-up — roadmap
 
-Scoping doc for the 4 follow-up points. Written 2026-08-28. **Point 1 done** on branch
-`docs/open-questions-composition-run-expansion`; points 2–4 not started.
+Scoping doc for the 4 follow-up points. Written 2026-08-28. **Point 1 done** (merged to
+`main`). **Point 2 plan written** at
+`docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md` (implementation not
+started). Points 3–4 not started.
 
 Inputs already in hand:
 
@@ -52,12 +54,15 @@ the full cross product of drones × lidars × missions, or something narrower; t
 
 ## Point 2 — Plan to close the "real gaps" (writing-plans skill)
 
-Gaps identified this session, to become individual tasks in a `superpowers:writing-plans`-format
-plan saved to `docs/superpowers/plans/YYYY-MM-DD-close-instructor-test-catalog-gaps.md`:
+**Status:** plan file exists —
+`docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md`. Execute that plan
+separately (subagent-driven or inline); do not treat this roadmap section as the task list.
+
+Gaps identified this session (mapped into that plan’s Tasks 1–7 + harness Task 8):
 
 | # | Gap | Catalog rows |
 |---|-----|--------------|
-| 1 | `check_isolation.sh` uses a renamed copy of our **own** `.so` to approximate "another team's plugin." `Simulator/tests/fixtures/valid_algorithm_plugin.cpp` / `valid_mission_control_plugin.cpp` already exist as genuinely independent, frozen-header-only mock plugins, but nothing builds them as standalone loadable `.so`s or exercises them through the real CLI. | PLUGIN-03 |
+| 1 | `check_isolation.sh` uses a renamed copy of our **own** `.so` to approximate "another team's plugin." `valid_algorithm_plugin` / `valid_mission_control_plugin` are already built as test `SHARED` `.so`s, but manual scripts never exercise them through the real CLI. | PLUGIN-03 |
 | 2 | `check_collision.sh` name collides with the catalog's wall-collision fault (`FAULT-02`) — it actually tests output-dir collision avoidance. The real mandatory fault (MockMovement throws, caught, no crash) is unit-tested only (`CollisionBlockedThrowContinues` per pickup file), with no black-box script and a misleading filename nearby. | FAULT-02, OUT-01 |
 | 3 | `check_cli_failures.sh` only asserts "didn't crash," never that the missing/unsupported **argument names** actually appear in the printed message (the docx's specific graded behavior). Also only ever tries one unsupported arg at a time, never two together to prove "all of them" are named. | CLI-04, CLI-05 |
 | 4 | No black-box run exercises 2+ **genuinely distinct** plugin binaries in one comparative/competitive run producing distinct per-plugin outputs — today's fixtures are same-binary copies (`_copy2.so`), and the multi-plugin report shape is only proven via synthetic unit tests. | PLUGIN-01, PLUGIN-02, YAML-OUT-03 |
