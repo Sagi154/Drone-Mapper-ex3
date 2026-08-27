@@ -115,3 +115,23 @@ on Jul 26, 2026, and post-draft changes are supposed to be highlighted.
 
 **Action:** re-extract and diff the docx before submission. Also check the Ex 3 forum for changes that
 create extra work — the doc explicitly says to raise those on the forum rather than rushing to rewrite code.
+
+---
+
+## 9. How are drones × lidars × missions crossed into composition runs?
+
+Comparative mode says to run MissionControls "on all the configurations in the simulation yaml config,"
+but never defines what one configuration is. The skeleton's `SimulationCompositionData` lists
+composition-level `drone_configs` / `lidar_configs` as siblings of `simulation_mission_groups` (missions
+nested per simulation), which does not by itself say whether every drone×lidar pair is applied to every
+`(simulation, mission)` pair, or whether some narrower pairing is intended. Catalog `UNSPEC-07` records
+the same gap.
+
+**Working assumption:** expand the full cartesian product
+**(simulation, mission) pairs × drone_configs × lidar_configs** — same nesting as
+`RunMatrixOrchestrator::expand` in `Simulator/src/RunMatrixOrchestrator.cpp` (group → mission → drone →
+lidar). That matches ex2's run count for the sample composition (6 pairs × 2 drones × 2 lidars = 24
+cells) and is what `.cursor/rules/simulator-cli-and-outputs.mdc` encodes as our choice, not a graded
+prose fact.
+
+**Ask:** is the mandatory expansion the full drone × lidar × mission cross product, or something else?

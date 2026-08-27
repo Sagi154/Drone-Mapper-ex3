@@ -25,7 +25,9 @@ alwaysApply: false
 | Sort | by size of the agreeing group, **descending** | by `total_score` **desc**, then `total_steps` **asc** |
 
 Both modes run **all configurations in the composition YAML** — the full (simulation, mission) pairs ×
-drones × lidars expansion, per plugin.
+drones × lidars expansion, per plugin. That cartesian product is a **working assumption** (assignment
+prose never defines the unit of "configuration") — see `docs/open-questions.md` §9 / catalog
+`UNSPEC-07`.
 
 ## Argument parsing (graded behavior)
 
