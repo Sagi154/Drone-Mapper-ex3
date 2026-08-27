@@ -30,10 +30,11 @@ at zip time and pre-submission packaging, not the Sagi/Yoav track split. Deadlin
 |-------|----------|
 | `port-ex2-component` | Moving a component from `../Drone-Mapper-ex2/` into the ex3 layout |
 | `plugin-loading-and-registration` | Implementing or debugging `dlopen`/registration/`dlclose` |
-| `pre-submission-review` | Checking the 5-folder/ID-naming submission structure before zipping |
+| `pre-submission-review` | Checking the 5-folder/ID-naming submission structure before zipping; also grep checks for `new`/`delete` (`ZIP-15`), mock placement (`ZIP-13`), `inputs/` presence (`ZIP-17`), and produced-zip archive name/root-placement (`ZIP-01`/`ZIP-04`/`ZIP-05`) |
 | `verify-frozen-interfaces` | Confirming `common/` (and the other frozen folders) weren't touched |
 | `gather-instructor-context` | Extracting / re-diffing Assignment 3 from `context/` via subagents (docx/pdf win over `docs/`) |
 | `populate-known-issues` | Adding a row to `docs/known-issues.md` (optional excel export later) |
+| `advcpp-rubric-review` | Subjective AdvCpp rubric review (`e01`–`e23`): dispatches one explore subagent per code group (headers/API, C++ idiom, structure/flow, HLD alignment), reports findings as a judgment-call table — not a pass/fail script. Run before submission or after major refactors. |
 
 ## Key docs
 

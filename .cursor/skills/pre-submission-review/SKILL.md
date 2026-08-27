@@ -73,6 +73,81 @@ grep -rn "TODO: Student" students.txt && echo "FIX students.txt before zipping"
 - [ ] Only approved external libraries are used; anything else is either removed or has forum approval
       documented in `README.md` (main code) or `bonus.txt` (bonus-only usage).
 
+## 5a. No `new`/`delete` in source (`ZIP-15` / `e13`)
+
+Grep shippable sources — `Simulator/src/`, `Algorithm/src/`, `MissionControl/src/`, `UserCommon/`
+— for bare `new` / `delete` expressions. Exclude test files and fixtures (`*/tests/*`,
+`*/test_*`, `*/fixture*`, `*/mock*` that live under those paths if any are not already under
+`Simulator/`).
+
+```bash
+grep -rn --include='*.cpp' --include='*.h' \
+     -E '\bnew\b|\bdelete\b' \
+     Simulator/src/ Algorithm/src/ MissionControl/src/ UserCommon/
+```
+
+- [ ] Zero results (or only operator-overload / placement-new in approved third-party headers).
+      If hits found: replace with `std::make_unique`/`std::make_shared` or stack allocation.
+      `malloc`/`free` are also forbidden — add `-E 'malloc\(|free\('` to the grep if in doubt.
+
+## 5b. Mocks are under `Simulator/` only (`ZIP-13`)
+
+`MockLidar`, `MockGPS`, `MockMovement`, `Map3DImpl`, and `MapsComparison` must live exclusively
+under `Simulator/` — they must **not** appear as source files or `#include` targets inside
+`Algorithm/` or `MissionControl/`.
+
+```bash
+# Should print nothing:
+grep -rn --include='*.cpp' --include='*.h' \
+     -E 'MockLidar|MockGPS|MockMovement|Map3DImpl|MapsComparison' \
+     Algorithm/ MissionControl/
+```
+
+- [ ] Zero results. Any hit means a mock leaked into a plugin namespace — move/refactor so the
+      mock lives only in `Simulator/src/` (per `context/Structuring the project.pdf`).
+
+## 5c. `inputs/` tree sanity (`ZIP-17`)
+
+Staff expect certain `inputs/` files to exist at submission / grading time. Check we haven't
+accidentally gitignored or deleted instructor-provided maps or YAML.
+
+```bash
+ls inputs/
+```
+
+- [ ] `inputs/` directory exists in the working tree.
+- [ ] At least one `.yaml` / `.yml` composition file present (the one used in §7 smoke pass).
+- [ ] At least one `.npy` map file present (reachable via that YAML).
+- [ ] No instructor-provided file has been deleted or moved to a non-submission path.
+
+Note: `inputs/` is **ours to keep for dev** but should **not** itself be excluded from the zip
+if the graders' test scripts reference a relative `inputs/` path — confirm with the assignment
+docx or forum before stripping it.
+
+## 5d. Produced-zip archive check (`ZIP-01` / `ZIP-04` / `ZIP-05`)
+
+Steps §1–5c all inspect the working tree. This step builds and inspects the **actual archive** so
+nothing extra gets swept in, and the zip name / root placement are verified exactly.
+
+```bash
+# Build the zip (adjust path/command to match your zip step):
+cd <parent-of-submission-root>
+zip -r ex3_207190406_209543255.zip ex3_207190406_209543255/ \
+    --exclude '*/build/*' --exclude '*/.git/*' --exclude '*/tmp/*'
+
+# Inspect the zip:
+unzip -l ex3_207190406_209543255.zip | head -40
+```
+
+- [ ] **ZIP-01** — archive name is exactly `ex3_<id1>_<id2>.zip` (no extra prefix, no `.tar`).
+- [ ] **ZIP-04** — all five top-level folders (`Simulator/`, `Algorithm/`, `MissionControl/`,
+      `common/`, `UserCommon/`) appear at the zip root with **no extra nesting**
+      (i.e., not `ex3_207190406_209543255/Simulator/…`).
+- [ ] **ZIP-05** — `students.txt`, `README.md`, and the root `CMakeLists.txt` appear at the zip
+      root alongside the folders, not nested inside any subfolder.
+- [ ] Re-run `find` for binaries inside the extracted zip to confirm §5's check holds for the
+      actual archive contents (build artifacts sometimes land here if the zip step is too broad).
+
 ## 6. Documentation present and accurate
 
 - [ ] `README.md` — build/run instructions match the actual build files and binary names; describes the
