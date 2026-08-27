@@ -1,0 +1,11 @@
+# One-cell composition for fast black-box scripts (not a substitute for full sim_compose smoke).
+# Paths are relative to this file's directory (CompositionYamlParser base_dir).
+simulation_compositions:
+  simulations:
+    - simulation_config: "../../../inputs/simulation/small_simulation_room.yaml"
+      mission_configs:
+        - "../../../inputs/mission/small_mission_room.yaml"
+  drone_configs:
+    - "../../../inputs/drone/drone_small.yaml"
+  lidar_configs:
+    - "../../../inputs/lidar/lidar_short.yaml"
