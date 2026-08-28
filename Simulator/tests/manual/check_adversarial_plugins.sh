@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # VAR-03: adversarial Algorithm/MissionControl fixtures — no crash under our simulator.
 # Uses tiny_compose_adversarial.yaml (max_steps=25) so never_finish/bad_scan stay bounded.
-# Each invocation is wrapped in `timeout` so a lidar/algo hang fails the check instead of
-# wedging run_all.sh (seen with extreme scan_orientation vs MockLidar).
+# Each run is wrapped in `timeout` so a hang fails the check instead of wedging run_all.sh.
+# Regression note (Known Issues #21): unbounded scan-batch while + extreme angles — fixed.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -78,7 +78,7 @@ run_comparative_with_mc adversarial_throw_mission_control_plugin.so throw_mc
 run_comparative_with_mc adversarial_empty_mission_control_plugin.so empty_mc
 run_comparative_with_mc adversarial_implausible_steps_mission_control_plugin.so implausible_mc
 
-# bad_scan last: extreme angles currently hang MockLidar (trig on ~1e12 deg).
+# bad_scan last (regression canary for Known Issues #21 / kMaxScansPerStep + angle wrap).
 run_competition_with_algo adversarial_bad_scan_orientation_algorithm_plugin.so bad_scan
 
 echo "PASS: check_adversarial_plugins"
