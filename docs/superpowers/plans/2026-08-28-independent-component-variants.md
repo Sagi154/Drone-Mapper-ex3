@@ -225,7 +225,7 @@ Blind sources stay under `ex_3_skeleton/blind_deliverables/` until Phase B copie
 - Consumes: blind VAR-01 sources
 - Produces: `${BUILD_DIR}/Simulator/tests/hosts/skeleton_host` or `${BUILD_DIR}/Simulator/skeleton_host` executable (pick one path and keep scripts consistent — plan uses `${BUILD_DIR}/Simulator/skeleton_host`)
 
-- [ ] **Step 1: Copy blind sources into the repo**
+- [x] **Step 1: Copy blind sources into the repo**
 
 ```bash
 mkdir -p Simulator/tests/hosts/skeleton_host
@@ -235,7 +235,7 @@ cp -r ../ex_3_skeleton/blind_deliverables/var01_skeleton_host/* \
 
 Adjust paths if this repo’s sibling skeleton folder differs; keep ASSUMPTIONS.md in the copy.
 
-- [ ] **Step 2: Add CMake target (append near the end of** `Simulator/CMakeLists.txt`**, after fixtures)**
+- [x] **Step 2: Add CMake target (append near the end of** `Simulator/CMakeLists.txt`**, after fixtures)**
 
 ```cmake
 # Test-only foreign host (never shipped). Own registration bodies — do NOT link
@@ -272,7 +272,7 @@ drone_warnings(skeleton_host)
 
 If blind file names differ, rename CMake entries to match the actual deliverable — do not rewrite host logic to match our Map3DImpl.
 
-- [ ] **Step 3: Build in Docker — expect SUCCESS**
+- [x] **Step 3: Build in Docker — expect SUCCESS**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg \
@@ -287,7 +287,7 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg \
 
 Expected: binary exists. If compile fails on missing files, fix CMake file list to match blind deliverable names only.
 
-- [ ] **Step 4: Propose commit (wait for human approval)**
+- [x] **Step 4: Propose commit (wait for human approval)**
 
 ```bash
 git add Simulator/tests/hosts/skeleton_host Simulator/CMakeLists.txt
@@ -315,7 +315,7 @@ EOF
 - Consumes: `skeleton_host`, our `Algorithm_*.so`, our `MissionControl_*.so`, staff inputs
 - Produces: PASS if both plugins survive ≥2 staff scenarios without crash / illegal move into host-Occupied
 
-- [ ] **Step 1: Write the check script**
+- [x] **Step 1: Write the check script**
 
 Create `Simulator/tests/manual/check_foreign_host.sh`:
 
@@ -379,7 +379,7 @@ run_one house_lower \
 echo "PASS: check_foreign_host"
 ```
 
-- [ ] **Step 2: chmod + wire into** `run_all.sh`
+- [x] **Step 2: chmod + wire into** `run_all.sh`
 
 Add before the final echo in `run_all.sh`:
 
@@ -389,7 +389,7 @@ Add before the final echo in `run_all.sh`:
 
 Add a one-line note to `Simulator/tests/manual/README.md`.
 
-- [ ] **Step 3: Run in Docker — expect PASS (or real finding)**
+- [x] **Step 3: Run in Docker — expect PASS (or real finding)**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg \
@@ -403,7 +403,7 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg \
 
 If this fails because our plugins depend on our Map3DImpl semantics: **do not soften the script**. Record the failure for human review (same spirit as VAR-02 findings gate); production fixes only after approval.
 
-- [ ] **Step 4: Propose commit (wait for human approval)**
+- [x] **Step 4: Propose commit (wait for human approval)**
 
 ```bash
 git add Simulator/tests/manual/check_foreign_host.sh \
@@ -435,11 +435,11 @@ EOF
   3. Passes `latest_scan = nullptr` on every `mapping_algorithm.nextStep(...)`
   4. Uses coarser effective mapping (e.g. skip writing some hits, or only write every Nth voxel — document in ASSUMPTIONS.md)
 
-- [ ] **Step 1: Fresh blind Cursor window at** `ex_3_skeleton`
+- [x] **Step 1: Fresh blind Cursor window at** `ex_3_skeleton`
 
 Do not reuse a chat that already saw Phase B / our sources.
 
-- [ ] **Step 2: Paste this prompt (verbatim)**
+- [x] **Step 2: Paste this prompt (verbatim)**
 
 ```text
 Author a TEST-ONLY MissionControl plugin for Assignment 3 independence testing.
@@ -487,7 +487,7 @@ ls ex_3_skeleton/blind_deliverables/var02_foreign_mission_control/
 - Consumes: foreign MC `.so`, our Algorithm, our simulator `-competition` OR `skeleton_host`
 - Produces: stdout/report dump for findings review; **no automatic production fix**
 
-- [ ] **Step 1: Copy fixture + CMake SHARED target**
+- [x] **Step 1: Copy fixture + CMake SHARED target**
 
 ```bash
 cp ../ex_3_skeleton/blind_deliverables/var02_foreign_mission_control/foreign_hits_only_mission_control_plugin.cpp \
@@ -509,7 +509,7 @@ drone_warnings(foreign_hits_only_mission_control_plugin)
 add_dependencies(simulator_207190406_209543255 foreign_hits_only_mission_control_plugin)
 ```
 
-- [ ] **Step 2: Write** `check_foreign_mission_control.sh`
+- [x] **Step 2: Write** `check_foreign_mission_control.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -574,7 +574,7 @@ echo "PASS: check_foreign_mission_control (diagnostic completed; crash-free)"
 
 Hard requirements this script **must** enforce: no crash (`exit < 128`). Coverage collapse is reported in findings, not auto-graded as FAIL.
 
-- [ ] **Step 3: Run script; present findings; wait for human**
+- [x] **Step 3: Run script; present findings; wait for human**
 
 Paste `/tmp/ex3_verify/foreign_mc_findings.txt` (or Docker-equivalent path) into chat. For each issue list: symptom, which foreign behavior likely caused it, evidence. Human chooses **fix** or **Known Issues row** per finding. **Do not implement production fixes in this step.**
 

@@ -344,6 +344,17 @@ set_target_properties(faulty_wall_algorithm_plugin PROPERTIES
 target_link_libraries(faulty_wall_algorithm_plugin PRIVATE common::common)
 drone_warnings(faulty_wall_algorithm_plugin)
 
+# VAR-02: blind foreign MissionControl (hits-only Occupied, no Empty carve).
+add_library(foreign_hits_only_mission_control_plugin SHARED
+    tests/fixtures/foreign_hits_only_mission_control_plugin.cpp
+)
+set_target_properties(foreign_hits_only_mission_control_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(foreign_hits_only_mission_control_plugin PRIVATE common::common)
+drone_warnings(foreign_hits_only_mission_control_plugin)
+
 add_executable(simulator_loader_test
     tests/test_plugin_loader.cpp
     $<TARGET_OBJECTS:simulator_registration>
@@ -443,7 +454,10 @@ target_link_libraries(simulator_207190406_209543255 PRIVATE
 )
 
 drone_warnings(simulator_207190406_209543255)
-add_dependencies(simulator_207190406_209543255 faulty_wall_algorithm_plugin)
+add_dependencies(simulator_207190406_209543255
+    faulty_wall_algorithm_plugin
+    foreign_hits_only_mission_control_plugin
+)
 
 # Test-only foreign host (never shipped). Own registration bodies — do NOT link
 # simulator_registration OBJECT (must not share our PluginRegistrar).
