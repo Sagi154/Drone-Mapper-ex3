@@ -1,9 +1,9 @@
 # Instructor test-catalog follow-up — roadmap
 
-Scoping doc for the 4 follow-up points. Written 2026-08-28. **Point 1 done** (merged to
-`main`). **Point 2 plan written** at
-`docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md` (implementation not
-started). Points 3–4 not started.
+Scoping doc for the 4 follow-up points. Written 2026-08-28. **Point 1 done** (on `main`).
+**Point 2** complete on `close-instructor-catalog-gaps-and-skills` through `3605b86`
+(Tasks 1–8 + full `run_all.sh` green). **Point 3 done** (`c5bd7fd`). Point 4 (orchestrator
+skill) not started.
 
 Inputs already in hand:
 
