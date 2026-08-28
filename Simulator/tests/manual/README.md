@@ -21,3 +21,4 @@ container's `/tmp`, not the Windows bind mount.
 Scratch output is under `/tmp/ex3_verify/` inside the container (never under `inputs/`).
 
 - `check_multi_plugin_outputs.sh` — comparative + competition with two distinct `.so`s per mode; asserts each plugin gets `<name>_simulation_output.yaml`.
+- `check_competition_output_dir.sh` — two back-to-back competition runs create distinct `competition_*` dirs under `algorithms_folder` (OUT-02).
