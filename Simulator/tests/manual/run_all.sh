@@ -13,6 +13,7 @@ fi
 "${ROOT}/make_fixture_dirs.sh" "${BUILD_DIR}"
 "${ROOT}/run_smoke_pass.sh" "${BUILD_DIR}"
 "${ROOT}/check_output_dir_collision.sh" "${BUILD_DIR}"
+"${ROOT}/check_output_dir_unwritable.sh" "${BUILD_DIR}"
 "${ROOT}/check_wall_collision_fault.sh" "${BUILD_DIR}"
 "${ROOT}/check_verbose.sh" "${BUILD_DIR}"
 "${ROOT}/check_threading.sh" "${BUILD_DIR}"
