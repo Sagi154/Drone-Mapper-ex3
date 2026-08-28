@@ -185,10 +185,16 @@ common::types::DroneStepResult DroneControlImpl::step() {
     }
 
     // Batch consecutive scan commands into a single mission step.
+    // Cap the batch: an algorithm that always returns Working+scan (VAR-03
+    // adversarial_bad_scan) would otherwise loop forever inside one step.
+    constexpr std::size_t kMaxScansPerStep = 16;
+    std::size_t scans_this_step = 0;
     while (command.scan_orientation.has_value() &&
-           command.status == common::types::AlgorithmStatus::Working) {
+           command.status == common::types::AlgorithmStatus::Working &&
+           scans_this_step < kMaxScansPerStep) {
         latest_scan_ = lidar_sensor_.scan(*command.scan_orientation);
         has_latest_scan_ = true;
+        ++scans_this_step;
         // fusion_max removed in ex3 — always fuse at full lidar z_max.
         ScanResultToVoxels::applyToMap(
             output_map_, gps_.position(), gps_.heading(), latest_scan_, lidar_);

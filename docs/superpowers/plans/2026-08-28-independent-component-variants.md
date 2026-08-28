@@ -578,11 +578,11 @@ Hard requirements this script **must** enforce: no crash (`exit < 128`). Coverag
 
 Paste `/tmp/ex3_verify/foreign_mc_findings.txt` (or Docker-equivalent path) into chat. For each issue list: symptom, which foreign behavior likely caused it, evidence. Human chooses **fix** or **Known Issues row** per finding. **Do not implement production fixes in this step.**
 
-- [ ] **Step 4: Only if human approved fixes — implement them in a follow-up commit on this branch**
+- [x] **Step 4: Only if human approved fixes — implement them in a follow-up commit on this branch**
 
 Otherwise add Known Issues via `populate-known-issues` skill, or skip.
 
-- [ ] **Step 5: Wire** `run_all.sh` **+ propose commit for harness only (wait for approval)**
+- [x] **Step 5: Wire** `run_all.sh` **+ propose commit for harness only (wait for approval)**
 
 ```bash
 git add Simulator/tests/fixtures/foreign_hits_only_mission_control_plugin.cpp \
@@ -633,7 +633,7 @@ Production Algorithm/MissionControl fixes (if any) are **separate** commits afte
 
 **Note:** Skip inventing `AlgorithmStatus::Error` — it does not exist in frozen headers.
 
-- [ ] **Step 1: Blind window prompt**
+- [x] **Step 1: Blind window prompt**
 
 ```text
 Author TEST-ONLY adversarial plugins under

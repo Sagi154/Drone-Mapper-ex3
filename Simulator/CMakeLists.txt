@@ -355,6 +355,25 @@ set_target_properties(foreign_hits_only_mission_control_plugin PROPERTIES
 target_link_libraries(foreign_hits_only_mission_control_plugin PRIVATE common::common)
 drone_warnings(foreign_hits_only_mission_control_plugin)
 
+# VAR-03: blind adversarial Algorithm / MissionControl fixtures (containment).
+foreach(_adv_plugin IN ITEMS
+    adversarial_throw_algorithm_plugin
+    adversarial_never_finish_algorithm_plugin
+    adversarial_into_occupied_algorithm_plugin
+    adversarial_bad_scan_orientation_algorithm_plugin
+    adversarial_throw_mission_control_plugin
+    adversarial_empty_mission_control_plugin
+    adversarial_implausible_steps_mission_control_plugin
+)
+    add_library(${_adv_plugin} SHARED tests/fixtures/${_adv_plugin}.cpp)
+    set_target_properties(${_adv_plugin} PROPERTIES
+        PREFIX ""
+        LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+    )
+    target_link_libraries(${_adv_plugin} PRIVATE common::common)
+    drone_warnings(${_adv_plugin})
+endforeach()
+
 add_executable(simulator_loader_test
     tests/test_plugin_loader.cpp
     $<TARGET_OBJECTS:simulator_registration>
@@ -457,6 +476,13 @@ drone_warnings(simulator_207190406_209543255)
 add_dependencies(simulator_207190406_209543255
     faulty_wall_algorithm_plugin
     foreign_hits_only_mission_control_plugin
+    adversarial_throw_algorithm_plugin
+    adversarial_never_finish_algorithm_plugin
+    adversarial_into_occupied_algorithm_plugin
+    adversarial_bad_scan_orientation_algorithm_plugin
+    adversarial_throw_mission_control_plugin
+    adversarial_empty_mission_control_plugin
+    adversarial_implausible_steps_mission_control_plugin
 )
 
 # Test-only foreign host (never shipped). Own registration bodies — do NOT link
