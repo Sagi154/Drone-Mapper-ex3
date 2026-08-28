@@ -462,7 +462,7 @@ Requirements (legal but unlike a free-space-carving host):
 Document all assumptions in ASSUMPTIONS.md.
 ```
 
-- [ ] **Step 3: Confirm deliverable files exist**
+- [x] **Step 3: Confirm deliverable files exist**
 
 ```bash
 ls ex_3_skeleton/blind_deliverables/var02_foreign_mission_control/
@@ -652,7 +652,7 @@ MissionControls:
 Also ASSUMPTIONS.md. Workspace: ex_3_skeleton only.
 ```
 
-- [ ] **Step 2: Phase B — CMake for each SHARED lib**
+- [x] **Step 2: Phase B — CMake for each SHARED lib**
 
 For each plugin `NAME`, mirror:
 
@@ -666,7 +666,7 @@ add_dependencies(simulator_207190406_209543255 NAME)
 
 (MissionControl fixtures link `common::common`; same pattern as `valid_mission_control_plugin`.)
 
-- [ ] **Step 3: Write** `check_adversarial_plugins.sh`
+- [x] **Step 3: Write** `check_adversarial_plugins.sh`
 
 Pattern (repeat per plugin; use `tiny_compose.yaml`):
 
@@ -740,7 +740,7 @@ echo "PASS: check_adversarial_plugins"
 
 Tighten per-plugin asserts only where behavior is definite (e.g. throw → `errors:` contains the `.so` name **or** score `-1` in per-plugin YAML — inspect one real run and lock the stronger assert that matches actual containment without softening).
 
-- [ ] **Step 4: Docker run + propose commit (wait for approval)**
+- [x] **Step 4: Docker run + propose commit (wait for approval)**
 
 ```bash
 git add Simulator/tests/fixtures/adversarial_*.cpp Simulator/CMakeLists.txt \
@@ -773,7 +773,7 @@ EOF
 - Blind lawnmower / frontier-lite `IMappingAlgorithm` that eventually `Finished` on small_room
 - Competition folder: our Algorithm + baseline → report mentions both; no crash; both get output YAML
 
-- [ ] **Step 1: Blind prompt**
+- [x] **Step 1: Blind prompt**
 
 ```text
 Author baseline_lawnmower_algorithm_plugin.cpp under
@@ -783,7 +783,7 @@ read access + configs. Must eventually return Finished or FinishedWithUnmappable
 on a small bounded mission. ASSUMPTIONS.md required. ex_3_skeleton workspace only.
 ```
 
-- [ ] **Step 2: Phase B SHARED target + check script**
+- [x] **Step 2: Phase B SHARED target + check script**
 
 ```bash
 #!/usr/bin/env bash
@@ -815,7 +815,7 @@ grep -q 'baseline_lawnmower_algorithm_plugin.so' "$report"
 echo "PASS: check_baseline_algorithm"
 ```
 
-- [ ] **Step 3: Propose commit (wait for approval)**
+- [x] **Step 3: Propose commit (wait for approval)**
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -828,6 +828,22 @@ EOF
 ---
 
 
+
+## Execution notes (2026-08-28)
+
+Branch: `independent-component-variants`. Blind deliverables staged under
+`ex_3_skeleton/blind_deliverables/var0{1,2,3,4}_*/`; Phase B under `Simulator/tests/`.
+
+| Variant | Status | Notes |
+|---------|--------|-------|
+| VAR-01 | Done | `skeleton_host` + `check_foreign_host.sh` green (staff small_room + house_lower) |
+| VAR-02 | Done | Foreign hits-only MC; findings F1/F2/F4 ignored; F3 → Known Issues **#20** (step inflation) |
+| VAR-03 | Done | Adversarial fixtures + `check_adversarial_plugins.sh`; hang fixed (`kMaxScansPerStep=16` + angle wrap); Known Issues **#21** resolved audit |
+| VAR-04 | Done | `baseline_lawnmower` + `check_baseline_algorithm.sh` green (~5 min on `tiny_compose`) |
+
+Re-verify on demand: `.cursor/skills/verify-independent-component-variants/SKILL.md`.
+
+---
 
 ## Self-review
 

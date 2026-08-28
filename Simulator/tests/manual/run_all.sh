@@ -26,5 +26,6 @@ fi
 "${ROOT}/check_foreign_host.sh" "${BUILD_DIR}"
 "${ROOT}/check_foreign_mission_control.sh" "${BUILD_DIR}"
 "${ROOT}/check_adversarial_plugins.sh" "${BUILD_DIR}"
+"${ROOT}/check_baseline_algorithm.sh" "${BUILD_DIR}"
 
 echo "run_all.sh: all default-preset checks finished"

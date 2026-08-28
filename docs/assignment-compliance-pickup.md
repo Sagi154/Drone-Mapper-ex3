@@ -46,10 +46,22 @@ Highest-leverage next work is below.
    `students.txt`, five folders, root build file).
 3. **Optional before zip:** run `.cursor/skills/verify-instructor-test-catalog/SKILL.md` for a
    catalog-ID PASS/FAIL/AMBIGUOUS report (Docker `ctest` + `run_all.sh` + pre-submission + AdvCpp
-   rubric). Independent-component variants are unblocked — see
-   `docs/superpowers/plans/2026-08-28-independent-component-variants.md` Task 0.
+   rubric). Also run `.cursor/skills/verify-independent-component-variants/SKILL.md` (default
+   VAR-01…03; add `--with-baseline` for VAR-04) after merging
+   `independent-component-variants`.
 
 ---
+
+## Fixed 2026-08-28 (independence variants)
+
+- **Independent component variants (VAR-01…04)** on branch `independent-component-variants`
+  (VAR-04 check green; commit may still be pending). Blind fixtures + `skeleton_host`,
+  `check_foreign_host.sh`, `check_foreign_mission_control.sh`, `check_adversarial_plugins.sh`,
+  `check_baseline_algorithm.sh`. Findings: Known Issues **#20** (hits-only step inflation);
+  **#21** resolved (scan-batch hang). Re-verify:
+  `.cursor/skills/verify-independent-component-variants/SKILL.md`. Spec/plan:
+  `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md`,
+  `docs/superpowers/plans/2026-08-28-independent-component-variants.md`.
 
 ## Fixed 2026-08-28
 

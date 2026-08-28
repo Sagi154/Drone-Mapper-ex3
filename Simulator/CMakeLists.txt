@@ -374,6 +374,17 @@ foreach(_adv_plugin IN ITEMS
     drone_warnings(${_adv_plugin})
 endforeach()
 
+# VAR-04: blind baseline lawnmower algorithm (competition cross-check).
+add_library(baseline_lawnmower_algorithm_plugin SHARED
+    tests/fixtures/baseline_lawnmower_algorithm_plugin.cpp
+)
+set_target_properties(baseline_lawnmower_algorithm_plugin PROPERTIES
+    PREFIX ""
+    LIBRARY_OUTPUT_DIRECTORY "${PLUGIN_FIXTURES_OUT}"
+)
+target_link_libraries(baseline_lawnmower_algorithm_plugin PRIVATE common::common)
+drone_warnings(baseline_lawnmower_algorithm_plugin)
+
 add_executable(simulator_loader_test
     tests/test_plugin_loader.cpp
     $<TARGET_OBJECTS:simulator_registration>
@@ -483,6 +494,7 @@ add_dependencies(simulator_207190406_209543255
     adversarial_throw_mission_control_plugin
     adversarial_empty_mission_control_plugin
     adversarial_implausible_steps_mission_control_plugin
+    baseline_lawnmower_algorithm_plugin
 )
 
 # Test-only foreign host (never shipped). Own registration bodies — do NOT link

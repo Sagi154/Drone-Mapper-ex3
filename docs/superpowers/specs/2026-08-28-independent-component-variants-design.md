@@ -1,7 +1,10 @@
 # Independent component variants — design
 
 **Date:** 2026-08-28  
-**Status:** Accepted 2026-08-28 (single-host placement; single-PC workflow; VAR-02 findings gate)  
+**Status:** Implemented 2026-08-28 on branch `independent-component-variants` (VAR-01…04 wired;
+VAR-04 commit may still be pending). Re-verify:
+`.cursor/skills/verify-independent-component-variants/SKILL.md`.  
+Accepted design 2026-08-28 (single-host placement; single-PC workflow; VAR-02 findings gate).  
 **Goal:** Verify the assignment's independence requirement — each part must work with another team's implementation of the other parts — by exercising our shipped `.so` files against components authored **without any knowledge of our implementation**, and by exercising our host against plugins that behave legally but differently from ours.
 
 ## Problem
@@ -175,9 +178,8 @@ Deadline **Sep 6**. `docs/assignment-compliance-pickup.md` still lists Known Iss
 | Priority | Action |
 |----------|--------|
 | Done | Instructor-test-catalog-followup-roadmap (Points 1–4) |
+| Done | VAR-01…04 independence harness (2026-08-28); re-verify with `verify-independent-component-variants` |
 | Keep | Packaging + Known Issues excel |
-| Next (execution unblocked) | VAR-01, VAR-02 (graded independence claim, currently untested) |
-| Only after packaging safe | VAR-03, VAR-04 |
 
 ## Open decisions
 

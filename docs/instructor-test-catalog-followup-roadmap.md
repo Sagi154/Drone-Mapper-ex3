@@ -10,9 +10,10 @@ Scoping doc for the 4 follow-up points. Written 2026-08-28. **All four points do
 | 3 — Skill coverage (`pre-submission-review` + `advcpp-rubric-review`) | Done (`c5bd7fd`) |
 | 4 — Orchestrator `verify-instructor-test-catalog` | Done (`2e95f81`) |
 
-Re-verify anytime with `.cursor/skills/verify-instructor-test-catalog/SKILL.md`. Next related work
-(independence variants) is gated only on Task 0 skeleton verify — see
-`docs/superpowers/plans/2026-08-28-independent-component-variants.md`.
+Re-verify anytime with `.cursor/skills/verify-instructor-test-catalog/SKILL.md`. Independence
+variants (VAR-01…04) are implemented on `independent-component-variants` — re-verify with
+`.cursor/skills/verify-independent-component-variants/SKILL.md` (see
+`docs/superpowers/plans/2026-08-28-independent-component-variants.md` execution notes).
 
 Inputs already in hand:
 
@@ -25,6 +26,7 @@ Inputs already in hand:
 - Skills: `.cursor/skills/pre-submission-review/SKILL.md`,
   `.cursor/skills/advcpp-rubric-review/SKILL.md`,
   `.cursor/skills/verify-instructor-test-catalog/SKILL.md`,
+  `.cursor/skills/verify-independent-component-variants/SKILL.md`,
   `.cursor/skills/verify-frozen-interfaces/SKILL.md`,
   `.cursor/skills/verify-interfaces-vs-skeleton/SKILL.md`.
 
@@ -207,5 +209,6 @@ to `AGENTS.md`'s skills table.
 ## Suggested execution order
 
 ~~1. Point 1 … 5. Point 4 …~~ **All four points complete 2026-08-28.** Use
-`verify-instructor-test-catalog` for regression; independence variants are the next optional
-workstream (`docs/superpowers/plans/2026-08-28-independent-component-variants.md`).
+`verify-instructor-test-catalog` for catalog regression;
+`verify-independent-component-variants` for VAR-01…04
+(`docs/superpowers/plans/2026-08-28-independent-component-variants.md`).

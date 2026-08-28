@@ -43,6 +43,7 @@ scripts use `inputs/tiny_compose.yaml` where a full 24-cell matrix is unnecessar
 | `check_foreign_host.sh` | VAR-01: our Algorithm + MissionControl under blind `skeleton_host` on staff maps |
 | `check_foreign_mission_control.sh` | VAR-02: our Algorithm under foreign hits-only MC (diagnostic findings; no crash) |
 | `check_adversarial_plugins.sh` | VAR-03: adversarial algo/MC fixtures — simulator must not crash (low `max_steps` compose + per-run timeout) |
+| `check_baseline_algorithm.sh` | VAR-04: competition with our Algorithm + baseline lawnmower; both in report |
 
 Helpers (not always in `run_all.sh`): `run_in_docker.sh`, `docker_verify_default.sh`,
 `docker_tsan.sh`.
