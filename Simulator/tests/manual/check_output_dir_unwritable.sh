@@ -3,6 +3,9 @@
 set -euo pipefail
 
 if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1 && getent passwd vscode >/dev/null 2>&1; then
+    # Prior harness steps create /tmp/ex3_verify as root; vscode must write here too.
+    mkdir -p /tmp/ex3_verify
+    chmod a+rwx /tmp/ex3_verify
     exec runuser -u vscode -- bash "$0" "$@"
 fi
 
