@@ -1,5 +1,10 @@
 # Integration & Whole-System Verification Report
 
+> **Superseded for current harness status (2026-08-28):** prefer
+> `Simulator/tests/manual/run_all.sh` (or `.cursor/skills/verify-instructor-test-catalog/SKILL.md`)
+> and `docs/assignment-compliance-pickup.md`. This file remains the Aug 25 baseline plus dated
+> addenda. Note: `check_collision.sh` was renamed to `check_output_dir_collision.sh`.
+
 Run **2026-08-25**, Docker Desktop Linux engine (`drone-mapper-ex3-dev`, Ubuntu 24.04, gcc 13.3),
 not WSL Ubuntu. Composition: `inputs/sim_compose.yaml` (24 run cells). Scripts:
 `Simulator/tests/manual/`.
@@ -22,7 +27,7 @@ After raising the WSL2 VM to 8 GB (`.wslconfig`), TSan completed.
 
 ## 2. Collision re-run check
 
-- Command: `./Simulator/tests/manual/check_collision.sh`
+- Command: `./Simulator/tests/manual/check_collision.sh` *(now `check_output_dir_collision.sh`)*
 - Result: `PASS: 2 distinct directories, no collision`
   (`…18:23:03Z` and `…18:23:26Z`).
 - Verdict: **PASS**
@@ -90,11 +95,30 @@ After `house_simulation.yaml` spawn fix (`height_cm` 10→150) on branch
 smoke results below remain the baseline for that run; see `docs/assignment-compliance-pickup.md`
 for current status.
 
+## Update 2026-08-28 (instructor-catalog harness)
+
+On branch `close-instructor-catalog-gaps-and-skills`: Point 2 catalog gaps closed and Docker
+`run_all.sh` reported all default-preset checks finished (~63 min). Notable harness changes vs this
+Aug 25 baseline:
+
+- `check_collision.sh` → `check_output_dir_collision.sh` (OUT-01); new `check_competition_output_dir.sh` (OUT-02)
+- `check_wall_collision_fault.sh` (FAULT-02 black-box), `check_output_dir_unwritable.sh` (CLI-08),
+  `check_cli_argument_order.sh` (CLI-03), `check_multi_plugin_outputs.sh` (PLUGIN-01/02, YAML-OUT-03)
+- `check_cli_failures.sh` strengthened (argument names in message; multi-missing)
+- `tiny_compose.yaml` + distinct fixture `.so`s for faster multi-plugin / isolation paths
+- Orchestrator skill: `.cursor/skills/verify-instructor-test-catalog/SKILL.md`
+
+Scoring / verbose FAIL notes above are historical for the Aug 25 run; composition scoring and
+`-verbose` wiring were fixed earlier (see pickup Fixed 2026-08-26/27). Catalog follow-up roadmap:
+`docs/instructor-test-catalog-followup-roadmap.md`.
+
 ## Open follow-ups
 
 - ~~20/24 `sim_compose.yaml` cells Error / `MISSION_EXCEPTION`.~~ **Resolved 2026-08-27:**
   comparative 24/24 `COMPLETED`, all scores ≥ 0, `MISSION_EXCEPTION` 0 (~276s). See
   `docs/known-issues.md` row 2 and
   `docs/superpowers/specs/2026-08-27-wall-collision-recovery-and-planner-design.md`.
+- ~~Instructor-catalog harness gaps (Point 2) / orchestrator (Point 4).~~ **Resolved 2026-08-28** —
+  see roadmap and addendum above.
 - TSan on Docker Desktop needs ~8 GB VM RAM, compile on Linux disk (not `C:\` bind mount), and
   often `--privileged` for ASLR. Documented in `Simulator/tests/manual/docker_tsan.sh`.

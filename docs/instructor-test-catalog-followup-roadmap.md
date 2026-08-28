@@ -1,29 +1,42 @@
 # Instructor test-catalog follow-up — roadmap
 
-Scoping doc for the 4 follow-up points. Written 2026-08-28. **Point 1 done** (on `main`).
-**Point 2** complete on `close-instructor-catalog-gaps-and-skills` through `3605b86`
-(Tasks 1–8 + full `run_all.sh` green). **Point 3 done** (`c5bd7fd`). **Point 4 done** —
-`.cursor/skills/verify-instructor-test-catalog/SKILL.md` (orchestrator + catalog-ID report).
+Scoping doc for the 4 follow-up points. Written 2026-08-28. **All four points done** on
+`close-instructor-catalog-gaps-and-skills` (merge/PR still open as of this note):
+
+| Point | Status |
+|-------|--------|
+| 1 — UNSPEC-07 in `open-questions.md` | Done on `main` |
+| 2 — Close catalog harness gaps (Tasks 1–8) | Done through `3605b86` + harness follow-ups; full Docker `run_all.sh` green |
+| 3 — Skill coverage (`pre-submission-review` + `advcpp-rubric-review`) | Done (`c5bd7fd`) |
+| 4 — Orchestrator `verify-instructor-test-catalog` | Done (`2e95f81`) |
+
+Re-verify anytime with `.cursor/skills/verify-instructor-test-catalog/SKILL.md`. Next related work
+(independence variants) is gated only on Task 0 skeleton verify — see
+`docs/superpowers/plans/2026-08-28-independent-component-variants.md`.
 
 Inputs already in hand:
 
 - `docs/simulator_runtime_test_catalog.md` — the blind-agent catalog (Phase A output).
-- `docs/instructor-test-suite-approach.md` — why/how the catalog was built.
+- `docs/instructor-test-suite-approach.md` — why/how the catalog was built (Phase A/B status updated).
 - The gap-diff from this session (catalog rows vs. `Simulator/tests/manual/*.sh` + relevant unit
   tests) — reproduced under Point 2 below.
-- `docs/open-questions.md` (8 entries today), `docs/assignment-compliance-pickup.md`,
+- `docs/open-questions.md` (9 entries; §9 = UNSPEC-07), `docs/assignment-compliance-pickup.md`,
   `docs/review-error-codes.md`.
-- Existing skills: `.cursor/skills/pre-submission-review/SKILL.md`,
+- Skills: `.cursor/skills/pre-submission-review/SKILL.md`,
+  `.cursor/skills/advcpp-rubric-review/SKILL.md`,
+  `.cursor/skills/verify-instructor-test-catalog/SKILL.md`,
   `.cursor/skills/verify-frozen-interfaces/SKILL.md`,
   `.cursor/skills/verify-interfaces-vs-skeleton/SKILL.md`.
 
-Housekeeping that applies to every point below (`.cursor/rules/git-workflow.mdc`): each point is its
-own feature branch off updated `main`, Conventional Commits, **human approval before every
-`git commit`** — none of this is a green light to commit unattended.
+Housekeeping that applied while executing (`.cursor/rules/git-workflow.mdc`): feature branch off
+updated `main`, Conventional Commits, **human approval before every `git commit`**.
 
 ---
 
 ## Point 1 — Add UNSPEC-07 to `docs/open-questions.md`
+
+**Status:** **done** on `main` (`docs/open-questions.md` §9 + caveat in
+`.cursor/rules/simulator-cli-and-outputs.mdc`).
 
 **What it is:** the catalog's `UNSPEC-07` — the docx never states whether a composition's runs are
 the full cross product of drones × lidars × missions, or something narrower; the skeleton's
@@ -54,9 +67,9 @@ the full cross product of drones × lidars × missions, or something narrower; t
 
 ## Point 2 — Plan to close the "real gaps" (writing-plans skill)
 
-**Status:** plan file exists —
-`docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md`. Execute that plan
-separately (subagent-driven or inline); do not treat this roadmap section as the task list.
+**Status:** **done** — plan
+`docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md` executed (Tasks 1–8);
+Docker `run_all.sh` green. Historical gap table below kept for audit.
 
 Gaps identified this session (mapped into that plan’s Tasks 1–7 + harness Task 8):
 
@@ -102,7 +115,10 @@ Gaps identified this session (mapped into that plan’s Tasks 1–7 + harness Ta
 ## Point 3 — Skill coverage for the catalog's "Static/structural checks" and "Not testable by any
 automated suite" sections
 
-Current state (checked this session):
+**Status:** **done** (`c5bd7fd`) — `pre-submission-review` extended (ZIP-15/13/17/01/04/05);
+`.cursor/skills/advcpp-rubric-review/SKILL.md` created; `AGENTS.md` skills table updated.
+
+Current state (checked this session; historical notes below):
 
 - `.cursor/skills/pre-submission-review/SKILL.md` already covers: 5 folders + `UserCommon/` no
   build file (`ZIP-02`, part of `ZIP-03`), `common/` untouched (`ZIP-07`, delegates to
@@ -190,9 +206,6 @@ to `AGENTS.md`'s skills table.
 
 ## Suggested execution order
 
-1. Point 1 (small, standalone, unblocks nothing else but is quick).
-2. Point 2's **plan** (writing-plans doc) — review it before any implementation starts.
-3. Point 3 (skill work) — independent of Point 2's implementation, can happen in parallel once
-   scoped.
-4. Execute Point 2's plan (subagent-driven or inline, per the plan's own handoff).
-5. Point 4 — only once 2's implementation and 3 both exist to be orchestrated.
+~~1. Point 1 … 5. Point 4 …~~ **All four points complete 2026-08-28.** Use
+`verify-instructor-test-catalog` for regression; independence variants are the next optional
+workstream (`docs/superpowers/plans/2026-08-28-independent-component-variants.md`).

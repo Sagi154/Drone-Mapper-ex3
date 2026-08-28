@@ -1,14 +1,17 @@
-# Instructor-style test suite — approach (no implementation yet)
+# Instructor-style test suite — approach
 
-Advice captured 2026-08-26. Do not treat this as a requirement catalog; it is a plan for how to
-build a black-box suite that mimics how a grader would probe the built binary.
+Advice captured 2026-08-26; **status updated 2026-08-28.** Do not treat this as a requirement
+catalog; it explains how to build a black-box suite that mimics how a grader would probe the built
+binary. Phase A (blind catalog) and Phase B (harness + skills) are **done** — see
+`docs/instructor-test-catalog-followup-roadmap.md` and
+`.cursor/skills/verify-instructor-test-catalog/SKILL.md`.
 
 Authoritative instructor sources still win: `context/Advanced Topics TAU 2026B - Assignment 3.docx`,
 `context/Common issues and handling.pdf`, AdvCpp guideline + Error Code Key. Condensed
 `docs/*.md` may already encode our working assumptions.
 
 Related: `docs/assignment-compliance-pickup.md`, `docs/open-questions.md`,
-`docs/assignment3-checklist.md`.
+`docs/assignment3-checklist.md`, `docs/simulator_runtime_test_catalog.md`.
 
 ---
 
@@ -173,6 +176,9 @@ Contradictions/ambiguities found across sources.
 
 ### Phase B — wiring pass, necessarily implementation-aware
 
+**Status 2026-08-28:** done — see `docs/instructor-test-catalog-followup-roadmap.md` Points 2–4
+and `Simulator/tests/manual/run_all.sh`.
+
 Isolation can't extend to *execution*: someone has to know our binary is
 `simulator_207190406_209543255`, our `.so` names, our CMake preset, and where `build/` outputs
 land. That pass takes Phase A's catalog and turns it into a runnable harness (shell/pytest driving
@@ -244,12 +250,16 @@ what a real grader running your `.so` against *their* simulator would hit.
 
 ---
 
-## Recommendation
+## Recommendation (executed)
 
-1. Dispatch a **blind agent** (only `context/` + `ex_3_skeleton`) to produce the test catalog as a
-   reviewable doc first (e.g. `docs/instructor-test-catalog.md`).
-2. Human sanity-check it against `docs/open-questions.md` for anything it over-specified.
-3. **Then** wire it into a runnable suite against the real build (Phase B: harness choice, where
-   it lives, CMake integration).
-
-Do not implement the suite until the catalog is reviewed.
+1. ~~Dispatch a **blind agent** (only `context/` + `ex_3_skeleton`) to produce the test catalog.~~
+   **Done** — `docs/simulator_runtime_test_catalog.md` (also mirrored under `ex_3_skeleton/`).
+2. ~~Human sanity-check against `docs/open-questions.md`.~~ **Done** — follow-up Point 1 added
+   UNSPEC-07 as `docs/open-questions.md` §9; remaining unspecified rows stay AMBIGUOUS in reports.
+3. ~~Wire Phase B against the real build.~~ **Done 2026-08-28** — catalog gaps closed in
+   `Simulator/tests/manual/` (plan:
+   `docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md`); skills
+   `pre-submission-review` (extended), `advcpp-rubric-review`, and orchestrator
+   `verify-instructor-test-catalog`. Cross-team independence variants are a **separate** follow-on
+   (`docs/superpowers/specs/2026-08-28-independent-component-variants-design.md`) — catalog
+   roadmap gate cleared.

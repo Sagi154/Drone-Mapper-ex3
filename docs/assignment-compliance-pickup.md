@@ -15,7 +15,9 @@ implementation exists; the remaining work is compliance and scoring.
 
 Visual tables live in the Cursor canvas `ex3-assignment-compliance.canvas.tsx` (open beside
 chat). Working Known Issues rows: `docs/known-issues.md`. Integration smoke:
-`docs/integration-verification-report.md`.
+`docs/integration-verification-report.md`. Instructor-catalog follow-up (Points 1–4):
+`docs/instructor-test-catalog-followup-roadmap.md` — **done 2026-08-28**. Re-verify with
+`.cursor/skills/verify-instructor-test-catalog/SKILL.md` (or `Simulator/tests/manual/run_all.sh`).
 
 ---
 
@@ -26,8 +28,9 @@ layout, CLI shape, threading, registration, frozen headers, `-verbose` wiring, a
 `errors:` reporting, and snake_case plugin/UserCommon namespaces match the instructor docs.
 Default composition `inputs/sim_compose.yaml` is **24/24 `COMPLETED` with `mission_score >= 0`**
 (wall-collision recovery + planner improvements). Submission README and root `HLD.pdf` are present.
-Remaining gap before Sep 6: zip-time Known Issues excel export and pre-submission packaging
-(re-diff assignment docx if forum changed).
+Instructor-catalog harness gaps and related skills (Points 1–4) are closed. Remaining gap before
+Sep 6: zip-time Known Issues excel export and pre-submission packaging (re-diff assignment docx if
+forum changed).
 
 Highest-leverage next work is below.
 
@@ -41,8 +44,23 @@ Highest-leverage next work is below.
 2. **Pre-submission packaging:** run `.cursor/skills/pre-submission-review/SKILL.md` end to end,
    then zip `ex3_207190406_209543255.zip` (no binaries; include `README.md`, `HLD.pdf`,
    `students.txt`, five folders, root build file).
+3. **Optional before zip:** run `.cursor/skills/verify-instructor-test-catalog/SKILL.md` for a
+   catalog-ID PASS/FAIL/AMBIGUOUS report (Docker `ctest` + `run_all.sh` + pre-submission + AdvCpp
+   rubric). Independent-component variants are unblocked — see
+   `docs/superpowers/plans/2026-08-28-independent-component-variants.md` Task 0.
 
 ---
+
+## Fixed 2026-08-28
+
+- **Instructor test-catalog follow-up (Points 1–4).** UNSPEC-07 in `docs/open-questions.md` §9;
+  manual harness gaps closed (`tiny_compose.yaml`, distinct fixture `.so`s, renamed
+  `check_output_dir_collision.sh`, FAULT-02 / CLI-03/04/05/08 / OUT-02 / multi-plugin scripts;
+  full `run_all.sh` green in Docker); `pre-submission-review` extended (ZIP-15/13/17/01/04/05);
+  new `advcpp-rubric-review` and `verify-instructor-test-catalog` skills. Evidence: roadmap
+  `docs/instructor-test-catalog-followup-roadmap.md`; plan
+  `docs/superpowers/plans/2026-08-28-close-instructor-test-catalog-gaps.md`;
+  `Simulator/tests/manual/`.
 
 ## Fixed 2026-08-27
 
@@ -162,4 +180,6 @@ Sheet and export `.xlsx` to the zip root — do not submit the markdown.
 | Doc | What is stale |
 |-----|----------------|
 | `docs/work-split-status.md` | Written 2026-08-13; pickup is this file. |
+| `docs/workplan.md` | Historical S/Y queue; header points here. Do not treat item codes as open work. |
+| `docs/integration-verification-report.md` Aug 25 body | Baseline only; see 2026-08-28 addendum + `run_all.sh`. |
 | `Simulator/CMakeLists.txt` comment “MapsComparison stub returns -1” | Body is the full BFS port. |

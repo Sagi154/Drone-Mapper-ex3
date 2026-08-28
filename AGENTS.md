@@ -7,8 +7,10 @@ separately built projects — `simulator_<ids>` executable that `dlopen`s an `Al
 **Status:** implementation is feature-complete enough for a full instructor-doc audit
 (`docs/assignment-compliance-pickup.md` — **start there**). Default composition
 `inputs/sim_compose.yaml` scores **24/24 Completed** with `mission_score >= 0`. Submission
-`README.md` and root `HLD.pdf` are done (2026-08-27). Remaining work is Known Issues excel export
-at zip time and pre-submission packaging, not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
+`README.md` and root `HLD.pdf` are done (2026-08-27). Instructor-catalog follow-up Points 1–4 are
+done (2026-08-28) — see `docs/instructor-test-catalog-followup-roadmap.md`; re-verify with
+`verify-instructor-test-catalog`. Remaining mandatory work is Known Issues excel export at zip
+time and pre-submission packaging, not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
 ## Start here
 
@@ -42,6 +44,9 @@ at zip time and pre-submission packaging, not the Sagi/Yoav track split. Deadlin
 | Path | Purpose |
 |------|---------|
 | `docs/assignment-compliance-pickup.md` | Where to pick up: instructor-doc audit verdict and ordered remaining work |
+| `docs/instructor-test-catalog-followup-roadmap.md` | Catalog follow-up Points 1–4 — **done 2026-08-28** (harness gaps, skills, orchestrator) |
+| `docs/instructor-test-suite-approach.md` | Why/how the blind catalog + Phase B harness were built |
+| `docs/simulator_runtime_test_catalog.md` | Phase A blind catalog (IDs keyed by `verify-instructor-test-catalog`) |
 | `docs/workplan.md` | Historical work items split between Sagi and Yoav (see pickup file first) |
 | `docs/assignment3-checklist.md` | Mandatory requirements, condensed from the assignment docx |
 | `docs/api-delta-ex2-to-ex3.md` | Header/type/namespace deltas between the ex2 and ex3 skeletons — **and** where our own `Drone-Mapper-ex2` deviated from the frozen ex2 headers itself (those need reverting, not porting) |
