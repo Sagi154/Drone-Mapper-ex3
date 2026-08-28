@@ -262,4 +262,5 @@ what a real grader running your `.so` against *their* simulator would hit.
    `pre-submission-review` (extended), `advcpp-rubric-review`, and orchestrator
    `verify-instructor-test-catalog`. Cross-team independence variants are a **separate** follow-on
    (`docs/superpowers/specs/2026-08-28-independent-component-variants-design.md`) — catalog
-   roadmap gate cleared.
+   roadmap gate cleared; harness executed 2026-08-28 (re-verify:
+   `.cursor/skills/verify-independent-component-variants/SKILL.md`).

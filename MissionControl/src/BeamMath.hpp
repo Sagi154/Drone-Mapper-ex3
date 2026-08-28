@@ -7,6 +7,7 @@
 
 #include <mp-units/systems/si/math.h>
 
+#include <cmath>
 #include <limits>
 
 namespace mission_control_207190406_209543255::beam_math {
@@ -34,6 +35,26 @@ using common::Position3D;
     };
 }
 
+[[nodiscard]] inline double wrapDeg(double degrees) {
+    double x = std::fmod(degrees, 360.0);
+    if (x <= -180.0) {
+        x += 360.0;
+    } else if (x > 180.0) {
+        x -= 360.0;
+    }
+    return x;
+}
+
+[[nodiscard]] inline Orientation normalizeOrientation(Orientation orientation) {
+    using common::deg;
+    using common::HorizontalAngle;
+    using common::AltitudeAngle;
+    return Orientation{
+        HorizontalAngle{wrapDeg(orientation.horizontal.numerical_value_in(deg)) * deg},
+        AltitudeAngle{wrapDeg(orientation.altitude.numerical_value_in(deg)) * deg},
+    };
+}
+
 [[nodiscard]] inline Position3D pointAlongBeam(const Position3D& origin,
                                                 const Orientation& beam_orientation,
                                                 PhysicalLength distance) {
@@ -41,10 +62,11 @@ using common::Position3D;
     using common::y_extent;
     using common::z_extent;
 
-    const auto cos_altitude = si::cos(beam_orientation.altitude);
-    const auto dx = cos_altitude * si::cos(beam_orientation.horizontal);
-    const auto dy = cos_altitude * si::sin(beam_orientation.horizontal);
-    const auto dz = si::sin(beam_orientation.altitude);
+    const Orientation beam = normalizeOrientation(beam_orientation);
+    const auto cos_altitude = si::cos(beam.altitude);
+    const auto dx = cos_altitude * si::cos(beam.horizontal);
+    const auto dy = cos_altitude * si::sin(beam.horizontal);
+    const auto dz = si::sin(beam.altitude);
 
     const double distance_cm = distance.force_numerical_value_in(cm);
     const double dir_x = dx.force_numerical_value_in(mp::one);

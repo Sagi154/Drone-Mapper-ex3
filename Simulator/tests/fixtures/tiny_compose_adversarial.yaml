@@ -1,0 +1,10 @@
+# One-cell composition with low max_steps for adversarial plugin checks.
+simulation_compositions:
+  simulations:
+    - simulation_config: "../../../inputs/simulation/small_simulation_room.yaml"
+      mission_configs:
+        - "tiny_mission_adversarial.yaml"
+  drone_configs:
+    - "../../../inputs/drone/drone_small.yaml"
+  lidar_configs:
+    - "../../../inputs/lidar/lidar_short.yaml"

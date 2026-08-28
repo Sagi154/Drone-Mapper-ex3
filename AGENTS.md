@@ -9,8 +9,10 @@ separately built projects — `simulator_<ids>` executable that `dlopen`s an `Al
 `inputs/sim_compose.yaml` scores **24/24 Completed** with `mission_score >= 0`. Submission
 `README.md` and root `HLD.pdf` are done (2026-08-27). Instructor-catalog follow-up Points 1–4 are
 done (2026-08-28) — see `docs/instructor-test-catalog-followup-roadmap.md`; re-verify with
-`verify-instructor-test-catalog`. Remaining mandatory work is Known Issues excel export at zip
-time and pre-submission packaging, not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
+`verify-instructor-test-catalog`. Independent-component variants (VAR-01…04) harness is on
+branch `independent-component-variants` — re-verify with `verify-independent-component-variants`.
+Remaining mandatory work is Known Issues excel export at zip time and pre-submission packaging,
+not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
 ## Start here
 
@@ -38,6 +40,7 @@ time and pre-submission packaging, not the Sagi/Yoav track split. Deadline: **Se
 | `populate-known-issues` | Adding a row to `docs/known-issues.md` (optional excel export later) |
 | `advcpp-rubric-review` | Subjective AdvCpp rubric review (`e01`–`e23`): dispatches one explore subagent per code group (headers/API, C++ idiom, structure/flow, HLD alignment), reports findings as a judgment-call table — not a pass/fail script. Run before submission or after major refactors. |
 | `verify-instructor-test-catalog` | End-to-end instructor-catalog verification: Docker build + `ctest` + `run_all.sh` + `pre-submission-review` + `advcpp-rubric-review` → one PASS/FAIL/AMBIGUOUS report keyed by catalog ID |
+| `verify-independent-component-variants` | Independence harness (VAR-01…04): Docker build + `check_foreign_host` / `check_foreign_mission_control` / `check_adversarial_plugins` / optional `check_baseline_algorithm` → PASS/FAIL/SKIP per variant (not catalog IDs) |
 
 ## Key docs
 
@@ -45,6 +48,8 @@ time and pre-submission packaging, not the Sagi/Yoav track split. Deadline: **Se
 |------|---------|
 | `docs/assignment-compliance-pickup.md` | Where to pick up: instructor-doc audit verdict and ordered remaining work |
 | `docs/instructor-test-catalog-followup-roadmap.md` | Catalog follow-up Points 1–4 — **done 2026-08-28** (harness gaps, skills, orchestrator) |
+| `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md` | Blind foreign host / MC / adversarial / baseline independence design |
+| `docs/superpowers/plans/2026-08-28-independent-component-variants.md` | Implementation plan + execution notes (VAR-01…04) |
 | `docs/instructor-test-suite-approach.md` | Why/how the blind catalog + Phase B harness were built |
 | `docs/simulator_runtime_test_catalog.md` | Phase A blind catalog (IDs keyed by `verify-instructor-test-catalog`) |
 | `docs/workplan.md` | Historical work items split between Sagi and Yoav (see pickup file first) |

@@ -264,3 +264,18 @@ TEST(MockLidar, ConfigGetterMatchesConstructorArg) {
     EXPECT_DOUBLE_EQ(got.z_max.numerical_value_in(cm), 300.0);
     EXPECT_EQ(got.fov_circles, 3u);
 }
+
+TEST(MockLidar, ExtremeScanOrientationCompletes) {
+    // VAR-03 adversarial angles must not hang MockLidar (trig on ~1e12 deg).
+    GridMap map{10, 10, 10, 10.0};
+    simulator::MockGPS gps{
+        Position3D{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+        {},
+        10.0 * cm};
+    LidarConfigData cfg{.z_min = 10.0 * cm, .z_max = 80.0 * cm, .d = 2.5 * cm, .fov_circles = 2};
+    simulator::MockLidar lidar{cfg, map, gps};
+
+    constexpr double kExtreme = 1.0e12;
+    const auto result = lidar.scan(Orientation{kExtreme * deg, -kExtreme * deg});
+    EXPECT_FALSE(result.empty());
+}

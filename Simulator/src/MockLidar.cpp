@@ -10,6 +10,7 @@
 #include <mp-units/systems/si/math.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace simulator {
@@ -24,6 +25,25 @@ using common::PhysicalLength;
 using common::HorizontalAngle;
 using common::AltitudeAngle;
 using common::Orientation;
+
+// Adversarial plugins may pass absurd angles (e.g. 1e12 deg). mp-units / libm
+// sin/cos on those values can hang; reduce to (-180, 180] in plain double first.
+[[nodiscard]] double wrap_deg(double degrees) {
+    double x = std::fmod(degrees, 360.0);
+    if (x <= -180.0) {
+        x += 360.0;
+    } else if (x > 180.0) {
+        x -= 360.0;
+    }
+    return x;
+}
+
+[[nodiscard]] Orientation normalize_orientation(Orientation orientation) {
+    return Orientation{
+        HorizontalAngle{wrap_deg(orientation.horizontal.numerical_value_in(deg)) * deg},
+        AltitudeAngle{wrap_deg(orientation.altitude.numerical_value_in(deg)) * deg},
+    };
+}
 
 [[nodiscard]] std::size_t beams_on_circle(std::size_t circle_index) {
     std::size_t count = 1;
@@ -58,14 +78,16 @@ common::types::LidarScanResult MockLidar::scan(common::Orientation scan_orientat
         return results;
     }
 
-    const Orientation sensor_heading = gps_.heading();
+    // Normalize before any trig and before publishing hit angles (fusion also uses them).
+    const Orientation scan = normalize_orientation(scan_orientation);
+    const Orientation sensor_heading = normalize_orientation(gps_.heading());
     const Orientation center_beam_abs{
-        scan_orientation.horizontal + sensor_heading.horizontal,
-        scan_orientation.altitude   + sensor_heading.altitude,
+        scan.horizontal + sensor_heading.horizontal,
+        scan.altitude   + sensor_heading.altitude,
     };
 
     const PhysicalLength center_distance = traceBeam(center_beam_abs);
-    results.push_back(common::types::LidarHit{center_distance, scan_orientation});
+    results.push_back(common::types::LidarHit{center_distance, scan});
 
     for (std::size_t circle = 1; circle < config_.fov_circles; ++circle) {
         const std::size_t beam_count = beams_on_circle(circle);
@@ -81,10 +103,10 @@ common::types::LidarScanResult MockLidar::scan(common::Orientation scan_orientat
                 horizontal_delta(horizontal_offset, config_.z_min),
                 altitude_delta(altitude_offset, config_.z_min),
             };
-            const Orientation relative_beam{
-                scan_orientation.horizontal + offset.horizontal,
-                scan_orientation.altitude   + offset.altitude,
-            };
+            const Orientation relative_beam = normalize_orientation(Orientation{
+                scan.horizontal + offset.horizontal,
+                scan.altitude   + offset.altitude,
+            });
             const Orientation absolute_beam{
                 relative_beam.horizontal + sensor_heading.horizontal,
                 relative_beam.altitude   + sensor_heading.altitude,
@@ -102,11 +124,12 @@ common::PhysicalLength MockLidar::traceBeam(const common::Orientation& beam_orie
     using common::y_extent;
     using common::z_extent;
 
+    const Orientation beam = normalize_orientation(beam_orientation);
     const common::Position3D origin = gps_.position();
-    const auto cos_altitude = si::cos(beam_orientation.altitude);
-    const auto dx = cos_altitude * si::cos(beam_orientation.horizontal);
-    const auto dy = cos_altitude * si::sin(beam_orientation.horizontal);
-    const auto dz = si::sin(beam_orientation.altitude);
+    const auto cos_altitude = si::cos(beam.altitude);
+    const auto dx = cos_altitude * si::cos(beam.horizontal);
+    const auto dy = cos_altitude * si::sin(beam.horizontal);
+    const auto dz = si::sin(beam.altitude);
 
     const PhysicalLength step = 0.1 * map_.getMapConfig().resolution;
 
