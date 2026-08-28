@@ -35,6 +35,7 @@ at zip time and pre-submission packaging, not the Sagi/Yoav track split. Deadlin
 | `gather-instructor-context` | Extracting / re-diffing Assignment 3 from `context/` via subagents (docx/pdf win over `docs/`) |
 | `populate-known-issues` | Adding a row to `docs/known-issues.md` (optional excel export later) |
 | `advcpp-rubric-review` | Subjective AdvCpp rubric review (`e01`–`e23`): dispatches one explore subagent per code group (headers/API, C++ idiom, structure/flow, HLD alignment), reports findings as a judgment-call table — not a pass/fail script. Run before submission or after major refactors. |
+| `verify-instructor-test-catalog` | End-to-end instructor-catalog verification: Docker build + `ctest` + `run_all.sh` + `pre-submission-review` + `advcpp-rubric-review` → one PASS/FAIL/AMBIGUOUS report keyed by catalog ID |
 
 ## Key docs
 

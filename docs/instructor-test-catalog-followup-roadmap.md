@@ -2,8 +2,8 @@
 
 Scoping doc for the 4 follow-up points. Written 2026-08-28. **Point 1 done** (on `main`).
 **Point 2** complete on `close-instructor-catalog-gaps-and-skills` through `3605b86`
-(Tasks 1–8 + full `run_all.sh` green). **Point 3 done** (`c5bd7fd`). Point 4 (orchestrator
-skill) not started.
+(Tasks 1–8 + full `run_all.sh` green). **Point 3 done** (`c5bd7fd`). **Point 4 done** —
+`.cursor/skills/verify-instructor-test-catalog/SKILL.md` (orchestrator + catalog-ID report).
 
 Inputs already in hand:
 
@@ -159,6 +159,9 @@ new `.cursor/skills/advcpp-rubric-review/SKILL.md`, possibly a one-line cross-re
 ---
 
 ## Point 4 — Orchestrator skill that runs everything verifying the catalog
+
+**Status:** done — `.cursor/skills/verify-instructor-test-catalog/SKILL.md` (+ `AGENTS.md` row).
+`run_all.sh` already lists all Point-2 scripts; the skill invokes it rather than duplicating the list.
 
 Only makes sense **after** points 1–3 land (needs the closed gaps from Point 2 and the new/extended
 skills from Point 3 to have something to call).
