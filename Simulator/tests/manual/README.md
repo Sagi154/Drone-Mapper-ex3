@@ -40,6 +40,7 @@ scripts use `inputs/tiny_compose.yaml` where a full 24-cell matrix is unnecessar
 | `check_all_folder_plugins_fail.sh` | All folder plugins unloadable → aggregate `errors:` |
 | `check_isolation.sh` | Distinct fixture `.so`s load under `RTLD_LOCAL` |
 | `check_multi_plugin_outputs.sh` | Two distinct `.so`s per mode; each gets `<name>_simulation_output.yaml` |
+| `check_foreign_host.sh` | VAR-01: our Algorithm + MissionControl under blind `skeleton_host` on staff maps |
 
 Helpers (not always in `run_all.sh`): `run_in_docker.sh`, `docker_verify_default.sh`,
 `docker_tsan.sh`.

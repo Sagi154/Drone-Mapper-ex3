@@ -444,3 +444,41 @@ target_link_libraries(simulator_207190406_209543255 PRIVATE
 
 drone_warnings(simulator_207190406_209543255)
 add_dependencies(simulator_207190406_209543255 faulty_wall_algorithm_plugin)
+
+# Test-only foreign host (never shipped). Own registration bodies — do NOT link
+# simulator_registration OBJECT (must not share our PluginRegistrar).
+# Sources are blind-authored under tests/hosts/skeleton_host/ (include/ + src/).
+set(SKELETON_HOST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/hosts/skeleton_host")
+add_executable(skeleton_host
+    ${SKELETON_HOST_DIR}/src/main.cpp
+    ${SKELETON_HOST_DIR}/src/HostMap3D.cpp
+    ${SKELETON_HOST_DIR}/src/HostGPS.cpp
+    ${SKELETON_HOST_DIR}/src/HostLidar.cpp
+    ${SKELETON_HOST_DIR}/src/HostMovement.cpp
+    ${SKELETON_HOST_DIR}/src/HostConfig.cpp
+    ${SKELETON_HOST_DIR}/src/HostNpy.cpp
+    ${SKELETON_HOST_DIR}/src/HostRegistrar.cpp
+    ${SKELETON_HOST_DIR}/src/MappingAlgorithmRegistration.cpp
+    ${SKELETON_HOST_DIR}/src/MissionControlRegistration.cpp
+)
+set_target_properties(skeleton_host PROPERTIES
+    ENABLE_EXPORTS ON
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+target_include_directories(skeleton_host PRIVATE
+    ${SKELETON_HOST_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+    ${CMAKE_SOURCE_DIR}/MissionControl/common_mission_control/include
+)
+target_link_libraries(skeleton_host PRIVATE
+    common::common
+    TinyNPY::TinyNPY
+    yaml-cpp::yaml-cpp
+    ${CMAKE_DL_LIBS}
+)
+drone_warnings(skeleton_host)
+if(NOT MSVC)
+    # PIE executables need an explicit dynamic symbol table for dlopen plugins.
+    target_link_options(skeleton_host PRIVATE "-Wl,--export-dynamic")
+endif()
+
