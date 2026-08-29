@@ -110,21 +110,15 @@ host that honours both, we pay **two steps** for what the API lets you do in one
 
 ### 2. The 26-direction sphere sweep isn't derived from the sensor
 
-`buildScanOrientations` hardcodes the 6 face + 12 edge + 8 corner directions regardless of
-the lidar. The actual cone half-angle follows from `d`, `z_min`, and `fov_circles`:
+**Historical finding:** `buildScanOrientations` hardcoded 6 face + 12 edge + 8 corner
+directions regardless of the lidar. Cone half-angle from MockLidar/HostLidar is
+`atan2((fov_circles-1)*d, z_min)` — ≈20.6° for `lidar_short`, ≈14° for `lidar_long`.
 
-- For **`lidar_short`** (`fov_circles: 4`, `d: 2.5`, `z_min: 20`) the outer ring sits at
-  `atan(7.5/20) ≈ 20.6°`.
-- For **`lidar_long`** (`fov_circles: 3`) it's `atan(5/20) ≈ 14°`.
-
-Adjacent axes in the 26-direction set are 45° apart. So `lidar_short` roughly tiles the
-sphere, while `lidar_long` leaves ~17° wedges unscanned — at its 150 cm range that's a
-44 cm gap, four voxels wide. The pattern is simultaneously expensive in steps and gappy in
-coverage, and the revisit machinery (`kMaxFrontierVisits`, `kNoProgressLimit`) exists
-largely to paper over the gaps.
-
-Note also that `lidar_config_` is read only for `z_max` (`MappingAlgorithmImpl.cpp:120`) —
-`d`, `z_min`, and `fov_circles` are never touched.
+**Resolution (project C, 2026-08-29):** Directions are derived from that half-angle
+(Fibonacci lattice, mandatory ± axes, count from cone spacing), and scans whose cones
+are already fully resolved in `output_map_` are gain-gated. Shared helpers live in
+`UserCommon/` (`LidarCone.h`, `BeamMath.h`). See
+`docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md`.
 
 ### 3. It's blind to its own step budget
 
@@ -160,23 +154,19 @@ Foreign MC may also:
 
 ### The drone-radius clearance test is a no-op with the shipped inputs
 
-`isSpherePassable` computes `rx = ceil(radius_cm / step_cm)`; radius is
-`dimensions_cm / 2 = 4 cm` (small) or `7.5 cm` (large), and the output-map step is 10 cm
-(`SimulationRunFactoryImpl.cpp:58-62` — the missions don't set
-`output_mapping_resolution_factor`, so it stays at the map's 10 cm). With `rx = 1`, every
-non-zero offset is ≥ 10 cm and fails the `ox²+oy²+oz² > radius²` filter, so all 26 probes
-are skipped and only the centre voxel is tested. The ~55-line clearance function reduces to
-a single `atVoxel`.
+**Historical finding:** `isSpherePassable` used a centre-distance gate
+`ox²+oy²+oz² > radius²` after `rx = ceil(radius/step)`. With radius 4–7.5 cm and step
+10 cm, every non-zero offset failed the gate — the sphere sweep reduced to a single
+`atVoxel`. Same bug in `sphereContainsNotMapped` / `isFrontier`.
 
-The same collapse makes `sphereContainsNotMapped` centre-only, which in turn makes the
-second branch of `isFrontier` (`MappingAlgorithmFrontier.cpp:199-202`) dead.
+**Consequence (at time of finding):** planner acted as a point drone; foreign MC hard
+`Error` on blocked moves could score **-1**.
 
-**Consequence:** the planner plans as a point drone, and since `Unmapped` is passable, it
-deliberately commands moves into unverified space. Our MC forgives that by substring-matching
-"blocked" / "boundary" in the failure message (`DroneControlImpl.cpp:93-96`); a foreign MC
-that returns a hard `Error` on a rejected move scores that run **-1**. That is the mechanism
-by which we'd lose a competition run outright, and it sits directly against the assignment's
-"do not fly the drone into walls."
+**Resolution (project C, 2026-08-29):** Keep `ceil` loop bounds (needed for 1 cm test
+grids); replace the gate with nearest-point-in-voxel-box vs sphere. Face neighbours on
+the shipped 10 cm / 7.5 cm case are now rejected when Occupied. Soft-cost `Unmapped`
+traversal is unchanged. Spec:
+`docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md`.
 
 ### Every planning cycle pays several full-graph sweeps
 

@@ -167,22 +167,38 @@ Band verdicts unchanged in shape (still inside only on house_lower + large_room)
 
 ## Project C — sensor model + belief map
 
-**Status:** specced 2026-08-29, not yet implemented. Depends on A (harness exists) and B (real
-step-accounting numbers). Spec:
+**Status:** implemented 2026-08-29 (code + tests + post-C `honest` baseline). Spec:
 `docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md`.
+Plan: `docs/superpowers/plans/2026-08-29-sensor-model-clearance-belief.md`.
 
-The spec resolved the two "genuinely open" items below at spec time (verified against the actual
-`isSpherePassable` arithmetic and confirmed the bug: every non-centre probe is skipped at both shipped
-drone radii against the 10 cm grid, not just "likely" as this roadmap section originally speculated):
+### Measured impact (post-B → post-C `honest`)
 
-- **Clearance fix chosen:** nearest-point-in-box-to-sphere test on the fixed `3×3×3` neighbour cells,
-  not the "treat `Unmapped` as non-traversable near frontiers" alternative — keeps the soft-cost
-  `Unmapped` policy untouched, only fixes the arithmetic that decides which probes are in range.
-- **Belief-map scope, per decision 1:** no new belief-map data structure in C. Both fixes operate
-  against `output_map_` directly; raycasting `latest_scan` independently is deferred to D, only if D's
-  viewpoint-scoring needs more than `output_map_` provides.
-- Still open, deliberately left to implementation time: the exact cone half-angle formula from `d` /
-  `z_min` / `fov_circles` (needs the authoritative lidar geometry, not just the field names).
+| Metric | Post-B | Post-C |
+|--------|--------|--------|
+| Score sum | 1335.4 | 1331.0 |
+| Total steps | 17693 | **9101** (~0.51×) |
+| MAX_STEPS cells | 8 | **2** |
+| Errors | 0 | 0 |
+
+Score nearly flat; step count roughly halved and MAX_STEPS cut from 8→2 via gain-gated
+lidar-derived scans. Band shape unchanged (still inside only house_lower + large_room).
+Artifacts: `docs/benchmarks/2026-08-29-post_c_honest.*`.
+
+### Resolved at implement time
+
+- Clearance: nearest-point-in-box vs sphere; kept `ceil` loop bounds (1 cm test grids).
+- No belief map — `output_map_` only; beam math + `LidarCone` in `UserCommon/`.
+- Half-angle: `atan2((fov_circles-1)*d, z_min)` (MockLidar); `fov_circles==1` uses
+  `atan2(d, z_min)` for tiling so pencil-beam configs still emit directions.
+- Orientation set: six axes + Fibonacci fill; gain-gate skips resolved cones.
+
+### Notes for Project D
+
+- `output_map_` was sufficient for C's gain-gating; D should start from that for NBV scoring
+  and only add an independent belief if foreign-MC null scans force it.
+- Clearance is safer for large (7.5 cm) drones on 10 cm grids; small (4 cm) still centre-only
+  by physics (nearest face = 5 cm > 4 cm).
+- Remaining beat-ex2 gap is policy (NBV / budget / move+scan), not sensor geometry.
 
 ### Why this project exists (two distinct motivations — keep them separate)
 

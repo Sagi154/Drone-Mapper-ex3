@@ -1,7 +1,7 @@
 # Sensor Model + Clearance Fix — Design
 
 **Date:** 2026-08-29
-**Status:** Proposed
+**Status:** Accepted 2026-08-29
 **Goal:** Fix the `isSpherePassable` clearance-check no-op (safety) and derive the scan pattern from the
 lidar's actual cone geometry instead of a hardcoded 26-direction sweep (efficiency), so the planner
 stops treating the drone as a point and stops re-scanning already-covered space.

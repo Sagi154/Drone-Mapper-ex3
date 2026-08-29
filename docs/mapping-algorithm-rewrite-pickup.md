@@ -24,10 +24,10 @@ Working tree should be clean after the B commits. If dirty, stop and reconcile b
 
 ## Verdict
 
-**Projects A and B are done.** We can measure per-cell score/steps, and our MissionControl is honest
-(one scan per step, movement→scan→fuse, co-emitted movement+scan honored). The current algorithm
-**does not** meet the beat-ex2 bar under that honest contract. Recovering coverage-per-step is the
-job of **C then D** — not further MC tweaks.
+**Projects A, B, and C are done.** We can measure per-cell score/steps; MissionControl is honest
+(one scan per step); clearance uses sphere-vs-box geometry; scans are lidar-cone-derived and
+gain-gated. Under the honest contract, post-C still does **not** meet the beat-ex2 bar — recovering
+coverage quality (not just cutting wasted scans) is the job of **D**.
 
 Two decisions that still constrain everything below (do not re-litigate without the user):
 
@@ -36,7 +36,7 @@ Two decisions that still constrain everything below (do not re-litigate without 
 2. **Success = beat ex2’s recorded 24-cell score bands** (same maps/scorer), not merely
    `mission_score >= 0`.
 
-Full rationale and open questions for C/D live in:
+Full rationale and open questions for D live in:
 `docs/superpowers/specs/2026-08-29-mapping-algorithm-roadmap.md`.
 
 ---
@@ -66,6 +66,16 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 | Docs | HLD, known-issues #20/#21, mapping-algorithm-analysis portability section, VAR-02 table |
 | Post-B baseline | `docs/benchmarks/2026-08-29-post_b_honest.{csv,md}` |
 
+### Project C — sensor model + clearance
+
+| Artifact | Path |
+|----------|------|
+| Spec | `docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md` |
+| Plan | `docs/superpowers/plans/2026-08-29-sensor-model-clearance-belief.md` |
+| Code | Frontier sphere-box clearance; `UserCommon` BeamMath + LidarCone; gain-gated scan orientations |
+| Tests | frontier cm10 cases; `test_lidar_cone.cpp`; updated mapping-algorithm scan expectations |
+| Post-C baseline | `docs/benchmarks/2026-08-29-post_c_honest.{csv,md}` |
+
 ---
 
 ## Measured scores (primary numbers)
@@ -75,10 +85,14 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 - Score sum **1371.3**, steps **4946**, 0× `MAX_STEPS`, 24 scored.
 - vs ex2 bands: **inside** house_lower, large_room; **below** house_full (~10), large_out (~36), small_out (~37), small_room (~65).
 
-### Post-B (honest MC) — `honest` ← **optimize against this**
+### Post-C (honest MC + sensor/clearance) — `honest` ← **optimize against this**
 
-- Score sum **1335.4**, steps **17693** (~3.6× pre-B), **8× `MAX_STEPS`**, 0 errors.
+- Score sum **1331.0**, steps **9101** (~0.51× post-B), **2× `MAX_STEPS`**, 0 errors.
 - Same band shape vs ex2 (still only inside on house_lower + large_room).
+
+### Post-B (honest MC, pre-C algorithm) — historical
+
+- Score sum **1335.4**, steps **17693**, **8× `MAX_STEPS`**, 0 errors.
 
 ### Adversarial (hits-only foreign MC)
 
@@ -92,33 +106,17 @@ per column at `num_threads=8`.
 
 ## Left to do (in order)
 
-### 1. Project C — sensor model + clearance / belief (specced, next: plan + implement)
+### 1. Project C — sensor model + clearance — **done**
 
-**Status:** specced 2026-08-29. Spec:
-`docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md`.
+**Status:** implemented 2026-08-29. Spec + plan + code + `docs/benchmarks/2026-08-29-post_c_honest.*`.
 
-1. **Fix `isSpherePassable` no-op** (safety — foreign hard `Error` → run score `-1`). Confirmed the bug
-   directly: `ceil(radius_cm/step_cm) = 1` for both shipped drone radii vs 10 cm grid, and the probe
-   loop's own range gate then skips every non-centre offset — the ~55-line sweep degrades to one
-   `atVoxel` call. Fix: nearest-point-in-box-to-sphere test on the fixed 3×3×3 neighbourhood, not a
-   bigger `Unmapped`-traversal policy change.
-2. **Derive scan directions from lidar** (`d` / `z_min` / `fov_circles`); gain-gate scans against
-   `output_map_` (no new belief-map structure — decision 1 keeps `output_map_` as ground truth).
-3. **Deferred to D, only if needed:** own belief from `latest_scan`, degrade when scans are null
-   (competition foreign MC) — D's viewpoint-scoring defines what it actually needs.
-4. Shared beam math → `UserCommon/` (currently empty of geometry code), lifted from
-   `MissionControl/src/BeamMath.hpp` / `ScanResultToVoxels`, scoped to what gain-gating needs.
-
-**Next session action:** write C's implementation plan (writing-plans skill) → execute via SDD →
-re-run harness `honest` column → commit `docs/benchmarks/*` deltas.
-
-### 2. Project D — exploration policy (NBV)
+### 2. Project D — exploration policy (NBV) (next)
 
 **Status:** not specced. Depends on C. Receding-horizon next-best-view, read `max_steps`, any-angle
 smoothing, emit move+scan, retire blacklists / stale `explore_dist_cache` / mid-search Dijkstra hack,
 `mp-units` geometry. Deterministic sampling (fixed seed) required for harness.
 
-### 3. After C/D land
+### 3. After D lands
 
 - Commit new `docs/benchmarks/*` CSVs; update roadmap tables.
 - Confirm adversarial column still completes without illegal-move disasters.
@@ -130,11 +128,10 @@ smoothing, emit move+scan, retire blacklists / stale `explore_dist_cache` / mid-
 
 ## Next session — concrete first steps
 
-1. Read this file + `docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md` (C's
-   spec, done) + `docs/mapping-algorithm-analysis.md` clearance / scan-geometry findings.
-2. Confirm on `algorithm-benchmark-harness`, `git status` clean, optionally `git log main..HEAD --oneline`.
-3. Write **C's implementation plan** and execute via SDD (do not jump to D).
-4. After C lands, re-benchmark `honest` before starting D’s full policy rewrite.
+1. Read this file + roadmap Project D section + C's post-C notes for D.
+2. Confirm on `algorithm-benchmark-harness`, `git status` clean.
+3. Brainstorm and write **D’s design spec** (do not re-open C).
+4. Re-benchmark `honest` after D until bands approach/beat ex2.
 
 ---
 
