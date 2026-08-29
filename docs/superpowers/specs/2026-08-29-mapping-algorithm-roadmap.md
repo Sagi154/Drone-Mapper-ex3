@@ -90,8 +90,7 @@ and whether they land below/inside/above ex2's bands.
 
 ## Project B — MissionControl honesty
 
-**Status:** not yet specced. Scope is well-understood; not blocked on any unmeasured number, so it
-can be specced in full as soon as A's tooling exists to measure the before/after.
+**Status:** specced. Spec: `docs/superpowers/specs/2026-08-29-missioncontrol-step-honesty-design.md`.
 
 ### What's already decided
 
@@ -114,25 +113,21 @@ can be specced in full as soon as A's tooling exists to measure the before/after
   code today is scan-batch → movement — B should make the code match the documented order, or fix the
   doc, whichever the implementation lands on. Resolve this explicitly, don't leave it split.).
 
-### What's genuinely open (resolve when specced)
+### Resolved by the spec (superseding earlier speculation in this roadmap)
 
-- **Expected fallout on `algorithm_test`, `test_drone_control`, `test_mission_control`:** the explore
-  survey found **no existing gtest hard-codes `kMaxScansPerStep == 16`** or asserts multi-scan
-  batching inside one `step()` call, so no test is expected to *break*, but re-run the full suite
-  (85/85 documented green) to confirm, not assume.
-- **Whether to remove `kMaxScansPerStep` entirely or set it to 1.** Setting it to 1 keeps the
-  loop-with-a-cap shape (defensive against a future adversarial algorithm that always returns
-  `Working` + `scan_orientation`, which is exactly what caused Known Issues #21). Removing the loop
-  structure entirely is simpler to read but re-opens that hang risk if a future change reintroduces
-  multi-iteration behavior. Recommend keeping the loop shape with a hard cap of 1, not deleting it.
-- **Whether the movement+scan fix changes step semantics for movement-only or scan-only commands.**
-  It should not — audit the diff to confirm only the co-emission path changes.
-- **Whether this needs a variant of the foreign-hits-only fixture semantics rechecked** — VAR-02's
-  `check_foreign_mission_control.sh` diagnostic should be re-run post-change since it compares against
-  *our* MC's step counts, which this project directly changes (Known Issues #20's "209 vs 42" numbers
-  will move).
+- **`nextStep` is called exactly once per `step()` call — the loop is removed entirely, not capped
+  at 1.** Earlier speculation in this roadmap recommended keeping the loop shape with a hard cap,
+  reasoning it stayed defensive against the VAR-03 hang class. The spec supersedes that: with no loop
+  inside `step()`, `nextStep` can't be re-invoked regardless of what the algorithm returns, so the
+  hang class is structurally impossible rather than bounded. Stronger fix, not a smaller diff.
+- **Movement executes before the scan, and a recoverable movement failure still lets the scan
+  happen** (stationary but functional) before returning `Continue`. A hard failure still
+  short-circuits before any scan. This makes the code match the documented movement → scan → fuse
+  order in `frozen-interfaces.mdc:66-67` — no rule change needed, only the code catching up.
+- **No test currently hardcodes `kMaxScansPerStep == 16`** (re-verify by grep at implementation time,
+  not by trusting this note) — full details and the new test list are in the spec.
 
-### Considerations for whoever specs B
+### Considerations for whoever executes B
 
 - Use project A's harness to capture `ex2_comparable` (pre-B) before starting, and to measure the
   `honest` column immediately after landing B, on the unmodified current algorithm — this is the
