@@ -1,7 +1,7 @@
 #pragma once
 
-// Private header — used only within MissionControl/src/.
-// Shared beam-geometry helpers used by both ScanResultToVoxels and DroneControlImpl.
+// Shared beam-geometry helpers (Algorithm gain-gating + MissionControl fusion).
+// Compiled into each consumer — no cross-.so symbol dependency.
 
 #include <Common/Types.h>
 
@@ -10,7 +10,7 @@
 #include <cmath>
 #include <limits>
 
-namespace mission_control_207190406_209543255::beam_math {
+namespace user_common_207190406_209543255::beam_math {
 
 namespace mp = common::mp;
 namespace si = common::si;
@@ -31,7 +31,7 @@ using common::Position3D;
                                                           const Orientation& relative_beam) {
     return Orientation{
         relative_beam.horizontal + drone_heading.horizontal,
-        relative_beam.altitude   + drone_heading.altitude,
+        relative_beam.altitude + drone_heading.altitude,
     };
 }
 
@@ -80,4 +80,4 @@ using common::Position3D;
     };
 }
 
-} // namespace mission_control_207190406_209543255::beam_math
+} // namespace user_common_207190406_209543255::beam_math

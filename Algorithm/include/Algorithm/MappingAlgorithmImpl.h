@@ -8,7 +8,7 @@
 
 namespace algorithm_207190406_209543255 {
 
-/// 26-direction scan batch + density-scored BFS frontier cleanup.
+/// Lidar-cone-derived scan orientations + density-scored BFS frontier cleanup.
 /// Each nextStep emits at most one scan orientation or one movement command.
 class MappingAlgorithmImpl_207190406_209543255 final : public common::IMappingAlgorithm {
 public:

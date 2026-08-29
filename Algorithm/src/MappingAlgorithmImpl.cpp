@@ -1,9 +1,11 @@
 // MappingAlgorithmImpl.cpp
-// 26-direction scan batch + density-scored BFS frontier cleanup.
+// Lidar-cone-derived scan orientations + density-scored BFS frontier cleanup.
 
 #include <Algorithm/MappingAlgorithmImpl.h>
 
 #include "MappingAlgorithmFrontier.h"
+
+#include <user_common_207190406_209543255/LidarCone.h>
 
 #include <Common/MappingAlgorithmRegistration.h>
 
@@ -128,74 +130,20 @@ void MappingAlgorithmImpl_207190406_209543255::ensurePlanningReady() {
 void MappingAlgorithmImpl_207190406_209543255::buildScanOrientations(const Orientation& heading,
                                                  const Position3D& /*position*/) {
     impl_->scan_orientations.clear();
-    impl_->scan_orientations.reserve(26);
 
-    const auto addDirection = [&](double dx, double dy, double dz) {
-        const double len = std::sqrt(dx * dx + dy * dy + dz * dz);
-        if (len < 1e-9) {
-            return;
-        }
-        dx /= len;
-        dy /= len;
-        dz /= len;
-
-        const double az_deg = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
-        const double horiz_len = std::sqrt(dx * dx + dy * dy);
-        const double el_deg = std::atan2(dz, horiz_len) * (180.0 / std::numbers::pi);
-
-        double az_norm = az_deg;
-        while (az_norm < 0.0) {
-            az_norm += 360.0;
-        }
-        while (az_norm >= 360.0) {
-            az_norm -= 360.0;
-        }
-
+    namespace lc = user_common_207190406_209543255::lidar_cone;
+    const double alpha = lc::coneHalfAngleRad(lidar_config_);
+    if (!(alpha > 0.0)) {
+        return;
+    }
+    const std::size_t n = lc::directionCountForHalfAngle(alpha);
+    const std::vector<Orientation> world = lc::fibonacciSphereOrientations(n);
+    impl_->scan_orientations.reserve(world.size());
+    for (const Orientation& abs_dir : world) {
         impl_->scan_orientations.push_back(
-            Orientation{az_norm * deg - heading.horizontal, el_deg * deg - heading.altitude});
-    };
-
-    addDirection(1.0, 0.0, 0.0);
-    addDirection(-1.0, 0.0, 0.0);
-    addDirection(0.0, 1.0, 0.0);
-    addDirection(0.0, -1.0, 0.0);
-    addDirection(0.0, 0.0, 1.0);
-    addDirection(0.0, 0.0, -1.0);
-
-    const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
-    for (const int sx : {-1, 1}) {
-        for (const int sy : {-1, 1}) {
-            addDirection(static_cast<double>(sx) * inv_sqrt2,
-                         static_cast<double>(sy) * inv_sqrt2,
-                         0.0);
-        }
+            Orientation{abs_dir.horizontal - heading.horizontal,
+                        abs_dir.altitude - heading.altitude});
     }
-    for (const int sx : {-1, 1}) {
-        for (const int sz : {-1, 1}) {
-            addDirection(static_cast<double>(sx) * inv_sqrt2,
-                         0.0,
-                         static_cast<double>(sz) * inv_sqrt2);
-        }
-    }
-    for (const int sy : {-1, 1}) {
-        for (const int sz : {-1, 1}) {
-            addDirection(0.0,
-                         static_cast<double>(sy) * inv_sqrt2,
-                         static_cast<double>(sz) * inv_sqrt2);
-        }
-    }
-
-    const double inv_sqrt3 = 1.0 / std::sqrt(3.0);
-    for (const int sx : {-1, 1}) {
-        for (const int sy : {-1, 1}) {
-            for (const int sz : {-1, 1}) {
-                addDirection(static_cast<double>(sx) * inv_sqrt3,
-                             static_cast<double>(sy) * inv_sqrt3,
-                             static_cast<double>(sz) * inv_sqrt3);
-            }
-        }
-    }
-
 }
 
 bool MappingAlgorithmImpl_207190406_209543255::samePosition(const Position3D& a, const Position3D& b) const {
@@ -274,9 +222,15 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::handleScanni
         impl_->scan_index = 0;
     }
 
-    if (impl_->scan_index < impl_->scan_orientations.size()) {
+    namespace lc = user_common_207190406_209543255::lidar_cone;
+    while (impl_->scan_index < impl_->scan_orientations.size()) {
+        const Orientation& orientation = impl_->scan_orientations[impl_->scan_index++];
+        if (!lc::coneCoversUnresolved(
+                output_map_, state.position, state.heading, orientation, lidar_config_)) {
+            continue;
+        }
         types::MappingStepCommand cmd{};
-        cmd.scan_orientation = impl_->scan_orientations[impl_->scan_index++];
+        cmd.scan_orientation = orientation;
         cmd.status = types::AlgorithmStatus::Working;
         return cmd;
     }

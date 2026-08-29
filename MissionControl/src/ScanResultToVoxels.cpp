@@ -1,6 +1,6 @@
 #include <MissionControl/ScanResultToVoxels.h>
 
-#include "BeamMath.hpp"
+#include <user_common_207190406_209543255/BeamMath.h>
 
 namespace mission_control_207190406_209543255 {
 namespace {
@@ -9,7 +9,7 @@ using common::Orientation;
 using common::PhysicalLength;
 using common::Position3D;
 using common::cm;
-namespace bm = beam_math;
+namespace bm = user_common_207190406_209543255::beam_math;
 
 // Evidence strength for conflicting writes to the same voxel.
 [[nodiscard]] int occupancyPriority(common::types::VoxelOccupancy occupancy) {

@@ -2,7 +2,7 @@
 
 #include <MissionControl/ScanResultToVoxels.h>
 
-#include "BeamMath.hpp"
+#include <user_common_207190406_209543255/BeamMath.h>
 
 #include <cmath>
 #include <exception>
@@ -19,7 +19,7 @@ using common::cm;
 using common::x_extent;
 using common::y_extent;
 using common::z_extent;
-namespace bm = beam_math;
+namespace bm = user_common_207190406_209543255::beam_math;
 
 void markDroneFootprintEmpty(common::IMutableMap3D& map,
                              const Position3D& centre,
