@@ -1,0 +1,21 @@
+score_report:
+  composition_file: "tiny_for_parser.yaml"
+  metric: maps_comparison_score_0_100
+  score_range: [0.0, 100.0]
+  error_score: -1
+  runs:
+    - run_id: 0
+      mission_score: 88.75
+      config_indices: {simulation: 0, mission: 0, drone: 0, lidar: 0}
+      mission_results: [{status: COMPLETED, steps: 42, errors: []}]
+    - run_id: 1
+      mission_score: 40.0
+      config_indices: {simulation: 0, mission: 0, drone: 1, lidar: 0}
+      mission_results: [{status: MAX_STEPS, steps: 500, errors: []}]
+    - run_id: 2
+      mission_score: -1.0
+      config_indices: {simulation: 0, mission: 0, drone: 2, lidar: 0}
+      mission_results:
+        - status: ERROR
+          steps: 3
+          errors: [{code: DRONE_STEP_FAILED, message: boom}]
