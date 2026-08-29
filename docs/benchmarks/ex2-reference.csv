@@ -1,0 +1,7 @@
+group,low,high,citation
+house_lower,100,100,"Drone-Mapper-ex2/docs/HLD.md:387-402; Jul 5 2026"
+house_full,56,62,"Drone-Mapper-ex2/docs/HLD.md:387-402; Jul 5 2026"
+large_out,80,88,"Drone-Mapper-ex2/docs/HLD.md:387-402; Jul 5 2026"
+large_room,92,96,"Drone-Mapper-ex2/docs/HLD.md:387-402; Jul 5 2026"
+small_out,75,89,"Drone-Mapper-ex2/docs/HLD.md:387-402; Jul 5 2026"
+small_room,87,90,"Drone-Mapper-ex2/docs/HLD.md:387-402; Jul 5 2026"
