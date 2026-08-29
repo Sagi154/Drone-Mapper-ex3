@@ -9,6 +9,9 @@ that specifying B, C, or D never depends on re-reading this chat.
 This doc is living: as each project lands, update its "Considerations for the next spec" section
 with what was actually learned (numbers, surprises, scope changes) before moving to the next one.
 
+**Session handoff (status + queue):** `docs/mapping-algorithm-rewrite-pickup.md` — read that first
+when picking up this work cold.
+
 ---
 
 ## Why four projects, and why this order
