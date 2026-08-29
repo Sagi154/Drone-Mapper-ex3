@@ -84,6 +84,36 @@ constexpr Offset kOffsets[6] = {
     return kEmptyTraversalCost;
 }
 
+// True iff the axis-aligned voxel box centered at (dx,dy,dz)*step_cm with half-extent
+// step_cm/2 intersects the closed sphere of radius radius_cm at the origin. Using cell
+// centres for the distance gate (the old ox²+oy²+oz² > r² test) is a no-op when
+// radius_cm < step_cm: every non-zero offset is ≥ step_cm and is skipped. Nearest-point
+// in the box restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
+[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz,
+                                           double step_cm,
+                                           double radius_cm) {
+    if (dx == 0 && dy == 0 && dz == 0) {
+        return true;
+    }
+    const double half = step_cm * 0.5;
+    const double ox = static_cast<double>(dx) * step_cm;
+    const double oy = static_cast<double>(dy) * step_cm;
+    const double oz = static_cast<double>(dz) * step_cm;
+    const auto nearest1d = [half](double o) {
+        if (0.0 < o - half) {
+            return o - half;
+        }
+        if (0.0 > o + half) {
+            return o + half;
+        }
+        return 0.0;
+    };
+    const double nx = nearest1d(ox);
+    const double ny = nearest1d(oy);
+    const double nz = nearest1d(oz);
+    return (nx * nx + ny * ny + nz * nz) <= (radius_cm * radius_cm);
+}
+
 [[nodiscard]] bool isSpherePassable(const IMap3D& map,
                                     const Position3D& centre,
                                     double radius_cm,
@@ -117,13 +147,13 @@ constexpr Offset kOffsets[6] = {
                 if (dx == 0 && dy == 0 && dz == 0) {
                     continue;
                 }
-                const double ox = dx * step_cm;
-                const double oy = dy * step_cm;
-                const double oz = dz * step_cm;
-                if (ox * ox + oy * oy + oz * oz > radius_cm * radius_cm) {
+                if (!sphereIntersectsCellBox(dx, dy, dz, step_cm, radius_cm)) {
                     continue;
                 }
 
+                const double ox = dx * step_cm;
+                const double oy = dy * step_cm;
+                const double oz = dz * step_cm;
                 const Position3D probe{
                     (cx + ox) * x_extent[cm],
                     (cy + oy) * y_extent[cm],
@@ -150,17 +180,16 @@ constexpr Offset kOffsets[6] = {
 
     const int rx = static_cast<int>(std::ceil(radius_cm / step_cm));
     const int rh = static_cast<int>(std::ceil(radius_cm / step_cm));
-    const double r2 = radius_cm * radius_cm;
 
     for (int dx = -rx; dx <= rx; ++dx) {
         for (int dy = -rx; dy <= rx; ++dy) {
             for (int dz = -rh; dz <= rh; ++dz) {
+                if (!sphereIntersectsCellBox(dx, dy, dz, step_cm, radius_cm)) {
+                    continue;
+                }
                 const double ox = dx * step_cm;
                 const double oy = dy * step_cm;
                 const double oz = dz * step_cm;
-                if (ox * ox + oy * oy + oz * oz > r2) {
-                    continue;
-                }
                 const Position3D probe{
                     (cx + ox) * x_extent[cm],
                     (cy + oy) * y_extent[cm],

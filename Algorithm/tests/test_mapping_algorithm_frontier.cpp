@@ -280,3 +280,60 @@ TEST(MappingAlgorithm, FrontierPrefersEmptyOverUnmappedPath) {
         }
     }
 }
+
+[[nodiscard]] ct::MapConfig makeCm10Config() {
+    ct::MapConfig config{};
+    config.resolution            = 10.0 * cm;
+    config.offset                = Position3D{};
+    config.boundaries.min_x      = 0.0 * x_extent[cm];
+    config.boundaries.max_x      = 100.0 * x_extent[cm];
+    config.boundaries.min_y      = 0.0 * y_extent[cm];
+    config.boundaries.max_y      = 100.0 * y_extent[cm];
+    config.boundaries.min_height = 0.0 * z_extent[cm];
+    config.boundaries.max_height = 100.0 * z_extent[cm];
+    return config;
+}
+
+// What: 10 cm grid, radius 7.5 cm, Occupied face neighbour (nearest box dist 5 ≤ 7.5).
+// Expected: start not passable — the old centre-distance gate silently skipped this probe.
+TEST(MappingAlgorithm, FrontierRejectsOccupiedFaceNeighbourOnCm10Grid) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config};
+    const Position3D centre = pointCm(50, 50, 50);
+    const Position3D face   = pointCm(60, 50, 50);
+    map.set(centre, ct::VoxelOccupancy::Empty);
+    map.set(face, ct::VoxelOccupancy::Occupied);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const detail::PlanningDiagnostics diag = frontier.diagnose(map, centre, 7.5 * cm);
+    EXPECT_FALSE(diag.start_passable);
+}
+
+// What: same Occupied face neighbour but radius 4 cm (nearest 5 > 4).
+// Expected: still passable — sphere does not reach the neighbour box.
+TEST(MappingAlgorithm, FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config};
+    const Position3D centre = pointCm(50, 50, 50);
+    const Position3D face   = pointCm(60, 50, 50);
+    map.set(centre, ct::VoxelOccupancy::Empty);
+    map.set(face, ct::VoxelOccupancy::Occupied);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const detail::PlanningDiagnostics diag = frontier.diagnose(map, centre, 4.0 * cm);
+    EXPECT_TRUE(diag.start_passable);
+}
+
+// What: face neighbour Unmapped, centre Empty, radius 7.5 on 10 cm grid.
+// Expected: hasNotMappedInSphere sees the face cell (same geometry as passability).
+TEST(MappingAlgorithm, FrontierHasUnmappedFaceNeighbourOnCm10Grid) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D centre = pointCm(50, 50, 50);
+    const Position3D face   = pointCm(60, 50, 50);
+    map.set(centre, ct::VoxelOccupancy::Empty);
+    map.set(face, ct::VoxelOccupancy::Unmapped);
+
+    EXPECT_TRUE(detail::hasNotMappedInSphere(map, centre, 7.5 * cm));
+    EXPECT_FALSE(detail::hasNotMappedInSphere(map, centre, 4.0 * cm));
+}
