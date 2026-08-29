@@ -34,12 +34,22 @@ python scripts/benchmark/run_benchmark.py --quick --columns ex2_comparable --lab
 
 ## Full baseline (project A)
 
+On the host (venv already created):
+
 ```bash
 python scripts/benchmark/run_benchmark.py \
   --mode hosts \
   --columns ex2_comparable,adversarial \
   --label pre_b_baseline \
   --num-threads 8
+```
+
+Inside `drone-mapper-ex3-dev` the image may lack `python3-venv`; install once per container:
+
+```bash
+apt-get update -qq && apt-get install -y -qq python3-venv python3-pip
+python3 -m venv scripts/benchmark/.venv
+scripts/benchmark/.venv/bin/pip install -r scripts/benchmark/requirements.txt
 ```
 
 Do not commit `--quick` outputs. Full-matrix CSVs under `docs/benchmarks/` are the deliverable.

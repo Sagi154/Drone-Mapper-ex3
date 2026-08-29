@@ -75,16 +75,27 @@ with the user first.
 
 ---
 
-## Project A — status: specced, ready to build
+## Project A — status: done (harness + pre-B baseline committed)
 
-Spec: `docs/superpowers/specs/2026-08-29-algorithm-benchmark-harness-design.md`.
+Spec: `docs/superpowers/specs/2026-08-29-algorithm-benchmark-harness-design.md`.  
+Plan: `docs/superpowers/plans/2026-08-29-algorithm-benchmark-harness.md`.  
+Baseline: `docs/benchmarks/2026-08-29-pre_b_baseline.csv` (+ `.md`).
 
-Produces three benchmark columns: `ex2_comparable` (one-time snapshot at commit `b1e141c`, before any
-production change), `honest` (primary, measurable once B lands), `adversarial` (existing hits-only
-fixture, robustness only). Committed CSV + markdown summary under `docs/benchmarks/`.
+| Group | Ex2 band | Pre-B `ex2_comparable` mean | Verdict |
+|-------|----------|-----------------------------|---------|
+| house_lower | 100 | 100.00 | inside |
+| house_full | 56–62 | **10.49** | **below** |
+| large_out | 80–88 | **36.29** | **below** |
+| large_room | 92–96 | 93.38 | inside |
+| small_out | 75–89 | **37.32** | **below** |
+| small_room | 87–90 | **65.35** | **below** |
 
-**When A lands, update this section with:** the actual `ex2_comparable` numbers per scenario group,
-and whether they land below/inside/above ex2's bands.
+Totals (`ex2_comparable`): score sum **1371.3** / 24 cells, **4946** steps, 0 errors.  
+Adversarial column (hits-only MC): score sum **536.0**, **6982** steps, 4× `MAX_STEPS` — much worse, as expected.
+
+**Implication for C/D:** today's algorithm already fails the beat-ex2 bar on four of six groups under
+our own batching MC. Project B's de-batching will make step budgets tighter still; recovering
+toward ex2 bands is the job of C+D, not of A.
 
 ---
 
