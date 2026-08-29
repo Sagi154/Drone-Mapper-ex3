@@ -135,20 +135,18 @@ greedy about gain-per-step when it's tight.
 
 ---
 
-## The portability risk worth taking seriously
+## The portability risk (resolved for step accounting — 2026-08-29)
 
-Our own `DroneControlImpl::step()` batches up to 16 consecutive scans into a single mission
-step (`DroneControlImpl.cpp:190-214`). A foreign MissionControl does one scan per step —
-that's exactly the variant your own VAR-02 design lists ("Batch consecutive scan commands
-into one step | Exactly one scan per step"). So the same algorithm costs ~2 steps per
-observation stop under our MC and ~26 under theirs.
+**Historical finding (at time of writing):** Our own `DroneControlImpl::step()` batched up to 16
+consecutive scans into a single mission step (`kMaxScansPerStep=16`). A foreign MissionControl does
+one scan per step — VAR-02 ("Batch consecutive scan commands into one step | Exactly one scan per
+step"). Known Issues #20 recorded **209 steps vs 42** on `small_simulation_room` under a hits-only
+foreign MC (~5×), largely from that asymmetry.
 
-Your team already measured the effect: Known Issues #20 records **209 steps vs 42** on
-`small_simulation_room` under a hits-only foreign MC — about **5×**. That means the
-internal "24/24 Completed" result is measured on the favourable side of an asymmetry that
-the competition will not reproduce. Worth being clear-eyed that the batching is a generous
-(though defensible) reading of the spec, and that it's the thing making our step counts
-look good.
+**Resolution (project B):** The batching loop was removed. `step()` now calls `nextStep` once and
+runs movement → at most one scan → fuse, matching the documented contract and the foreign scan
+rate. Remaining foreign-MC gaps are Empty-carving and `latest_scan` policy, not scan batching.
+See `docs/superpowers/specs/2026-08-29-missioncontrol-step-honesty-design.md`.
 
 Foreign MC may also:
 

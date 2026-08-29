@@ -249,8 +249,9 @@ algorithm in a folder is varied; the same orchestrator/factory/run path applies.
 ## Sequence: DroneControl step loop
 
 Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration calls
-`DroneControlImpl::step()`. The algorithm may return scan commands (batched in one step)
-or a movement command.
+`DroneControlImpl::step()`. Each step invokes `nextStep` once and may execute an optional
+movement followed by at most one scan (then voxel fusion), matching the published
+movement → scan → fuse contract.
 
 ![Drone step sequence](hld/seq-drone-step.png)
 
