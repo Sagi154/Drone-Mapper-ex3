@@ -92,18 +92,25 @@ per column at `num_threads=8`.
 
 ## Left to do (in order)
 
-### 1. Project C — sensor model + clearance / belief (next)
+### 1. Project C — sensor model + clearance / belief (specced, next: plan + implement)
 
-**Status:** not specced. Roadmap section “Project C” has considerations (priority already reordered
-after decision 1):
+**Status:** specced 2026-08-29. Spec:
+`docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md`.
 
-1. **Fix `isSpherePassable` no-op** (safety — foreign hard `Error` → run score `-1`).
-2. **Derive scan directions from lidar** (`d` / `z_min` / `fov_circles`); gain-gate scans.
-3. **Optional / secondary:** own belief from `latest_scan`, beam math in `UserCommon/`, degrade when
-   scans are null (competition foreign MC).
+1. **Fix `isSpherePassable` no-op** (safety — foreign hard `Error` → run score `-1`). Confirmed the bug
+   directly: `ceil(radius_cm/step_cm) = 1` for both shipped drone radii vs 10 cm grid, and the probe
+   loop's own range gate then skips every non-centre offset — the ~55-line sweep degrades to one
+   `atVoxel` call. Fix: nearest-point-in-box-to-sphere test on the fixed 3×3×3 neighbourhood, not a
+   bigger `Unmapped`-traversal policy change.
+2. **Derive scan directions from lidar** (`d` / `z_min` / `fov_circles`); gain-gate scans against
+   `output_map_` (no new belief-map structure — decision 1 keeps `output_map_` as ground truth).
+3. **Deferred to D, only if needed:** own belief from `latest_scan`, degrade when scans are null
+   (competition foreign MC) — D's viewpoint-scoring defines what it actually needs.
+4. Shared beam math → `UserCommon/` (currently empty of geometry code), lifted from
+   `MissionControl/src/BeamMath.hpp` / `ScanResultToVoxels`, scoped to what gain-gating needs.
 
-**Next session action:** brainstorm → write
-`docs/superpowers/specs/YYYY-MM-DD-…-design.md` → plan → implement → re-run harness `honest` column.
+**Next session action:** write C's implementation plan (writing-plans skill) → execute via SDD →
+re-run harness `honest` column → commit `docs/benchmarks/*` deltas.
 
 ### 2. Project D — exploration policy (NBV)
 
@@ -123,10 +130,10 @@ smoothing, emit move+scan, retire blacklists / stale `explore_dist_cache` / mid-
 
 ## Next session — concrete first steps
 
-1. Read this file + roadmap Project C section + `docs/mapping-algorithm-analysis.md` clearance /
-   scan-geometry findings.
+1. Read this file + `docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md` (C's
+   spec, done) + `docs/mapping-algorithm-analysis.md` clearance / scan-geometry findings.
 2. Confirm on `algorithm-benchmark-harness`, `git status` clean, optionally `git log main..HEAD --oneline`.
-3. Brainstorm and write **C’s design spec** (do not jump to D).
+3. Write **C's implementation plan** and execute via SDD (do not jump to D).
 4. After C lands, re-benchmark `honest` before starting D’s full policy rewrite.
 
 ---
@@ -145,6 +152,7 @@ smoothing, emit move+scan, retire blacklists / stale `explore_dist_cache` / mid-
 | Doc | Role |
 |-----|------|
 | `docs/superpowers/specs/2026-08-29-mapping-algorithm-roadmap.md` | Living A/B/C/D index + C/D considerations |
+| `docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md` | Project C's full spec |
 | `docs/mapping-algorithm-analysis.md` | Original Algorithm/ review |
 | `docs/benchmarks/` | Committed score tables |
 | `docs/assignment-compliance-pickup.md` | Submission / packaging (orthogonal) |

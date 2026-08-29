@@ -167,7 +167,22 @@ Band verdicts unchanged in shape (still inside only on house_lower + large_room)
 
 ## Project C — sensor model + belief map
 
-**Status:** not yet specced. Depends on A (harness exists) and B (real step-accounting numbers).
+**Status:** specced 2026-08-29, not yet implemented. Depends on A (harness exists) and B (real
+step-accounting numbers). Spec:
+`docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md`.
+
+The spec resolved the two "genuinely open" items below at spec time (verified against the actual
+`isSpherePassable` arithmetic and confirmed the bug: every non-centre probe is skipped at both shipped
+drone radii against the 10 cm grid, not just "likely" as this roadmap section originally speculated):
+
+- **Clearance fix chosen:** nearest-point-in-box-to-sphere test on the fixed `3×3×3` neighbour cells,
+  not the "treat `Unmapped` as non-traversable near frontiers" alternative — keeps the soft-cost
+  `Unmapped` policy untouched, only fixes the arithmetic that decides which probes are in range.
+- **Belief-map scope, per decision 1:** no new belief-map data structure in C. Both fixes operate
+  against `output_map_` directly; raycasting `latest_scan` independently is deferred to D, only if D's
+  viewpoint-scoring needs more than `output_map_` provides.
+- Still open, deliberately left to implementation time: the exact cone half-angle formula from `d` /
+  `z_min` / `fov_circles` (needs the authoritative lidar geometry, not just the field names).
 
 ### Why this project exists (two distinct motivations — keep them separate)
 
