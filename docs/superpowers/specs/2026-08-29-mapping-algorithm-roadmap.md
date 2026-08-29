@@ -101,7 +101,21 @@ toward ex2 bands is the job of C+D, not of A.
 
 ## Project B — MissionControl honesty
 
-**Status:** specced. Spec: `docs/superpowers/specs/2026-08-29-missioncontrol-step-honesty-design.md`.
+**Status:** implemented (code + docs + post-B `honest` baseline). Spec:
+`docs/superpowers/specs/2026-08-29-missioncontrol-step-honesty-design.md`.
+Plan: `docs/superpowers/plans/2026-08-29-missioncontrol-step-honesty.md`.
+
+### Measured fall (accepted)
+
+| Metric | Pre-B `ex2_comparable` | Post-B `honest` |
+|--------|------------------------|-----------------|
+| Score sum | 1371.3 | 1335.4 |
+| Total steps | 4946 | **17693** (~3.6×) |
+| MAX_STEPS cells | 0 | **8** |
+| Errors | 0 | 0 |
+
+Band verdicts unchanged in shape (still inside only on house_lower + large_room). Artifacts:
+`docs/benchmarks/2026-08-29-pre_b_baseline.*`, `docs/benchmarks/2026-08-29-post_b_honest.*`.
 
 ### What's already decided
 
