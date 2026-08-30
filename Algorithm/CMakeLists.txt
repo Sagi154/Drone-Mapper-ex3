@@ -16,6 +16,7 @@ add_executable(algorithm_test
     tests/test_mapping_algorithm.cpp
     tests/test_mapping_algorithm_frontier.cpp
     tests/test_lidar_cone.cpp
+    tests/test_cone_template.cpp
     tests/test_path_shaping.cpp
     tests/test_nbv_planner.cpp
     # Compile sources directly so tests are self-contained (no dlopen/shared lib).
