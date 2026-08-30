@@ -128,8 +128,15 @@ utility(v) = expected_new_voxels(v) / step_cost(v)
 `expected_new_voxels(v)` casts C's direction set from `v` — `fibonacciSphereOrientations(
 directionCountForHalfAngle(coneHalfAngleRad(lidar_config_)))`, the same set the drone can actually
 scan — and counts distinct `Unmapped` voxels reached before an `Occupied`/`OutOfBounds` terminates the
-ray, considering only the interval `[z_min, z_max]`. Reusing C's beam walk means the gain estimate and
-the executable scans agree by construction, and occlusion and the dead zone are respected for free.
+ray, out to `z_max`. Reusing C's beam walk means the gain estimate and the executable scans agree by
+construction, and occlusion is respected for free.
+
+Two details follow from how our MissionControl actually fuses a scan
+(`MissionControl/src/ScanResultToVoxels.cpp:78-115`) and are easy to get wrong: carving starts at
+distance **0**, not at `z_min`, so voxels inside the 20 cm dead zone *are* resolved by a scan — on a
+miss as `Empty`, on a too-close hit as `PotentiallyOccupied` — and gain must therefore count from the
+first sample rather than from `z_min`. And `PotentiallyOccupied` is a resolved state: it must not be
+counted as gain, or the policy will re-scan near-field walls forever.
 
 `step_cost(v)` is computed on the *smoothed* path against the real command set, not on Dijkstra cell
 cost: `ceil(run_length / max_advance)` per straight run, `ceil(turn_angle / max_rotate)` per turn,
