@@ -10,6 +10,7 @@
 #include "MappingAlgorithmFrontier.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 
@@ -92,8 +93,7 @@ TEST(MappingAlgorithm, FrontierStartPassableWhenSphereHasUnmapped) {
     map.set(start, ct::VoxelOccupancy::Empty);
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::PlanningDiagnostics diag = frontier.diagnose(map, start, 5.0 * cm);
-    EXPECT_TRUE(diag.start_passable);
+    EXPECT_TRUE(frontier.exploreReachable(map, start, 5.0 * cm, {}, 1, 1).start_passable);
 }
 
 // What: centre is Empty but the drone sphere overlaps Occupied voxels.
@@ -117,9 +117,8 @@ TEST(MappingAlgorithm, FrontierStartNotPassableWhenSphereOverlapsOccupied) {
     }
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::PlanningDiagnostics diag =
-        frontier.diagnose(map, pointCm(0, 0, 50), 5.0 * cm);
-    EXPECT_FALSE(diag.start_passable);
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(0, 0, 50), 5.0 * cm, {}, 1, 1)
+                     .start_passable);
 }
 
 // What: centre cell is Occupied.
@@ -130,29 +129,35 @@ TEST(MappingAlgorithm, FrontierStartNotPassableWhenCentreOccupied) {
     map.set(pointCm(0, 0, 50), ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::PlanningDiagnostics diag =
-        frontier.diagnose(map, pointCm(0, 0, 50), 5.0 * cm);
-    EXPECT_FALSE(diag.start_passable);
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(0, 0, 50), 5.0 * cm, {}, 1, 1)
+                     .start_passable);
 }
 
 // What: straight empty corridor ending before unknown space along +X.
-// Expected: path reaches a frontier; density scoring may prefer a farther target than nearest.
+// Expected: exploreReachable finds frontier-adjacent cells at the empty/unmapped interface.
 TEST(MappingAlgorithm, FrontierFindsPathAlongEmptyCorridor) {
     const ct::MapConfig config = makeNarrowCorridorConfig();
     Map map{{11, 3, 3}, config};
     fillEmptyBox(map, 0, 2, 0, 2, 0, 2, config);
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::FrontierPathResult result =
-        frontier.findPath(map, pointCm(0, 0, 1), 0.0 * cm);
+    const detail::ReachabilityResult result = frontier.exploreReachable(
+        map, pointCm(0, 0, 1), 0.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
 
-    ASSERT_TRUE(result.found);
-    ASSERT_GE(result.path.size(), 2U);
-    EXPECT_GE(result.path.back().x.force_numerical_value_in(cm), 2.0);
+    EXPECT_TRUE(result.start_passable);
+    ASSERT_FALSE(result.candidates.empty());
+    bool reached_interface = false;
+    for (const detail::ReachableCell& cell : result.candidates) {
+        if (cell.position.x.force_numerical_value_in(cm) >= 2.0) {
+            reached_interface = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(reached_interface);
 }
 
 // What: large empty cube with a 5 cm drone radius.
-// Expected: BFS reaches a frontier on the cube face (path may be longer than nearest).
+// Expected: exploreReachable finds frontier-adjacent cells on the cube face.
 TEST(MappingAlgorithm, FrontierFindsFrontierInsideEmptyCube) {
     const ct::MapConfig config = makeWideConfig();
     Map map{{101, 101, 101}, config};
@@ -160,11 +165,23 @@ TEST(MappingAlgorithm, FrontierFindsFrontierInsideEmptyCube) {
 
     const Position3D start = pointCm(20, 20, 50);
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::FrontierPathResult result = frontier.findPath(map, start, 5.0 * cm);
+    // Face is 8 cells from centre; do not walk the whole 101³ Unmapped volume.
+    const detail::ReachabilityResult result =
+        frontier.exploreReachable(map, start, 5.0 * cm, {}, 1, 5000);
 
-    ASSERT_TRUE(result.found);
-    ASSERT_FALSE(result.path.empty());
-    EXPECT_GE(result.path.back().x.force_numerical_value_in(cm), 15.0);
+    EXPECT_TRUE(result.start_passable);
+    ASSERT_FALSE(result.candidates.empty());
+    bool on_face = false;
+    for (const detail::ReachableCell& cell : result.candidates) {
+        const double dx = std::abs(cell.position.x.force_numerical_value_in(cm) - 20.0);
+        const double dy = std::abs(cell.position.y.force_numerical_value_in(cm) - 20.0);
+        const double dz = std::abs(cell.position.z.force_numerical_value_in(cm) - 50.0);
+        if (dx >= 7.0 || dy >= 7.0 || dz >= 7.0) {
+            on_face = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(on_face);
 }
 
 // What: unstored cells exist inside the probe sphere.
@@ -188,36 +205,26 @@ TEST(MappingAlgorithm, FrontierHasNoUnmappedInSphereWhenFullyKnown) {
 }
 
 // What: long corridor with unknown beyond fused range.
-// Expected: findExplorePath returns a non-empty path toward unknown space.
+// Expected: exploreReachable reports frontier-adjacent cells toward unknown space.
 TEST(MappingAlgorithm, FrontierFindExplorePathMovesTowardUnknown) {
     const ct::MapConfig config = makeNarrowCorridorConfig();
     Map map{{11, 3, 3}, config};
     fillEmptyBox(map, 0, 8, 0, 2, 0, 2, config);
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::FrontierPathResult explore =
-        frontier.findExplorePath(map, pointCm(0, 0, 1), 0.0 * cm);
+    const detail::ReachabilityResult result = frontier.exploreReachable(
+        map, pointCm(0, 0, 1), 0.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
 
-    ASSERT_TRUE(explore.found);
-    ASSERT_FALSE(explore.path.empty());
-    EXPECT_GT(explore.path.back().x.force_numerical_value_in(cm), 0.0);
-}
-
-// What: corridor with no reachable frontier at zero radius but distant unknown.
-// Expected: diagnose reports connectivity and explore_path_available.
-TEST(MappingAlgorithm, FrontierDiagnoseReportsConnectivityMetrics) {
-    const ct::MapConfig config = makeNarrowCorridorConfig();
-    Map map{{11, 3, 3}, config};
-    fillEmptyBox(map, 0, 8, 0, 2, 0, 2, config);
-
-    const detail::MappingAlgorithmFrontier frontier;
-    const detail::PlanningDiagnostics diag =
-        frontier.diagnose(map, pointCm(0, 0, 1), 0.0 * cm);
-
-    EXPECT_TRUE(diag.start_passable);
-    EXPECT_GT(diag.passable_reached, 0U);
-    EXPECT_GE(diag.nearest_unknown_steps, 0);
-    EXPECT_TRUE(diag.explore_path_available);
+    EXPECT_TRUE(result.start_passable);
+    ASSERT_FALSE(result.candidates.empty());
+    bool toward_unknown = false;
+    for (const detail::ReachableCell& cell : result.candidates) {
+        if (cell.position.x.force_numerical_value_in(cm) > 0.0) {
+            toward_unknown = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(toward_unknown);
 }
 
 // What: map still contains Unmapped voxels inside mission bounds.
@@ -305,8 +312,7 @@ TEST(MappingAlgorithm, FrontierRejectsOccupiedFaceNeighbourOnCm10Grid) {
     map.set(face, ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::PlanningDiagnostics diag = frontier.diagnose(map, centre, 7.5 * cm);
-    EXPECT_FALSE(diag.start_passable);
+    EXPECT_FALSE(frontier.exploreReachable(map, centre, 7.5 * cm, {}, 1, 1).start_passable);
 }
 
 // What: same Occupied face neighbour but radius 4 cm (nearest 5 > 4).
@@ -320,8 +326,7 @@ TEST(MappingAlgorithm, FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall) {
     map.set(face, ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    const detail::PlanningDiagnostics diag = frontier.diagnose(map, centre, 4.0 * cm);
-    EXPECT_TRUE(diag.start_passable);
+    EXPECT_TRUE(frontier.exploreReachable(map, centre, 4.0 * cm, {}, 1, 1).start_passable);
 }
 
 // What: face neighbour Unmapped, centre Empty, radius 7.5 on 10 cm grid.
@@ -435,4 +440,73 @@ TEST(MappingAlgorithm, ExploreReachableTerminatesWithoutOccupancyBound) {
         frontier.exploreReachable(map, start, 4.0 * cm, {}, 3, 20000);
 
     EXPECT_TRUE(result.truncated);
+}
+
+TEST(MappingAlgorithm, FindUnstickPathStepsToAdjacentEmpty) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Occupied};
+    const Position3D start = pointCm(50, 50, 50);
+    const Position3D neighbour = pointCm(60, 50, 50);
+    map.set(start, ct::VoxelOccupancy::Occupied);
+    map.set(neighbour, ct::VoxelOccupancy::Empty);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    // Radius 4 cm: nearest Occupied box is 5 cm away, so the Empty neighbour is passable.
+    const detail::FrontierPathResult result = frontier.findUnstickPath(map, start, 4.0 * cm);
+
+    ASSERT_TRUE(result.found);
+    ASSERT_EQ(result.path.size(), 1u);
+    EXPECT_EQ(result.path.front().x.force_numerical_value_in(cm), 60.0);
+    EXPECT_EQ(result.path.front().y.force_numerical_value_in(cm), 50.0);
+    EXPECT_EQ(result.path.front().z.force_numerical_value_in(cm), 50.0);
+}
+
+TEST(MappingAlgorithm, FindUnstickPathBoxedInByOccupied) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Occupied};
+    const Position3D start = pointCm(50, 50, 50);
+    map.set(start, ct::VoxelOccupancy::Occupied);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const detail::FrontierPathResult result = frontier.findUnstickPath(map, start, 4.0 * cm);
+
+    EXPECT_FALSE(result.found);
+    EXPECT_TRUE(result.path.empty());
+}
+
+TEST(MappingAlgorithm, FindUnstickPathDoesNotTeleportThroughOccupied) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Occupied};
+    const Position3D start = pointCm(50, 50, 50);
+    const Position3D between = pointCm(60, 50, 50);
+    const Position3D far = pointCm(70, 50, 50);
+    map.set(start, ct::VoxelOccupancy::Occupied);
+    map.set(between, ct::VoxelOccupancy::Occupied);
+    map.set(far, ct::VoxelOccupancy::Empty);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const detail::FrontierPathResult result = frontier.findUnstickPath(map, start, 4.0 * cm);
+
+    EXPECT_FALSE(result.found);
+    EXPECT_TRUE(result.path.empty());
+}
+
+TEST(MappingAlgorithm, FindPathToIsExpansionBounded) {
+    ct::MapConfig config = makeCm10Config();
+    // FakeMap3D dims stay huge so occupancy / OutOfBounds cannot stop the walk.
+    // Mission bounds stay at 0..100 cm (11^3 cells): findPathTo caps on
+    // maxExpansionsForMap, unlike exploreReachable which takes an explicit cap.
+    // Exploding max_* here would make the cap ~10^12 and the test would still hang.
+    Map map{{10000, 10000, 10000}, config, ct::VoxelOccupancy::Unmapped};
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const Position3D start{0.0 * x_extent[cm], 0.0 * y_extent[cm], 0.0 * z_extent[cm]};
+    const Position3D unreachable{99000.0 * x_extent[cm], 99000.0 * y_extent[cm],
+                                 99000.0 * z_extent[cm]};
+
+    // Must return, not hang. Result may be found or not; termination is the assertion.
+    const detail::FrontierPathResult result =
+        frontier.findPathTo(map, start, unreachable, 4.0 * cm, {});
+    (void)result;
+    SUCCEED();
 }

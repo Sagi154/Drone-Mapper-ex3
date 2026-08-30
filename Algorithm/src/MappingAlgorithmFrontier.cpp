@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <queue>
 #include <unordered_map>
 #include <utility>
@@ -24,7 +23,6 @@ using common::z_extent;
 
 namespace {
 
-constexpr int kInf = std::numeric_limits<int>::max();
 constexpr int kEmptyTraversalCost = 1;
 constexpr int kUnmappedTraversalCost = 4;
 
@@ -205,93 +203,6 @@ constexpr Offset kOffsets[6] = {
     return false;
 }
 
-[[nodiscard]] bool isFrontier(const IMap3D& map,
-                              const Position3D& cell,
-                              double radius_cm,
-                              double step_cm) {
-    const double cx = cell.x.force_numerical_value_in(cm);
-    const double cy = cell.y.force_numerical_value_in(cm);
-    const double cz = cell.z.force_numerical_value_in(cm);
-
-    const Position3D neighbours[6] = {
-        {(cx + step_cm) * x_extent[cm], cy * y_extent[cm], cz * z_extent[cm]},
-        {(cx - step_cm) * x_extent[cm], cy * y_extent[cm], cz * z_extent[cm]},
-        {cx * x_extent[cm], (cy + step_cm) * y_extent[cm], cz * z_extent[cm]},
-        {cx * x_extent[cm], (cy - step_cm) * y_extent[cm], cz * z_extent[cm]},
-        {cx * x_extent[cm], cy * y_extent[cm], (cz + step_cm) * z_extent[cm]},
-        {cx * x_extent[cm], cy * y_extent[cm], (cz - step_cm) * z_extent[cm]},
-    };
-    for (const Position3D& neighbour : neighbours) {
-        const types::VoxelOccupancy occ = occupancyAt(map, neighbour);
-        if (occ == types::VoxelOccupancy::Unmapped) {
-            return true;
-        }
-        if (occ == types::VoxelOccupancy::Empty &&
-            sphereContainsNotMapped(map, neighbour, radius_cm, step_cm)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-[[nodiscard]] bool canTraverseForUnknownDistance(types::VoxelOccupancy value) {
-    return value == types::VoxelOccupancy::Empty || value == types::VoxelOccupancy::Unmapped;
-}
-
-[[nodiscard]] GridIntMap
-buildUnknownDistanceField(const IMap3D& map, double step_cm) {
-    const types::MapConfig config = map.getMapConfig();
-    const types::MappingBounds& bounds = config.boundaries;
-
-    const double min_x = bounds.min_x.force_numerical_value_in(cm);
-    const double max_x = bounds.max_x.force_numerical_value_in(cm);
-    const double min_y = bounds.min_y.force_numerical_value_in(cm);
-    const double max_y = bounds.max_y.force_numerical_value_in(cm);
-    const double min_z = bounds.min_height.force_numerical_value_in(cm);
-    const double max_z = bounds.max_height.force_numerical_value_in(cm);
-
-    GridIntMap dist;
-    std::queue<GridKey> queue;
-
-    for (double x = min_x; x <= max_x + 1e-9; x += step_cm) {
-        for (double y = min_y; y <= max_y + 1e-9; y += step_cm) {
-            for (double z = min_z; z <= max_z + 1e-9; z += step_cm) {
-                const Position3D pos{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]};
-                if (occupancyAt(map, pos) != types::VoxelOccupancy::Unmapped) {
-                    continue;
-                }
-                const GridKey key = quantizePosition(pos, config);
-                if (dist.contains(key)) {
-                    continue;
-                }
-                dist[key] = 0;
-                queue.push(key);
-            }
-        }
-    }
-
-    while (!queue.empty()) {
-        const GridKey current = queue.front();
-        queue.pop();
-        const int current_dist = dist.at(current);
-
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            if (dist.contains(neighbour)) {
-                continue;
-            }
-            const Position3D neighbour_pos = keyToPoint(neighbour, config);
-            if (!canTraverseForUnknownDistance(occupancyAt(map, neighbour_pos))) {
-                continue;
-            }
-            dist[neighbour] = current_dist + 1;
-            queue.push(neighbour);
-        }
-    }
-
-    return dist;
-}
-
 [[nodiscard]] FrontierPathResult reconstructPath(
     const GridKey& start_key,
     const GridKey& goal_key,
@@ -368,116 +279,6 @@ bool hasAnyNotMappedInBounds(const IMap3D& map) {
     return countUnmappedInBounds(map) > 0;
 }
 
-FrontierPathResult MappingAlgorithmFrontier::findPath(
-    const IMap3D& map,
-    const Position3D& start,
-    PhysicalLength drone_radius,
-    const BlockedCells& blocked_cells,
-    const GridIntMap& frontier_visits) const {
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    const double radius_cm = drone_radius.force_numerical_value_in(cm);
-
-    const GridKey start_key = quantizePosition(start, config);
-    const Position3D start_pt = keyToPoint(start_key, config);
-    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
-        return {};
-    }
-
-    ParentMap parent_of;
-    GridIntMap cost_of;
-    CostQueue queue;
-    parent_of[start_key] = start_key;
-    cost_of[start_key] = 0;
-    queue.push({0, start_key});
-
-    // Pick the reachable frontier with best value density: unmapped_neighbours / path_cost.
-    GridKey best_key = start_key;
-    double best_score = -1.0;
-    int best_cost = kInf;
-
-    while (!queue.empty()) {
-        const auto [current_cost, current] = queue.top();
-        queue.pop();
-        if (current_cost > cost_of.at(current)) {
-            continue;
-        }
-        const Position3D current_pt = keyToPoint(current, config);
-
-        if (!(current == start_key) && isFrontier(map, current_pt, radius_cm, step)) {
-            constexpr int kMaxFrontierVisits = 3;
-            constexpr int kMaxNearFloorFrontierVisits = 5;
-            const double min_z = config.boundaries.min_height.force_numerical_value_in(cm);
-            const double frontier_z = current_pt.z.force_numerical_value_in(cm);
-            const int max_visits =
-                (frontier_z - min_z <= 2.0 * step + 1e-9) ? kMaxNearFloorFrontierVisits
-                                                           : kMaxFrontierVisits;
-            const int visits =
-                frontier_visits.contains(current) ? frontier_visits.at(current) : 0;
-            if (visits < max_visits) {
-                int value = 0;
-                constexpr int kFrontierValueRadius = 2;
-                const int radius_sq = kFrontierValueRadius * kFrontierValueRadius;
-                for (int dx = -kFrontierValueRadius; dx <= kFrontierValueRadius; ++dx) {
-                    for (int dy = -kFrontierValueRadius; dy <= kFrontierValueRadius; ++dy) {
-                        for (int dz = -kFrontierValueRadius; dz <= kFrontierValueRadius; ++dz) {
-                            if (dx * dx + dy * dy + dz * dz > radius_sq) {
-                                continue;
-                            }
-                            const Position3D nb_pt = keyToPoint(
-                                GridKey{current.qx + dx, current.qy + dy, current.qz + dz},
-                                config);
-                            if (occupancyAt(map, nb_pt) == types::VoxelOccupancy::Unmapped) {
-                                ++value;
-                            }
-                        }
-                    }
-                }
-                if (value > 0) {
-                    const double score =
-                        static_cast<double>(value) / static_cast<double>(current_cost);
-                    if (score > best_score ||
-                        (score == best_score && current_cost < best_cost)) {
-                        best_score = score;
-                        best_cost = current_cost;
-                        best_key = current;
-                    }
-                }
-            }
-        }
-
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-                continue;
-            }
-            // Once an Empty-reachable frontier exists, skip expanding further into
-            // Unmapped space. Soft Unmapped cost still applies when no frontier has
-            // been found yet (Unmapped remains the only way to reach one).
-            if (best_score >= 0.0 &&
-                occupancyAt(map, neighbour_pt) == types::VoxelOccupancy::Unmapped) {
-                continue;
-            }
-            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
-            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
-                continue;
-            }
-            parent_of[neighbour] = current;
-            cost_of[neighbour] = new_cost;
-            queue.push({new_cost, neighbour});
-        }
-    }
-
-    if (best_score < 0.0) {
-        return {};
-    }
-
-    FrontierPathResult result = reconstructPath(start_key, best_key, parent_of, config);
-    result.frontier_key = best_key;
-    return result;
-}
-
 FrontierPathResult MappingAlgorithmFrontier::findPathTo(
     const IMap3D& map,
     const Position3D& start,
@@ -510,7 +311,12 @@ FrontierPathResult MappingAlgorithmFrontier::findPathTo(
     cost_of[start_key] = 0;
     queue.push({0, start_key});
 
+    std::size_t expansions = 0;
+    const std::size_t max_expansions = maxExpansionsForMap(map);
     while (!queue.empty()) {
+        if (++expansions > max_expansions) {
+            return {};
+        }
         const auto [current_cost, current] = queue.top();
         queue.pop();
         if (current_cost > cost_of.at(current)) {
@@ -540,153 +346,6 @@ FrontierPathResult MappingAlgorithmFrontier::findPathTo(
     return {};
 }
 
-FrontierPathResult MappingAlgorithmFrontier::findFarthestPath(
-    const IMap3D& map,
-    const Position3D& start,
-    PhysicalLength drone_radius,
-    const BlockedCells& blocked_cells) const {
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    const double radius_cm = drone_radius.force_numerical_value_in(cm);
-
-    const GridKey start_key = quantizePosition(start, config);
-    const Position3D start_pt = keyToPoint(start_key, config);
-    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
-        return {};
-    }
-
-    ParentMap parent_of;
-    GridIntMap cost_of;
-    CostQueue queue;
-    parent_of[start_key] = start_key;
-    cost_of[start_key] = 0;
-    queue.push({0, start_key});
-
-    GridKey best_goal = start_key;
-    int best_cost = -1;
-
-    while (!queue.empty()) {
-        const auto [current_cost, current] = queue.top();
-        queue.pop();
-        if (current_cost > cost_of.at(current)) {
-            continue;
-        }
-        const Position3D current_pt = keyToPoint(current, config);
-
-        if (!(current == start_key) && isFrontier(map, current_pt, radius_cm, step)) {
-            if (current_cost > best_cost) {
-                best_cost = current_cost;
-                best_goal = current;
-            }
-        }
-
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-                continue;
-            }
-            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
-            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
-                continue;
-            }
-            parent_of[neighbour] = current;
-            cost_of[neighbour] = new_cost;
-            queue.push({new_cost, neighbour});
-        }
-    }
-
-    if (best_cost >= 0) {
-        return reconstructPath(start_key, best_goal, parent_of, config);
-    }
-
-    return {};
-}
-
-FrontierPathResult MappingAlgorithmFrontier::findExplorePath(
-    const IMap3D& map,
-    const Position3D& start,
-    PhysicalLength drone_radius,
-    const BlockedCells& blocked_cells,
-    GridIntMap* dist_cache) const {
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    const double radius_cm = drone_radius.force_numerical_value_in(cm);
-
-    const GridKey start_key = quantizePosition(start, config);
-    const Position3D start_pt = keyToPoint(start_key, config);
-    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
-        return {};
-    }
-
-    GridIntMap local_dist;
-    if (dist_cache != nullptr) {
-        if (dist_cache->empty()) {
-            *dist_cache = buildUnknownDistanceField(map, step);
-        }
-    } else {
-        local_dist = buildUnknownDistanceField(map, step);
-        dist_cache = &local_dist;
-    }
-    if (dist_cache->empty()) {
-        return {};
-    }
-    const GridIntMap& unknown_dist = *dist_cache;
-
-    ParentMap parent_of;
-    GridIntMap cost_of;
-    CostQueue queue;
-    parent_of[start_key] = start_key;
-    cost_of[start_key] = 0;
-    queue.push({0, start_key});
-
-    GridKey best_key = start_key;
-    int best_unknown_steps = kInf;
-    int best_path_cost = kInf;
-
-    while (!queue.empty()) {
-        const auto [path_cost, current] = queue.top();
-        queue.pop();
-        if (path_cost > cost_of.at(current)) {
-            continue;
-        }
-
-        const auto dist_it = unknown_dist.find(current);
-        const int unknown_steps = (dist_it == unknown_dist.end()) ? kInf : dist_it->second;
-
-        if (!(current == start_key) && unknown_steps < best_unknown_steps) {
-            best_key = current;
-            best_unknown_steps = unknown_steps;
-            best_path_cost = path_cost;
-        } else if (!(current == start_key) && unknown_steps == best_unknown_steps &&
-                   path_cost < best_path_cost) {
-            best_key = current;
-            best_path_cost = path_cost;
-        }
-
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-                continue;
-            }
-            const int new_cost = path_cost + traversalCost(map, neighbour_pt);
-            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
-                continue;
-            }
-            parent_of[neighbour] = current;
-            cost_of[neighbour] = new_cost;
-            queue.push({new_cost, neighbour});
-        }
-    }
-
-    if (best_key == start_key || best_unknown_steps == kInf) {
-        return {};
-    }
-
-    return reconstructPath(start_key, best_key, parent_of, config);
-}
-
 FrontierPathResult MappingAlgorithmFrontier::findUnstickPath(const IMap3D& map,
                                                              const Position3D& start,
                                                              PhysicalLength drone_radius) const {
@@ -700,190 +359,25 @@ FrontierPathResult MappingAlgorithmFrontier::findUnstickPath(const IMap3D& map,
         return {};
     }
 
-    const auto unknown_dist = buildUnknownDistanceField(map, step);
-
-    GridKey best_key = start_key;
-    int best_unknown_steps = kInf;
-
+    // Adjacent escape only: Occupied/non-passable neighbours are not walked.
+    std::size_t expansions = 0;
+    const std::size_t max_expansions = maxExpansionsForMap(map);
     for (const Offset& off : kOffsets) {
-        const GridKey neighbour{start_key.qx + off.dx, start_key.qy + off.dy, start_key.qz + off.dz};
+        if (++expansions > max_expansions) {
+            return {};
+        }
+        const GridKey neighbour{start_key.qx + off.dx, start_key.qy + off.dy,
+                                start_key.qz + off.dz};
         const Position3D neighbour_pt = keyToPoint(neighbour, config);
-        if (!isSpherePassable(map, neighbour_pt, radius_cm, step, {})) {
-            continue;
+        if (isSpherePassable(map, neighbour_pt, radius_cm, step, {})) {
+            FrontierPathResult result;
+            result.found = true;
+            result.path.push_back(neighbour_pt);
+            return result;
         }
-        const auto dist_it = unknown_dist.find(neighbour);
-        const int unknown_steps = (dist_it == unknown_dist.end()) ? kInf : dist_it->second;
-        if (unknown_steps < best_unknown_steps) {
-            best_key = neighbour;
-            best_unknown_steps = unknown_steps;
-        }
-    }
-
-    if (best_key == start_key || best_unknown_steps == kInf) {
-        return {};
-    }
-
-    FrontierPathResult result;
-    result.found = true;
-    result.path.push_back(keyToPoint(best_key, config));
-    return result;
-}
-
-FrontierPathResult MappingAlgorithmFrontier::findGreedyUnknownStep(
-    const IMap3D& map,
-    const Position3D& start,
-    PhysicalLength drone_radius,
-    const BlockedCells& blocked_cells) const {
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    const double radius_cm = drone_radius.force_numerical_value_in(cm);
-
-    const GridKey start_key = quantizePosition(start, config);
-    const Position3D start_pt = keyToPoint(start_key, config);
-    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
-        return {};
-    }
-
-    const auto unknown_dist = buildUnknownDistanceField(map, step);
-    const auto dist_at = [&](const GridKey& key) -> int {
-        const auto it = unknown_dist.find(key);
-        return (it == unknown_dist.end()) ? kInf : it->second;
-    };
-
-    const int start_unknown = dist_at(start_key);
-
-    GridKey best_key = start_key;
-    int best_unknown = start_unknown;
-
-    for (const Offset& off : kOffsets) {
-        const GridKey neighbour{start_key.qx + off.dx, start_key.qy + off.dy, start_key.qz + off.dz};
-        const Position3D neighbour_pt = keyToPoint(neighbour, config);
-        if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-            continue;
-        }
-        const int unknown_steps = dist_at(neighbour);
-        if (unknown_steps < best_unknown) {
-            best_key = neighbour;
-            best_unknown = unknown_steps;
-        }
-    }
-
-    if (best_key == start_key && start_unknown != kInf) {
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{start_key.qx + off.dx, start_key.qy + off.dy, start_key.qz + off.dz};
-            if (neighbour == start_key) {
-                continue;
-            }
-            const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-                continue;
-            }
-            const int unknown_steps = dist_at(neighbour);
-            if (unknown_steps <= start_unknown) {
-                best_key = neighbour;
-                best_unknown = unknown_steps;
-                break;
-            }
-        }
-    }
-
-    if (best_key == start_key) {
-        return {};
-    }
-
-    FrontierPathResult result;
-    result.found = true;
-    result.path.push_back(keyToPoint(best_key, config));
-    return result;
-}
-
-FrontierPathResult MappingAlgorithmFrontier::findAnyPassableNeighbor(
-    const IMap3D& map,
-    const Position3D& start,
-    PhysicalLength drone_radius,
-    const BlockedCells& blocked_cells) const {
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    const double radius_cm = drone_radius.force_numerical_value_in(cm);
-
-    const GridKey start_key = quantizePosition(start, config);
-
-    for (const Offset& off : kOffsets) {
-        const GridKey neighbour{start_key.qx + off.dx, start_key.qy + off.dy, start_key.qz + off.dz};
-        const Position3D neighbour_pt = keyToPoint(neighbour, config);
-        if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-            continue;
-        }
-        FrontierPathResult result;
-        result.found = true;
-        result.path.push_back(neighbour_pt);
-        return result;
     }
 
     return {};
-}
-
-PlanningDiagnostics MappingAlgorithmFrontier::diagnose(
-    const IMap3D& map,
-    const Position3D& start,
-    PhysicalLength drone_radius,
-    const BlockedCells& blocked_cells) const {
-    PlanningDiagnostics diag{};
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    const double radius_cm = drone_radius.force_numerical_value_in(cm);
-
-    const GridKey start_key = quantizePosition(start, config);
-    const Position3D start_pt = keyToPoint(start_key, config);
-    diag.start_passable = isSpherePassable(map, start_pt, radius_cm, step, blocked_cells);
-    if (!diag.start_passable) {
-        return diag;
-    }
-
-    ParentMap parent_of;
-    std::queue<GridKey> queue;
-    parent_of[start_key] = start_key;
-    queue.push(start_key);
-
-    const auto unknown_dist = buildUnknownDistanceField(map, step);
-    int nearest_unknown = kInf;
-    int best_unknown_steps = kInf;
-
-    while (!queue.empty()) {
-        const GridKey current = queue.front();
-        queue.pop();
-        ++diag.passable_reached;
-
-        const Position3D current_pt = keyToPoint(current, config);
-        if (!(current == start_key) && isFrontier(map, current_pt, radius_cm, step)) {
-            ++diag.reachable_frontiers;
-        }
-
-        const auto dist_it = unknown_dist.find(current);
-        if (dist_it != unknown_dist.end()) {
-            nearest_unknown = std::min(nearest_unknown, dist_it->second);
-            if (!(current == start_key)) {
-                best_unknown_steps = std::min(best_unknown_steps, dist_it->second);
-            }
-        }
-
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            if (parent_of.contains(neighbour)) {
-                continue;
-            }
-            const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
-                continue;
-            }
-            parent_of[neighbour] = current;
-            queue.push(neighbour);
-        }
-    }
-
-    diag.nearest_unknown_steps = (nearest_unknown == kInf) ? -1 : nearest_unknown;
-    diag.explore_path_available = (best_unknown_steps != kInf);
-    return diag;
 }
 
 std::size_t maxExpansionsForMap(const IMap3D& map) {

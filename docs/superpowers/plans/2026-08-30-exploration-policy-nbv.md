@@ -2010,16 +2010,16 @@ Now that nothing calls them, remove the policy-shaped helpers. This is where the
 - Modify: `Algorithm/src/MappingAlgorithmFrontier.h`, `Algorithm/src/MappingAlgorithmFrontier.cpp`
 - Modify: `Algorithm/tests/test_mapping_algorithm_frontier.cpp`
 
-- [ ] **Step 1: Confirm there are no remaining callers**
+- [x] **Step 1: Confirm there are no remaining callers**
 
 Run: `grep -rn "findPath\|findExplorePath\|findAnyPassableNeighbor\|findFarthestPath\|findGreedyUnknownStep\|diagnose\|buildUnknownDistanceField\|frontier_visits\|explore_dist_cache" Algorithm/ MissionControl/ Simulator/`
 Expected: hits only inside `MappingAlgorithmFrontier.{h,cpp}` and `Algorithm/tests/test_mapping_algorithm_frontier.cpp`. If anything else appears, stop and reconcile before deleting.
 
-- [ ] **Step 2: Delete from the header**
+- [x] **Step 2: Delete from the header**
 
 Remove these declarations from `MappingAlgorithmFrontier.h`: `findPath`, `findExplorePath`, `findFarthestPath`, `findGreedyUnknownStep`, `findAnyPassableNeighbor`, `diagnose`, and `struct PlanningDiagnostics`. Keep `findPathTo`, `findUnstickPath`, `exploreReachable`, `reconstructPathTo`, `hasClearLineOfSight`, `maxExpansionsForMap`, `quantizePosition`, `hasNotMappedInSphere`, `hasAnyNotMappedInBounds`, `countUnmappedInBounds`, and the `GridKey`/`BlockedCells`/`GridIntMap`/`ParentMap`/`FrontierPathResult`/`ReachableCell`/`ReachabilityResult` types.
 
-- [ ] **Step 3: Delete from the implementation**
+- [x] **Step 3: Delete from the implementation**
 
 Remove the corresponding definitions plus the now-unused file-local `buildUnknownDistanceField` and `canTraverseForUnknownDistance`. Add the expansion bound to the two searches that survive, so every search in the file is bounded:
 
@@ -2034,7 +2034,7 @@ Remove the corresponding definitions plus the now-unused file-local `buildUnknow
 
 Apply that to `findPathTo` and `findUnstickPath` (in `findUnstickPath` the loop is a BFS over `std::queue`; the same counter and early `return {}` applies).
 
-- [ ] **Step 4: Update the tests**
+- [x] **Step 4: Update the tests**
 
 Project C's clearance tests assert passability through `frontier.diagnose(...).start_passable`, so deleting `diagnose` breaks them. **Convert, don't delete** — `exploreReachable` with `max_expansions = 1` is an O(1) start-passability probe, which also fixes the known-slow `FrontierStartPassableWhenSphereHasUnmapped` (it was slow precisely because `diagnose` swept the 101³ 1 cm grid).
 
@@ -2076,17 +2076,17 @@ TEST(MappingAlgorithm, FindPathToIsExpansionBounded) {
 }
 ```
 
-- [ ] **Step 5: Run the full suite and check timing**
+- [x] **Step 5: Run the full suite and check timing**
 
 Run: `ctest --test-dir build --output-on-failure`
 Expected: all green, and `algorithm_test` completes without the previously slow case. Note the wall-clock time; it should drop.
 
-- [ ] **Step 6: Confirm the deletions landed**
+- [x] **Step 6: Confirm the deletions landed**
 
 Run: `grep -rn "findPath\b\|findExplorePath\|findFarthestPath\|findGreedyUnknownStep\|findAnyPassableNeighbor\|diagnose\|PlanningDiagnostics\|frontier_visit_counts\|explore_dist_cache\|kMaxFrontierVisits\|kNoProgressLimit\|kNoFrontierStuckLimit" Algorithm/`
 Expected: no output.
 
-- [ ] **Step 7: Stage and propose the commit**
+- [x] **Step 7: Stage and propose the commit**
 
 ```bash
 git add Algorithm/src/MappingAlgorithmFrontier.h Algorithm/src/MappingAlgorithmFrontier.cpp Algorithm/tests/test_mapping_algorithm_frontier.cpp
