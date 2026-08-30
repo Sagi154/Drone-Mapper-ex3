@@ -61,7 +61,7 @@ Two behaviours are easy to get wrong and are pinned by tests here. Our MissionCo
   - `std::size_t countUnresolvedVoxels(const common::IMap3D&, const Position3D& origin, const Orientation& drone_heading, const Orientation& relative_scan, const common::types::LidarConfigData&, std::unordered_set<std::int64_t>& seen)`
   - `bool coneCoversUnresolved(...)` — unchanged signature, reimplemented over `forEachConeBeam`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `Algorithm/tests/test_lidar_cone.cpp`:
 
@@ -143,12 +143,12 @@ TEST(LidarCone, NearFieldInsideZMinIsCounted) {
 
 Add `#include <cstdint>` and `#include <unordered_set>` to the test file's include block.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='LidarCone.*'`
 Expected: compile error — `countUnresolvedVoxels` is not a member of `lidar_cone`.
 
-- [ ] **Step 3: Implement the shared walk**
+- [x] **Step 3: Implement the shared walk**
 
 In `LidarCone.h`, add `#include <cstdint>` and `#include <unordered_set>`. Replace the `detail::beamHitsUnresolved` helper and the body of `coneCoversUnresolved` with the following, keeping `beamsOnCircle` as it is:
 
@@ -329,17 +329,17 @@ inline bool walkBeam(const common::IMap3D& map,
 
 Note the ordering constraint: `detail::beamsOnCircle` must be declared before `forEachConeBeam`, and `detail::walkBeam` before the two public functions. Move the existing `namespace detail { beamsOnCircle }` block above `forEachConeBeam` if it is not already.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='LidarCone.*'`
 Expected: PASS, all cone tests including the four pre-existing ones.
 
-- [ ] **Step 5: Verify the C gate did not change behaviour**
+- [x] **Step 5: Verify the C gate did not change behaviour**
 
 Run: `./build/Algorithm/algorithm_test --gtest_filter='-MappingAlgorithm.FrontierStartPassableWhenSphereHasUnmapped'`
 Expected: PASS. `coneCoversUnresolved` is a refactor with identical semantics; any failure here is a regression in the extracted walk, not an intended change.
 
-- [ ] **Step 6: Stage and propose the commit**
+- [x] **Step 6: Stage and propose the commit**
 
 ```bash
 git add UserCommon/include/user_common_207190406_209543255/LidarCone.h Algorithm/tests/test_lidar_cone.cpp

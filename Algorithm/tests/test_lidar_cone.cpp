@@ -7,7 +7,9 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdint>
 #include <numbers>
+#include <unordered_set>
 
 namespace lc = user_common_207190406_209543255::lidar_cone;
 using Map = AlgorithmTest::FakeMap3D;
@@ -118,4 +120,78 @@ TEST(LidarCone, ConeDoesNotCoverWhenFullyResolved) {
     const Orientation heading{};
     const Orientation scan{};
     EXPECT_FALSE(lc::coneCoversUnresolved(map, origin, heading, scan, cfg));
+}
+
+TEST(LidarCone, CountsUnresolvedVoxelsAndDeduplicatesAcrossCalls) {
+    const ct::MapConfig config = makeSmallMapConfig();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    map.set(Position3D{70.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+            ct::VoxelOccupancy::Unmapped);
+    map.set(Position3D{80.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+            ct::VoxelOccupancy::Unmapped);
+
+    ct::LidarConfigData cfg = makeShortLidar();
+    cfg.z_max = 40.0 * cm;
+    cfg.fov_circles = 1;
+
+    std::unordered_set<std::int64_t> seen;
+    const std::size_t first =
+        lc::countUnresolvedVoxels(map, origin, Orientation{}, Orientation{}, cfg, seen);
+    EXPECT_EQ(first, 2u);
+
+    // Same cone again with the same `seen` set adds nothing.
+    const std::size_t second =
+        lc::countUnresolvedVoxels(map, origin, Orientation{}, Orientation{}, cfg, seen);
+    EXPECT_EQ(second, 0u);
+}
+
+TEST(LidarCone, CountStopsAtOccludingVoxel) {
+    const ct::MapConfig config = makeSmallMapConfig();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    map.set(Position3D{60.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+            ct::VoxelOccupancy::Occupied);
+    map.set(Position3D{70.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+            ct::VoxelOccupancy::Unmapped);
+
+    ct::LidarConfigData cfg = makeShortLidar();
+    cfg.z_max = 40.0 * cm;
+    cfg.fov_circles = 1;
+
+    std::unordered_set<std::int64_t> seen;
+    EXPECT_EQ(lc::countUnresolvedVoxels(map, origin, Orientation{}, Orientation{}, cfg, seen), 0u);
+}
+
+TEST(LidarCone, PotentiallyOccupiedCountsAsResolved) {
+    const ct::MapConfig config = makeSmallMapConfig();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    map.set(Position3D{60.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+            ct::VoxelOccupancy::PotentiallyOccupied);
+
+    ct::LidarConfigData cfg = makeShortLidar();
+    cfg.z_max = 40.0 * cm;
+    cfg.fov_circles = 1;
+
+    std::unordered_set<std::int64_t> seen;
+    EXPECT_EQ(lc::countUnresolvedVoxels(map, origin, Orientation{}, Orientation{}, cfg, seen), 0u);
+    EXPECT_FALSE(lc::coneCoversUnresolved(map, origin, Orientation{}, Orientation{}, cfg));
+}
+
+TEST(LidarCone, NearFieldInsideZMinIsCounted) {
+    // Our MissionControl carves from distance 0, so a voxel inside z_min is
+    // resolvable and must contribute gain.
+    const ct::MapConfig config = makeSmallMapConfig();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    map.set(Position3D{60.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+            ct::VoxelOccupancy::Unmapped);  // 10 cm away, inside z_min = 20 cm
+
+    ct::LidarConfigData cfg = makeShortLidar();
+    cfg.z_max = 40.0 * cm;
+    cfg.fov_circles = 1;
+
+    std::unordered_set<std::int64_t> seen;
+    EXPECT_EQ(lc::countUnresolvedVoxels(map, origin, Orientation{}, Orientation{}, cfg, seen), 1u);
 }
