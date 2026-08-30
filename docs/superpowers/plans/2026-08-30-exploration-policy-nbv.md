@@ -1106,7 +1106,7 @@ The current pose is always a candidate with an empty path — that is what makes
   - `class NbvPlanner` with `ExplorationPlan plan(const NbvInputs&) const;`
   - `struct NbvInputs { const common::IMap3D& map; const common::types::DroneState& state; const common::types::LidarConfigData& lidar; const common::types::DroneConfigData& drone; std::size_t remaining_steps; const BlockedCells& blocked; bool ignore_blocked; };`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `Algorithm/tests/test_nbv_planner.cpp`:
 
@@ -1298,12 +1298,12 @@ TEST(NbvPlanner, IgnoreBlockedRecoversWhenTheBlockedSetSealsTheDrone) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cmake --build build -j`
 Expected: FAIL — `NbvPlanner.h` does not exist.
 
-- [ ] **Step 3: Create the header**
+- [x] **Step 3: Create the header**
 
 `Algorithm/src/NbvPlanner.h`:
 
@@ -1376,7 +1376,7 @@ private:
 } // namespace algorithm_207190406_209543255::detail
 ```
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `Algorithm/src/NbvPlanner.cpp`:
 
@@ -1409,6 +1409,23 @@ struct ScoredCandidate {
 
 [[nodiscard]] MovementLimits limitsFrom(const types::DroneConfigData& drone) {
     return MovementLimits{drone.max_advance, drone.max_elevate, drone.max_rotate};
+}
+
+/// Unique Unmapped voxels of `dirs` in listed order, with a fresh `seen` set.
+/// Do not reuse per-direction `added` from `gainAt`: those were counted in
+/// Fibonacci order, then the list was sorted.
+[[nodiscard]] double uniqueGainOf(const common::IMap3D& map,
+                                  const Position3D& origin,
+                                  const types::LidarConfigData& lidar,
+                                  const std::vector<Orientation>& dirs) {
+    const Orientation world_heading{};
+    std::unordered_set<std::int64_t> seen;
+    double total = 0.0;
+    for (const Orientation& dir : dirs) {
+        total += static_cast<double>(
+            lc::countUnresolvedVoxels(map, origin, world_heading, dir, lidar, seen));
+    }
+    return total;
 }
 
 } // namespace
@@ -1468,16 +1485,20 @@ ExplorationPlan NbvPlanner::plan(const NbvInputs& in) const {
     // Candidate 0: stay where we are. Costs only the scans it performs.
     {
         std::vector<Orientation> here_dirs;
-        const double here_gain = gainAt(in.map, in.state.position, in.lidar, &here_dirs);
-        if (here_gain > 0.0 && !here_dirs.empty()) {
-            const std::size_t scan_steps = std::min(here_dirs.size(), in.remaining_steps);
-            if (scan_steps > 0) {
+        (void)gainAt(in.map, in.state.position, in.lidar, &here_dirs);
+        const std::size_t scan_budget = in.remaining_steps;
+        if (scan_budget > 0 && !here_dirs.empty()) {
+            const std::size_t scan_steps = std::min(here_dirs.size(), scan_budget);
+            std::vector<Orientation> prefix(
+                here_dirs.begin(),
+                here_dirs.begin() + static_cast<std::ptrdiff_t>(scan_steps));
+            const double prefix_gain =
+                uniqueGainOf(in.map, in.state.position, in.lidar, prefix);
+            if (prefix_gain > 0.0) {
                 best.valid = true;
                 best.waypoints.clear();
-                best.terminal_scans.assign(here_dirs.begin(),
-                                           here_dirs.begin() +
-                                               static_cast<std::ptrdiff_t>(scan_steps));
-                best.expected_gain = here_gain;
+                best.terminal_scans = std::move(prefix);
+                best.expected_gain = prefix_gain;
             }
         }
     }
@@ -1529,18 +1550,29 @@ ExplorationPlan NbvPlanner::plan(const NbvInputs& in) const {
 
         const std::size_t travel =
             stepCostForPath(waypoints, in.state.position, in.state.heading, limits);
-        const std::size_t total = travel + dirs.size();
-        if (total == 0 || total > in.remaining_steps) {
+        if (travel > in.remaining_steps) {
             continue;  // budget feasibility filter
         }
+        const std::size_t scan_budget = in.remaining_steps - travel;
+        if (scan_budget == 0) {
+            continue;
+        }
 
-        const double utility = gain / static_cast<double>(total);
+        const std::size_t scan_steps = std::min(dirs.size(), scan_budget);
+        std::vector<Orientation> prefix(
+            dirs.begin(), dirs.begin() + static_cast<std::ptrdiff_t>(scan_steps));
+        const double prefix_gain = uniqueGainOf(in.map, cell.position, in.lidar, prefix);
+        if (!(prefix_gain > 0.0)) {
+            continue;
+        }
+
+        const double utility = prefix_gain / static_cast<double>(travel + prefix.size());
         if (utility > best_utility) {
             best_utility = utility;
             best.valid = true;
             best.waypoints = std::move(waypoints);
-            best.terminal_scans = std::move(dirs);
-            best.expected_gain = gain;
+            best.terminal_scans = std::move(prefix);
+            best.expected_gain = prefix_gain;
         }
     }
 
@@ -1550,18 +1582,18 @@ ExplorationPlan NbvPlanner::plan(const NbvInputs& in) const {
 } // namespace algorithm_207190406_209543255::detail
 ```
 
-- [ ] **Step 5: Register the new sources**
+- [x] **Step 5: Register the new sources**
 
 In `Algorithm/CMakeLists.txt`, add `src/NbvPlanner.cpp` to both target source lists and `tests/test_nbv_planner.cpp` to `algorithm_test`, mirroring what task 3 did for `PathShaping`.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cmake -S . -B build && cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='NbvPlanner.*'`
 Expected: PASS (6 tests).
 
 If `NbvPlanner.PlansTowardTheUnexploredSideOfTheMap` fails because the in-place candidate wins, check that the far pocket is outside `z_max` of the start pose — the test intends travel to be the only way to see it. Adjust the pocket distance in the test, not the objective.
 
-- [ ] **Step 7: Stage and propose the commit**
+- [x] **Step 7: Stage and propose the commit**
 
 ```bash
 git add Algorithm/src/NbvPlanner.h Algorithm/src/NbvPlanner.cpp Algorithm/tests/test_nbv_planner.cpp Algorithm/CMakeLists.txt
