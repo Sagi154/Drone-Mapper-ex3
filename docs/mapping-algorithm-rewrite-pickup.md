@@ -112,9 +112,11 @@ per column at `num_threads=8`.
 
 ### 2. Project D — exploration policy (NBV) (next)
 
-**Status:** not specced. Depends on C. Receding-horizon next-best-view, read `max_steps`, any-angle
-smoothing, emit move+scan, retire blacklists / stale `explore_dist_cache` / mid-search Dijkstra hack,
-`mp-units` geometry. Deterministic sampling (fixed seed) required for harness.
+**Status:** specced 2026-08-29 — `docs/superpowers/specs/2026-08-29-exploration-policy-nbv-design.md`.
+Next: implementation plan, then implement. Frontier-anchored NBV (no RNG), budget as a feasibility
+filter on `max_steps - step_index`, move+scan co-emission, constant-altitude string-pulling, gain-based
+termination replacing the 100-cycle counters, expiring blocked set, ALG28 expansion bound. `mp-units`
+conversion of the frontier substrate deferred to a follow-up project E.
 
 ### 3. After D lands
 

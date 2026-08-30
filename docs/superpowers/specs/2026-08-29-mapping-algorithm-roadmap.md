@@ -263,7 +263,18 @@ is still worth doing, but its priority ordering shifts:
 
 ## Project D — exploration policy (next-best-view)
 
-**Status:** not yet specced. Depends on A, B, C.
+**Status:** specced 2026-08-29, not yet implemented. Depends on A, B, C. Spec:
+`docs/superpowers/specs/2026-08-29-exploration-policy-nbv-design.md`.
+
+### Superseded by D's spec
+
+- The clearance invariant below ("no emitted movement may enter a cell the belief map hasn't
+  cleared") is **not achievable with the shipped sensor** and is replaced by "never command a move
+  whose drone-sphere footprint contains `Occupied`/`OutOfBounds`". Lidar `z_min` is 20 cm on a 10 cm
+  grid and `markDroneFootprintEmpty` clears only the occupied voxel, so an `Empty`-only planner
+  cannot leave spawn. `Unmapped` stays soft-cost traversable. See D's spec, decision 1.
+- `mp-units` conversion of the existing frontier substrate moves to a follow-up **project E**; D
+  writes only its new code in strong types, so a mechanical refactor can't silently move the score.
 
 ### What's already decided
 
