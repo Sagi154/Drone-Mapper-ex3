@@ -1,0 +1,38 @@
+#pragma once
+
+#include "MappingAlgorithmFrontier.h"
+
+#include <Common/IMap3D.h>
+#include <Common/Units.h>
+#include <Common/types/DroneTypes.h>
+#include <Common/types/LidarTypes.h>
+
+#include <cstddef>
+#include <vector>
+
+namespace algorithm_207190406_209543255::detail {
+
+struct ExplorationPlan {
+    std::vector<common::Position3D> waypoints{};
+    std::vector<common::Orientation> terminal_scans{};  // NBV only; empty under WFD
+    double expected_gain = 0.0;                         // NBV only
+    std::size_t target_cluster_cells = 0;
+    double expected_rate = 0.0;
+    std::vector<GridKey> target_keys{};
+    FrontierCells frontier_cells{};
+    bool valid = false;
+};
+
+struct NbvInputs {
+    const common::IMap3D& map;
+    const common::types::DroneState& state;
+    const common::types::LidarConfigData& lidar;
+    const common::types::DroneConfigData& drone;
+    std::size_t remaining_steps = 0;
+    const BlockedCells& blocked;
+    bool ignore_blocked = false;
+};
+
+using WavefrontInputs = NbvInputs;
+
+} // namespace algorithm_207190406_209543255::detail
