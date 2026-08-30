@@ -1618,7 +1618,7 @@ During travel, evaluating all ~26 directions every step would be too expensive, 
 - Consumes: `detail::NbvPlanner`, `detail::ExplorationPlan`, `detail::NbvInputs`, `detail::hasAnyNotMappedInBounds`, `detail::quantizePosition`, `lidar_cone::countUnresolvedVoxels`.
 - Produces: no new public API. The class name, constructor, `nextStep` signature and registration macro are unchanged.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `Algorithm/tests/test_mapping_algorithm.cpp`. That file's existing helpers are `makeCorridorConfig()`, `makeDroneConfig()` (radius 5 cm, rotate 45°, advance 10 cm, elevate 10 cm), `makeLidarConfig()` (`z_min` 1 cm, `z_max` 200 cm, `d` 1 cm, `fov_circles` 1), `makeMissionConfig()` (`max_steps = 10000`), `gridPoint(x, y, z, config)` and `fillEmptyBox(...)`. Algorithms are constructed inline as `Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}}`. Follow that; do not introduce `makeConfig`/`makeAlgorithm`/`makeState` helpers.
 
@@ -1717,12 +1717,12 @@ Note `makeLidarConfig()` has `fov_circles = 1`, so `coneHalfAngleRad` takes the 
 
 Delete `ScanSweepEmitsMultipleOrientationsBeforeMovement` and `ScanPassZeroIncludesAxisAlignedOrientations`: both assert the retired phase machine's sweep shape, and the co-emission test replaces their intent. Keep every test that asserts contract-level behaviour — `FirstStepRequestsScanWithNullLatestScan`, `FinishesWhenNoFrontierRemains`, `EmitsMovementTowardFrontier`, status monotonicity after finish, non-null-scan tolerance, and the no-crash cases. If `FirstStepRequestsScanWithNullLatestScan` now fails because the first command also carries a movement, relax its `EXPECT_FALSE(cmd.movement.has_value())` to allow co-emission rather than suppressing co-emission on the first step.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='MappingAlgorithm.EmitsMovementAndScan*:MappingAlgorithm.DoesNotFinishWhile*:MappingAlgorithm.FinishesCleanly*:MappingAlgorithm.TerminatesWhenBudget*'`
 Expected: FAIL — the current policy emits either movement or scan and gives up on the first failed planning cycle.
 
-- [ ] **Step 3: Rewrite the header's private section**
+- [x] **Step 3: Rewrite the header's private section**
 
 In `Algorithm/include/Algorithm/MappingAlgorithmImpl.h`, update the doc comment and replace the private members. The public section does not change.
 
@@ -1764,7 +1764,7 @@ private:
 
 The `Phase` enum, the four phase handlers, and `buildScanOrientations` are gone.
 
-- [ ] **Step 4: Rewrite the implementation**
+- [x] **Step 4: Rewrite the implementation**
 
 In `Algorithm/src/MappingAlgorithmImpl.cpp`: keep `gridStepCm`, `axisSign`, `movementToward`, `reachedWaypoint`, `samePosition` as they are; delete `areCollinearSteps`/`compressPath` (string-pulling replaces them) and `buildScanOrientations`. Replace `struct Impl` and every handler with:
 
@@ -1981,22 +1981,24 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
 
 Add `#include <cstdint>`, `#include <unordered_set>` and `#include <vector>` to the file's include block, and drop the now-unused `<limits>` if nothing else needs it. `ensurePlanningReady` keeps only the `planning_initialized` flag (the `spacing_cells` computation is gone with travel-scan spacing).
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='MappingAlgorithm.*:-MappingAlgorithm.FrontierStartPassableWhenSphereHasUnmapped'`
 Expected: PASS. Fix any test that asserted the retired phase machine's shape rather than a contract. (A single `--gtest_filter` with `:-` excludes; passing the flag twice silently drops the first.)
 
-- [ ] **Step 6: Run the whole suite**
+- [x] **Step 6: Run the whole suite**
 
 Run: `ctest --test-dir build --output-on-failure -E drone_mapper_algorithm_tests; ./build/Algorithm/algorithm_test --gtest_filter=-MappingAlgorithm.FrontierStartPassableWhenSphereHasUnmapped`
 Expected: everything green. MissionControl and Simulator tests must be untouched by this task.
 
-- [ ] **Step 7: Stage and propose the commit**
+- [x] **Step 7: Stage and propose the commit**
 
 ```bash
 git add Algorithm/include/Algorithm/MappingAlgorithmImpl.h Algorithm/src/MappingAlgorithmImpl.cpp Algorithm/tests/test_mapping_algorithm.cpp
 # propose: "feat: replace phase machine with NBV plan execution and move+scan co-emission"
 ```
+
+**Review fix:** `adoptTravelPlan` and the extra `hasNotMappedInSphere` finish branches were removed so `nextStep` matches this skeleton. Frozen-map travel / co-emission / stall tests use a local short lidar; `makeLidarConfig()` is unchanged.
 
 ---
 
