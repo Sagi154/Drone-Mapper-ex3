@@ -462,6 +462,17 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
     }
     out.start_passable = true;
 
+    std::unordered_map<GridKey, bool, GridKeyHash> passable_memo;
+    auto passable = [&](const GridKey& key, const Position3D& pt) {
+        const auto it = passable_memo.find(key);
+        if (it != passable_memo.end()) {
+            return it->second;
+        }
+        const bool ok = isSpherePassable(map, pt, radius_cm, step, blocked_cells);
+        passable_memo.emplace(key, ok);
+        return ok;
+    };
+
     GridIntMap cost_of;
     CostQueue queue;
     out.parent_of[out.start_key] = out.start_key;
@@ -470,6 +481,7 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
 
     // bucket key -> index into out.candidates, lowest cost per bucket wins.
     std::unordered_map<GridKey, std::size_t, GridKeyHash> bucket_of;
+    std::vector<GridKey> frontier_list;
     std::size_t expansions = 0;
 
     while (!queue.empty()) {
@@ -483,24 +495,25 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
             continue;
         }
         const Position3D current_pt = keyToPoint(current, config);
+        const types::VoxelOccupancy current_occ = occupancyAt(map, current_pt);
 
-        if (!(current == out.start_key)) {
-            int unmapped = 0;
-            for (int dx = -1; dx <= 1; ++dx) {
-                for (int dy = -1; dy <= 1; ++dy) {
-                    for (int dz = -1; dz <= 1; ++dz) {
-                        if (dx == 0 && dy == 0 && dz == 0) {
-                            continue;
-                        }
-                        const Position3D nb = keyToPoint(
-                            GridKey{current.qx + dx, current.qy + dy, current.qz + dz}, config);
-                        if (occupancyAt(map, nb) == types::VoxelOccupancy::Unmapped) {
-                            ++unmapped;
-                        }
-                    }
-                }
+        int unmapped = 0;
+        for (const Offset& off : kOffsets) {
+            const Position3D nb = keyToPoint(
+                GridKey{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz}, config);
+            if (occupancyAt(map, nb) == types::VoxelOccupancy::Unmapped) {
+                ++unmapped;
             }
-            if (unmapped > 0) {
+        }
+        // Isolated Unmapped voxels have no Unmapped face neighbour, but they are the
+        // unknown volume. Including them keeps face-connected clustering as one
+        // cluster per pocket (the Empty shell alone is six disconnected cells).
+        const bool self_unmapped = current_occ == types::VoxelOccupancy::Unmapped;
+        if (unmapped > 0 || self_unmapped) {
+            if (out.frontier_cells.insert(current).second) {
+                frontier_list.push_back(current);
+            }
+            if (unmapped > 0 && !(current == out.start_key)) {
                 const auto floor_div = [stride](int v) {
                     return (v >= 0) ? (v / stride) : -(((-v) + stride - 1) / stride);
                 };
@@ -520,7 +533,7 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
         for (const Offset& off : kOffsets) {
             const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
             const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
+            if (!passable(neighbour, neighbour_pt)) {
                 continue;
             }
             const int new_cost = current_cost + traversalCost(map, neighbour_pt);
@@ -532,6 +545,53 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
             queue.push({new_cost, neighbour});
         }
     }
+
+    std::unordered_set<GridKey, GridKeyHash> clustered;
+    for (const GridKey& seed : frontier_list) {
+        if (clustered.contains(seed)) {
+            continue;
+        }
+        FrontierCluster cluster;
+        std::queue<GridKey> bfs;
+        bfs.push(seed);
+        clustered.insert(seed);
+        int best_cost = cost_of.at(seed);
+        GridKey best_key = seed;
+        while (!bfs.empty()) {
+            const GridKey cell = bfs.front();
+            bfs.pop();
+            cluster.keys.push_back(cell);
+            const int cell_cost = cost_of.at(cell);
+            if (cell_cost < best_cost) {
+                best_cost = cell_cost;
+                best_key = cell;
+            }
+            for (const Offset& off : kOffsets) {
+                const GridKey neighbour{cell.qx + off.dx, cell.qy + off.dy, cell.qz + off.dz};
+                if (!out.frontier_cells.contains(neighbour) || clustered.contains(neighbour)) {
+                    continue;
+                }
+                clustered.insert(neighbour);
+                bfs.push(neighbour);
+            }
+        }
+        cluster.cell_count = cluster.keys.size();
+        cluster.approach_key = best_key;
+        cluster.approach_position = keyToPoint(best_key, config);
+        cluster.approach_cost = best_cost;
+        out.clusters.push_back(std::move(cluster));
+    }
+
+    std::sort(out.clusters.begin(), out.clusters.end(),
+              [](const FrontierCluster& a, const FrontierCluster& b) {
+                  if (a.approach_key.qx != b.approach_key.qx) {
+                      return a.approach_key.qx < b.approach_key.qx;
+                  }
+                  if (a.approach_key.qy != b.approach_key.qy) {
+                      return a.approach_key.qy < b.approach_key.qy;
+                  }
+                  return a.approach_key.qz < b.approach_key.qz;
+              });
 
     return out;
 }

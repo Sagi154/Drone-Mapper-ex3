@@ -47,7 +47,17 @@ struct ReachableCell {
     GridKey key{};
     common::Position3D position{};
     int cost = 0;                 ///< Dijkstra traversal cost from start.
-    int unmapped_neighbours = 0;  ///< Unmapped cells in the 26-neighbourhood (cheap prefilter).
+    int unmapped_neighbours = 0;  ///< Unmapped cells among the 6 face neighbours.
+};
+
+using FrontierCells = std::unordered_set<GridKey, GridKeyHash>;
+
+struct FrontierCluster {
+    std::size_t cell_count = 0;
+    GridKey approach_key{};
+    common::Position3D approach_position{};
+    int approach_cost = 0;
+    std::vector<GridKey> keys{};
 };
 
 struct ReachabilityResult {
@@ -56,6 +66,8 @@ struct ReachabilityResult {
     GridKey start_key{};
     ParentMap parent_of{};
     std::vector<ReachableCell> candidates{};
+    FrontierCells frontier_cells{};
+    std::vector<FrontierCluster> clusters{};
 };
 
 /// BFS / Dijkstra reachability through confirmed-empty cells on a read-only output map.
