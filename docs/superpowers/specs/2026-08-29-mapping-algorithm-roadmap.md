@@ -1,10 +1,11 @@
-# Mapping Algorithm Roadmap — A/B/C/D
+# Mapping Algorithm Roadmap — A/B/C/D/F
 
 **Date:** 2026-08-29
 **Status:** Accepted 2026-08-29
-**Purpose:** Index and rationale for the four-project sequence that replaces `Algorithm/`'s action
-policy, and a standing record of the considerations relevant to each not-yet-specced project — so
-that specifying B, C, or D never depends on re-reading this chat.
+**Purpose:** Index and rationale for the A/B/C/D/F sequence that replaces `Algorithm/`'s action
+policy (E remains the deferred mp-units conversion), and a standing record of the considerations
+relevant to each not-yet-specced project — so that specifying B, C, D, or F never depends on
+re-reading this chat.
 
 This doc is living: as each project lands, update its "Considerations for the next spec" section
 with what was actually learned (numbers, surprises, scope changes) before moving to the next one.
@@ -35,6 +36,8 @@ not actually entangled the way they first look:
 | **B** — MissionControl honesty | Exactly one scan per step; honor a command carrying both movement and scan | A (to measure the impact) |
 | **C** — sensor model + belief map | Cone half-angle from `d`/`z_min`/`fov_circles`; own occupancy belief from `latest_scan`; fix the clearance-check no-op | A, B (to know how bad step inflation actually is) |
 | **D** — exploration policy | Receding-horizon next-best-view; any-angle smoothing; retire the blacklists/stale cache/mid-search Dijkstra hack | A, B, C |
+| **F** — wavefront frontier | WFD clustering + cells-per-step ranking + score-aware scan; supersedes D's candidate-scoring half | A, B, C, D (substrate) |
+| **E** — mp-units (deferred) | Strong-type the remaining frontier substrate | after F |
 
 **A first:** nothing downstream is verifiable without it. Right now the only recorded fact about
 ex3's algorithm is "24/24 `COMPLETED` with `mission_score >= 0`" — a floor, not a score
@@ -263,8 +266,18 @@ is still worth doing, but its priority ordering shifts:
 
 ## Project D — exploration policy (next-best-view)
 
-**Status:** specced 2026-08-29, not yet implemented. Depends on A, B, C. Spec:
+**Status:** implemented and measured 2026-08-30. Depends on A, B, C. Spec:
 `docs/superpowers/specs/2026-08-29-exploration-policy-nbv-design.md`.
+D's candidate-scoring half is **superseded by project F**.
+
+### Measured outcome (honest, `-O2`/`Release`)
+
+- `-O2` `house_full` / `large_out` **killed at 120 s** (did not finish).
+- `small_room` **76.37** vs post-C **82.57** (regression; `MAX_STEPS`).
+- `small_out` **83.49** vs post-C **25.16** (large outdoor gain).
+- D recovered outdoor coverage relative to C but lost `small_room` and failed the
+  runtime gate on the two largest maps. F replaces the NBV candidate loop with WFD
+  clustering for that reason.
 
 ### Superseded by D's spec
 
@@ -329,6 +342,27 @@ is still worth doing, but its priority ordering shifts:
   reintroduce an unbounded walk.
 
 ---
+
+## Project F — wavefront frontier exploration
+
+**Status:** implemented 2026-08-31 (code through Task 5; Task 6 records the honest
+column). Depends on A, B, C and D's reachability substrate. Spec:
+`docs/superpowers/specs/2026-08-31-wavefront-frontier-exploration-design.md`.
+Plan: `docs/superpowers/plans/2026-08-31-wavefront-frontier-exploration.md`.
+Measured column: `docs/benchmarks/2026-08-31-post_f_honest.{csv,md}`.
+
+WFD over `MappingAlgorithmFrontier` picks a frontier cluster, then the executor
+emits movement plus a score-aware scan toward that cluster.
+
+### Measured outcome (honest, Release `-O3`, 2026-08-31)
+
+- Score sum **1402.6** vs post-C 1331.0 vs lawnmower 646.4. Zero `ERROR`. 2× `MAX_STEPS`.
+- Profiling `small_room` **85.60** (COMPLETED) vs post-C 82.57 / D 76.37.
+- Profiling `small_out` **34.54** — D's 83.49 outdoor gain is given back (still above post-C 25.16).
+- Profiling `house_full` **25.81** in **65.4 s** (COMPLETED, 9994 steps). The 60 s gate **did not pass**.
+  Group mean 6.50: the other three `house_full` variants collapse to ~0.06.
+- Profiling `large_out` **36.92** in **154.2 s** (COMPLETED).
+- `kMinInformationRate` sweep {0.10, 0.25, 0.50} was **identical** on all six profiling cells; kept **0.25**.
 
 ## Related docs
 

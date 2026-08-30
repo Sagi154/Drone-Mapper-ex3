@@ -350,7 +350,7 @@ tuned; the rest are derived or structural, which is the property `.cursor/rules`
 |----------|-------|---------------------------|
 | `kRankedClusters` | 8 | Bounds path reconstruction per replan. Path work is cheap, so this is generous rather than tight |
 | `kSweepStepsReserve` | `min(directions.size(), 8)` | Steps reserved for scanning on arrival, so a cluster is not chosen that can be reached but not observed. Derived from the lidar's direction count, not fixed |
-| `kMinInformationRate` | 0.25 | **Tuned.** Swept over {0.10, 0.25, 0.50}; the chosen value is recorded with its measurement |
+| `kMinInformationRate` | 0.25 | **Tuned.** Swept {0.10, 0.25, 0.50} on the six profiling cells 2026-08-31; all three rates produced identical scores/steps. Kept 0.25. Table: `docs/benchmarks/2026-08-31-post_f_honest.md` |
 | `kLowRateReplans` | 3 | Matches D's `kRecoveryAttempts = 3` so termination needs the same amount of corroboration as recovery |
 | `kReplanIntervalSteps` | 25 | Raised from D's 10. A backstop only: the target-cluster invalidation check is the real trigger |
 | `kTravelScanProbes` | 3 | The waypoint direction plus ±Z. Down from D's 6, since the probe is now early-exit and directed |

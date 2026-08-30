@@ -1,9 +1,10 @@
-# Pickup — Mapping algorithm rewrite (A/B/C/D)
+# Pickup — Mapping algorithm rewrite (A/B/C/D/F)
 
-**Read this first** when continuing the “better algorithm” work. It is the standing handoff from
-2026-08-29: what landed on branch `algorithm-benchmark-harness`, measured scores, and the ordered
-queue for C → D. Do not restart from the deadline-driven “patch the current policy” framing in older
-docs — quality is the constraint; the four-project roadmap is authoritative.
+**Read this first** when continuing the “better algorithm” work. It is the standing handoff:
+what landed on branch `algorithm-benchmark-harness`, measured scores, and the ordered
+queue. Do not restart from the deadline-driven “patch the current policy” framing in older
+docs — quality is the constraint; the A/B/C/D/F roadmap is authoritative (E is the deferred
+mp-units conversion).
 
 **Not this file:** assignment packaging / zip / Known Issues excel → still
 `docs/assignment-compliance-pickup.md`. That track is separate from the algorithm rewrite.
@@ -15,19 +16,16 @@ docs — quality is the constraint; the four-project roadmap is authoritative.
 | Item | Value |
 |------|--------|
 | Branch | `algorithm-benchmark-harness` (from up-to-date `main` at start of work) |
-| vs `main` | **14 commits ahead**, not pushed (as of handoff) |
-| Tip (approx) | `docs: record post-B honest-column score regression` |
-
-Working tree should be clean after the B commits. If dirty, stop and reconcile before starting C.
+| Tip (approx) | `docs: record post-F wavefront benchmark against ex2` |
 
 ---
 
 ## Verdict
 
-**Projects A, B, and C are done.** We can measure per-cell score/steps; MissionControl is honest
-(one scan per step); clearance uses sphere-vs-box geometry; scans are lidar-cone-derived and
-gain-gated. Under the honest contract, post-C still does **not** meet the beat-ex2 bar — recovering
-coverage quality (not just cutting wasted scans) is the job of **D**.
+**Projects A, B, and C are done.** **D was implemented and measured as a regression** on
+runtime (`house_full` / `large_out` killed at 120 s) and on `small_room` (76.37 vs post-C
+82.57), while `small_out` jumped to 83.49. **F is done** (WFD clustering + score-aware
+scan; honest column recorded 2026-08-31).
 
 Two decisions that still constrain everything below (do not re-litigate without the user):
 
@@ -36,8 +34,7 @@ Two decisions that still constrain everything below (do not re-litigate without 
 2. **Success = beat ex2’s recorded 24-cell score bands** (same maps/scorer), not merely
    `mission_score >= 0`.
 
-Full rationale and open questions for D live in:
-`docs/superpowers/specs/2026-08-29-mapping-algorithm-roadmap.md`.
+Full rationale: `docs/superpowers/specs/2026-08-29-mapping-algorithm-roadmap.md`.
 
 ---
 
@@ -76,6 +73,23 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 | Tests | frontier cm10 cases; `test_lidar_cone.cpp`; updated mapping-algorithm scan expectations |
 | Post-C baseline | `docs/benchmarks/2026-08-29-post_c_honest.{csv,md}` |
 
+### Project D — exploration policy (NBV)
+
+| Artifact | Path |
+|----------|------|
+| Spec | `docs/superpowers/specs/2026-08-29-exploration-policy-nbv-design.md` |
+| Plan | `docs/superpowers/plans/2026-08-30-exploration-policy-nbv.md` |
+| Outcome | Runtime regression on `house_full` / `large_out` (killed at 120 s); `small_room` 76.37 vs post-C 82.57; `small_out` 83.49 vs 25.16. Candidate-scoring half superseded by F. |
+
+### Project F — wavefront frontier
+
+| Artifact | Path |
+|----------|------|
+| Spec | `docs/superpowers/specs/2026-08-31-wavefront-frontier-exploration-design.md` |
+| Plan | `docs/superpowers/plans/2026-08-31-wavefront-frontier-exploration.md` |
+| Code | `WavefrontPlanner` + score-aware executor; NBV candidate API removed |
+| Post-F baseline | `docs/benchmarks/2026-08-31-post_f_honest.{csv,md}` (+ adversarial CSV) |
+
 ---
 
 ## Measured scores (primary numbers)
@@ -83,57 +97,52 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 ### Pre-B (batching MC) — `ex2_comparable`
 
 - Score sum **1371.3**, steps **4946**, 0× `MAX_STEPS`, 24 scored.
-- vs ex2 bands: **inside** house_lower, large_room; **below** house_full (~10), large_out (~36), small_out (~37), small_room (~65).
 
-### Post-C (honest MC + sensor/clearance) — `honest` ← **optimize against this**
+### Post-C (honest MC + sensor/clearance) — historical optimize-against
 
-- Score sum **1331.0**, steps **9101** (~0.51× post-B), **2× `MAX_STEPS`**, 0 errors.
-- Same band shape vs ex2 (still only inside on house_lower + large_room).
+- Score sum **1331.0**, steps **9101**, **2× `MAX_STEPS`**, 0 errors.
 
-### Post-B (honest MC, pre-C algorithm) — historical
+### Post-D (NBV) — historical
 
-- Score sum **1335.4**, steps **17693**, **8× `MAX_STEPS`**, 0 errors.
+- `-O2` `house_full` / `large_out` killed at 120 s. Profiling `small_room` 76.37; `small_out` 83.49.
+
+### Post-F (WFD) — `honest` ← **current column**
+
+- Score sum **1402.6**, steps **50632**, **2× `MAX_STEPS`**, 0 errors.
+- vs ex2: **inside** house_lower, large_room; **below** house_full (mean 6.50), large_out (43.47), small_out (38.36), small_room (70.03).
+- Profiling `small_room` **85.60** (≥ post-C 82.57). Profiling `house_full` **25.81** in **65.4 s** (60 s gate **failed**). Profiling `small_out` **34.54** (not the 80s).
+- `kMinInformationRate` kept **0.25** (0.10 / 0.25 / 0.50 identical on the six-cell sweep).
 
 ### Adversarial (hits-only foreign MC)
 
-- Pre-B column in `pre_b_baseline`: score sum ~536, steps ~6982, 4× `MAX_STEPS`. Robustness only.
+- Post-F: score sum **468.2**, steps **1465**, 2× `MAX_STEPS`, 0 errors. Most cells ~28 steps then finish.
 
 **How to re-measure:** see `scripts/benchmark/README.md`. Docker image may need
-`apt-get install -y python3-venv python3-pip` once per container. Full 24-cell sweep ~2–5+ minutes
-per column at `num_threads=8`.
+`apt-get install -y python3-venv python3-pip` once per container. Full 24-cell sweep is
+~200 s per column at `num_threads=8` if `house_full` / `large_out` run to ~10k steps.
+Do **not** kill cells at 60 s.
 
 ---
 
 ## Left to do (in order)
 
-### 1. Project C — sensor model + clearance — **done**
+### 1. Project E — mp-units on the substrate (next)
 
-**Status:** implemented 2026-08-29. Spec + plan + code + `docs/benchmarks/2026-08-29-post_c_honest.*`.
+Strong-type the remaining frontier / reachability substrate. Packaging / zip / Known
+Issues excel remain on the assignment-compliance track.
 
-### 2. Project D — exploration policy (NBV) (next)
+### 2. After E / packaging
 
-**Status:** specced 2026-08-29 — `docs/superpowers/specs/2026-08-29-exploration-policy-nbv-design.md`.
-Next: implementation plan, then implement. Frontier-anchored NBV (no RNG), budget as a feasibility
-filter on `max_steps - step_index`, move+scan co-emission, constant-altitude string-pulling, gain-based
-termination replacing the 100-cycle counters, expiring blocked set, ALG28 expansion bound. `mp-units`
-conversion of the frontier substrate deferred to a follow-up project E.
-
-### 3. After D lands
-
-- Commit new `docs/benchmarks/*` CSVs; update roadmap tables.
-- Confirm adversarial column still completes without illegal-move disasters.
-- Open PR(s) for `algorithm-benchmark-harness` (consider splitting docs/A vs B vs C/D if review size
-  hurts) — **do not push to `main`**.
+- Open PR(s) for `algorithm-benchmark-harness` — **do not push to `main`**.
 - Separate track: zip packaging / Known Issues excel (`assignment-compliance-pickup.md`).
 
 ---
 
 ## Next session — concrete first steps
 
-1. Read this file + roadmap Project D section + C's post-C notes for D.
+1. Read this file + roadmap Project E note.
 2. Confirm on `algorithm-benchmark-harness`, `git status` clean.
-3. Brainstorm and write **D’s design spec** (do not re-open C).
-4. Re-benchmark `honest` after D until bands approach/beat ex2.
+3. Start **E** (mp-units on the substrate), or packaging if the deadline is the constraint.
 
 ---
 
@@ -150,8 +159,8 @@ conversion of the frontier substrate deferred to a follow-up project E.
 
 | Doc | Role |
 |-----|------|
-| `docs/superpowers/specs/2026-08-29-mapping-algorithm-roadmap.md` | Living A/B/C/D index + C/D considerations |
-| `docs/superpowers/specs/2026-08-29-sensor-model-clearance-belief-design.md` | Project C's full spec |
+| `docs/superpowers/specs/2026-08-29-mapping-algorithm-roadmap.md` | Living A/B/C/D/F index |
+| `docs/superpowers/specs/2026-08-31-wavefront-frontier-exploration-design.md` | Project F spec |
 | `docs/mapping-algorithm-analysis.md` | Original Algorithm/ review |
 | `docs/benchmarks/` | Committed score tables |
 | `docs/assignment-compliance-pickup.md` | Submission / packaging (orthogonal) |

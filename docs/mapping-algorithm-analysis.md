@@ -40,7 +40,10 @@ be efficient and exact), plus two things that matter more than they look:
    `total_steps` ascending. Coverage is primary; steps are the tiebreaker.
 
 Scoring uses `MapsComparison::compare` — 0–100 BFS/reachability-weighted voxel agreement
-against the hidden map, seeded at the drone spawn.
+against the hidden map, seeded at the drone spawn. Pass 2 then counts **target-known**
+voxels **outside** that spawn-reachable set and credits only `Empty`. Resolving wall
+interiors or painting `PotentiallyOccupied` there increases the denominator without a
+matching credit, so it **lowers** the score.
 
 ---
 
@@ -262,12 +265,14 @@ Fibonacci lattice sized to that angle, and emit only cones whose solid angle act
 contains `Unmapped` voxels. This kills the "re-scan the ceiling I mapped four stops ago"
 steps, which is where most of the step budget goes.
 
-### 3. Promote the multi-source distance field to the primary mechanism
+### 3. Promote the multi-source distance field to the primary mechanism — **adopted by project F**
 
 `buildUnknownDistanceField` is already a multi-source BFS from every unknown cell — that's
-Wavefront Frontier Detection (Keidar & Kaminka). Run it once per map update and descend the
-gradient: you get nearest-frontier in one O(V) pass and stop calling `isFrontier` per node.
-Today it's relegated to the fallback path while a full Dijkstra does the main work.
+Wavefront Frontier Detection (Keidar & Kaminka). At the time of this review it was
+relegated to the fallback path while a full Dijkstra did the main work.
+**Project F** (`docs/superpowers/specs/2026-08-31-wavefront-frontier-exploration-design.md`)
+makes WFD the primary exploration policy: cluster reachable frontiers, rank by cells per
+step, and scan toward the chosen cluster.
 
 ### 4. Any-angle path smoothing
 

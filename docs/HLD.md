@@ -88,8 +88,9 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 
 - **`MappingAlgorithmImpl_207190406_209543255`** — Plugin entry point implementing
   `common::IMappingAlgorithm`. Reads the world through `const common::IMap3D&` only.
-  Uses an internal BFS frontier planner (`MappingAlgorithmFrontier`) to choose scan
-  orientations and movement toward unexplored voxels.
+  Uses Wavefront Frontier Detection over a reachability substrate
+  (`MappingAlgorithmFrontier`) to pick a cluster, then emits movement plus a
+  score-aware scan toward that cluster.
 
 **Note on `simulator::ISimulation`:** The course publishes
 `Simulator/common_simulator/include/Simulator/ISimulation.h`, but we do **not**
