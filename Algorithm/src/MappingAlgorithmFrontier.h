@@ -42,14 +42,6 @@ struct FrontierPathResult {
     GridKey frontier_key{};
 };
 
-/// A reachable cell that borders unresolved space — an NBV viewpoint candidate.
-struct ReachableCell {
-    GridKey key{};
-    common::Position3D position{};
-    int cost = 0;                 ///< Dijkstra traversal cost from start.
-    int unmapped_neighbours = 0;  ///< Unmapped cells among the 6 face neighbours.
-};
-
 using FrontierCells = std::unordered_set<GridKey, GridKeyHash>;
 
 struct FrontierCluster {
@@ -65,7 +57,6 @@ struct ReachabilityResult {
     bool truncated = false;  ///< Expansion cap hit; treat the result as partial.
     GridKey start_key{};
     ParentMap parent_of{};
-    std::vector<ReachableCell> candidates{};
     FrontierCells frontier_cells{};
     std::vector<FrontierCluster> clusters{};
 };
@@ -82,15 +73,14 @@ public:
         const BlockedCells& blocked_cells = {}) const;
 
     /// Dijkstra over the passable component with a FIXED edge set, collecting
-    /// frontier-adjacent cells deduplicated onto a stride lattice (lowest cost per
-    /// bucket wins). Bounded by max_expansions so a broken passability check yields
-    /// a truncated result instead of an unbounded walk (ALG28).
+    /// frontier-adjacent cells and clustering them. Bounded by max_expansions so a
+    /// broken passability check yields a truncated result instead of an unbounded
+    /// walk (ALG28).
     [[nodiscard]] ReachabilityResult exploreReachable(
         const common::IMap3D& map,
         const common::Position3D& start,
         common::PhysicalLength drone_radius,
         const BlockedCells& blocked_cells,
-        int stride_cells,
         std::size_t max_expansions) const;
 
     /// One-step face-neighbour escape when the start sphere is blocked.

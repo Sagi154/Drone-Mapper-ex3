@@ -36,7 +36,7 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
 
     const ReachabilityResult reach = frontier_.exploreReachable(
         in.map, in.state.position, in.drone.radius, blocked,
-        /*stride_cells=*/3, maxExpansionsForMap(in.map));
+        maxExpansionsForMap(in.map));
     if (!reach.start_passable || reach.clusters.empty()) {
         return {};
     }
@@ -93,8 +93,6 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
             best_rate = rate;
             best.valid = true;
             best.waypoints = std::move(waypoints);
-            best.terminal_scans.clear();
-            best.expected_gain = 0.0;
             best.target_cluster_cells = cluster->cell_count;
             best.expected_rate = rate;
             best.target_keys = cluster->keys;

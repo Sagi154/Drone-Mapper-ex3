@@ -75,7 +75,7 @@ TEST(ScanPlanning, SweepOrdersByIndependentGainNotEnumerationOrder) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const auto reach = frontier.exploreReachable(
-        map, origin, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, origin, 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     ctpl::ConeTemplateCache cache;
     const auto& templates = cache.get(makeLidar(), config.resolution);
@@ -95,7 +95,7 @@ TEST(ScanPlanning, MarginalPassDropsFullyClaimedDirections) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const auto reach = frontier.exploreReachable(
-        map, origin, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, origin, 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     ctpl::ConeTemplateCache cache;
     const auto& templates = cache.get(makeLidar(), config.resolution);

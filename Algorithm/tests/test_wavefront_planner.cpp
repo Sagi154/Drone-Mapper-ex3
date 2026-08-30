@@ -89,7 +89,6 @@ TEST(WavefrontPlanner, PrefersDistantRoomOverNearbyCrumb) {
     ASSERT_FALSE(plan.waypoints.empty());
     EXPECT_GT(plan.waypoints.back().x.force_numerical_value_in(cm), 100.0);
     EXPECT_GT(plan.target_cluster_cells, 20u);
-    EXPECT_TRUE(plan.terminal_scans.empty());
 }
 
 TEST(WavefrontPlanner, StaysPutWhenStartIsTheCheapestFrontier) {

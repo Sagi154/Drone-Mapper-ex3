@@ -447,12 +447,10 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
     const Position3D& start,
     PhysicalLength drone_radius,
     const BlockedCells& blocked_cells,
-    int stride_cells,
     std::size_t max_expansions) const {
     const types::MapConfig config = map.getMapConfig();
     const double step = gridStepCm(config);
     const double radius_cm = drone_radius.force_numerical_value_in(cm);
-    const int stride = std::max(1, stride_cells);
 
     ReachabilityResult out;
     out.start_key = quantizePosition(start, config);
@@ -479,8 +477,6 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
     cost_of[out.start_key] = 0;
     queue.push({0, out.start_key});
 
-    // bucket key -> index into out.candidates, lowest cost per bucket wins.
-    std::unordered_map<GridKey, std::size_t, GridKeyHash> bucket_of;
     std::vector<GridKey> frontier_list;
     std::size_t expansions = 0;
 
@@ -512,21 +508,6 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
         if (unmapped > 0 || self_unmapped) {
             if (out.frontier_cells.insert(current).second) {
                 frontier_list.push_back(current);
-            }
-            if (unmapped > 0 && !(current == out.start_key)) {
-                const auto floor_div = [stride](int v) {
-                    return (v >= 0) ? (v / stride) : -(((-v) + stride - 1) / stride);
-                };
-                const GridKey bucket{floor_div(current.qx), floor_div(current.qy),
-                                     floor_div(current.qz)};
-                const ReachableCell cell{current, current_pt, current_cost, unmapped};
-                const auto it = bucket_of.find(bucket);
-                if (it == bucket_of.end()) {
-                    bucket_of[bucket] = out.candidates.size();
-                    out.candidates.push_back(cell);
-                } else if (current_cost < out.candidates[it->second].cost) {
-                    out.candidates[it->second] = cell;
-                }
             }
         }
 

@@ -93,7 +93,7 @@ TEST(MappingAlgorithm, FrontierStartPassableWhenSphereHasUnmapped) {
     map.set(start, ct::VoxelOccupancy::Empty);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_TRUE(frontier.exploreReachable(map, start, 5.0 * cm, {}, 1, 1).start_passable);
+    EXPECT_TRUE(frontier.exploreReachable(map, start, 5.0 * cm, {}, 1).start_passable);
 }
 
 // What: centre is Empty but the drone sphere overlaps Occupied voxels.
@@ -117,7 +117,7 @@ TEST(MappingAlgorithm, FrontierStartNotPassableWhenSphereOverlapsOccupied) {
     }
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(0, 0, 50), 5.0 * cm, {}, 1, 1)
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(0, 0, 50), 5.0 * cm, {}, 1)
                      .start_passable);
 }
 
@@ -129,7 +129,7 @@ TEST(MappingAlgorithm, FrontierStartNotPassableWhenCentreOccupied) {
     map.set(pointCm(0, 0, 50), ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(0, 0, 50), 5.0 * cm, {}, 1, 1)
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(0, 0, 50), 5.0 * cm, {}, 1)
                      .start_passable);
 }
 
@@ -142,13 +142,14 @@ TEST(MappingAlgorithm, FrontierFindsPathAlongEmptyCorridor) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, pointCm(0, 0, 1), 0.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(0, 0, 1), 0.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     EXPECT_TRUE(result.start_passable);
-    ASSERT_FALSE(result.candidates.empty());
+    ASSERT_FALSE(result.clusters.empty());
+    EXPECT_FALSE(result.frontier_cells.empty());
     bool reached_interface = false;
-    for (const detail::ReachableCell& cell : result.candidates) {
-        if (cell.position.x.force_numerical_value_in(cm) >= 2.0) {
+    for (const detail::FrontierCluster& cluster : result.clusters) {
+        if (cluster.approach_position.x.force_numerical_value_in(cm) >= 2.0) {
             reached_interface = true;
             break;
         }
@@ -167,15 +168,16 @@ TEST(MappingAlgorithm, FrontierFindsFrontierInsideEmptyCube) {
     const detail::MappingAlgorithmFrontier frontier;
     // Face is 8 cells from centre; do not walk the whole 101³ Unmapped volume.
     const detail::ReachabilityResult result =
-        frontier.exploreReachable(map, start, 5.0 * cm, {}, 1, 5000);
+        frontier.exploreReachable(map, start, 5.0 * cm, {}, 5000);
 
     EXPECT_TRUE(result.start_passable);
-    ASSERT_FALSE(result.candidates.empty());
+    ASSERT_FALSE(result.clusters.empty());
+    EXPECT_FALSE(result.frontier_cells.empty());
     bool on_face = false;
-    for (const detail::ReachableCell& cell : result.candidates) {
-        const double dx = std::abs(cell.position.x.force_numerical_value_in(cm) - 20.0);
-        const double dy = std::abs(cell.position.y.force_numerical_value_in(cm) - 20.0);
-        const double dz = std::abs(cell.position.z.force_numerical_value_in(cm) - 50.0);
+    for (const detail::FrontierCluster& cluster : result.clusters) {
+        const double dx = std::abs(cluster.approach_position.x.force_numerical_value_in(cm) - 20.0);
+        const double dy = std::abs(cluster.approach_position.y.force_numerical_value_in(cm) - 20.0);
+        const double dz = std::abs(cluster.approach_position.z.force_numerical_value_in(cm) - 50.0);
         if (dx >= 7.0 || dy >= 7.0 || dz >= 7.0) {
             on_face = true;
             break;
@@ -213,13 +215,14 @@ TEST(MappingAlgorithm, FrontierFindExplorePathMovesTowardUnknown) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, pointCm(0, 0, 1), 0.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(0, 0, 1), 0.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     EXPECT_TRUE(result.start_passable);
-    ASSERT_FALSE(result.candidates.empty());
+    ASSERT_FALSE(result.clusters.empty());
+    EXPECT_FALSE(result.frontier_cells.empty());
     bool toward_unknown = false;
-    for (const detail::ReachableCell& cell : result.candidates) {
-        if (cell.position.x.force_numerical_value_in(cm) > 0.0) {
+    for (const detail::FrontierCluster& cluster : result.clusters) {
+        if (cluster.approach_position.x.force_numerical_value_in(cm) > 0.0) {
             toward_unknown = true;
             break;
         }
@@ -312,7 +315,7 @@ TEST(MappingAlgorithm, FrontierRejectsOccupiedFaceNeighbourOnCm10Grid) {
     map.set(face, ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_FALSE(frontier.exploreReachable(map, centre, 7.5 * cm, {}, 1, 1).start_passable);
+    EXPECT_FALSE(frontier.exploreReachable(map, centre, 7.5 * cm, {}, 1).start_passable);
 }
 
 // What: same Occupied face neighbour but radius 4 cm (nearest 5 > 4).
@@ -326,7 +329,7 @@ TEST(MappingAlgorithm, FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall) {
     map.set(face, ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_TRUE(frontier.exploreReachable(map, centre, 4.0 * cm, {}, 1, 1).start_passable);
+    EXPECT_TRUE(frontier.exploreReachable(map, centre, 4.0 * cm, {}, 1).start_passable);
 }
 
 // What: face neighbour Unmapped, centre Empty, radius 7.5 on 10 cm grid.
@@ -346,38 +349,21 @@ TEST(MappingAlgorithm, FrontierHasUnmappedFaceNeighbourOnCm10Grid) {
 TEST(MappingAlgorithm, ExploreReachableFindsFrontierAdjacentCandidates) {
     const ct::MapConfig config = makeCm10Config();
     Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
-    // A single Unmapped pocket makes exactly its neighbours frontier-adjacent.
     map.set(pointCm(50, 50, 50), ct::VoxelOccupancy::Unmapped);
 
     const detail::MappingAlgorithmFrontier frontier;
     const Position3D start = pointCm(0, 0, 0);
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, start, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, start, 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     EXPECT_TRUE(result.start_passable);
     EXPECT_FALSE(result.truncated);
-    ASSERT_FALSE(result.candidates.empty());
-    for (const detail::ReachableCell& cell : result.candidates) {
-        EXPECT_GT(cell.unmapped_neighbours, 0);
-        EXPECT_GT(cell.cost, 0);
+    ASSERT_FALSE(result.clusters.empty());
+    EXPECT_FALSE(result.frontier_cells.empty());
+    for (const detail::FrontierCluster& cluster : result.clusters) {
+        EXPECT_GT(cluster.cell_count, 0u);
+        EXPECT_GT(cluster.approach_cost, 0);
     }
-}
-
-TEST(MappingAlgorithm, ExploreReachableStrideDeduplicatesCandidates) {
-    const ct::MapConfig config = makeCm10Config();
-    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Unmapped};
-    // Everything Unmapped: every reachable cell is frontier-adjacent, so stride
-    // is the only thing bounding the candidate count.
-    const detail::MappingAlgorithmFrontier frontier;
-    const Position3D start = pointCm(50, 50, 50);
-
-    const std::size_t dense = frontier.exploreReachable(
-        map, start, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map)).candidates.size();
-    const std::size_t strided = frontier.exploreReachable(
-        map, start, 4.0 * cm, {}, 3, detail::maxExpansionsForMap(map)).candidates.size();
-
-    EXPECT_GT(dense, strided);
-    EXPECT_GT(strided, 0u);
 }
 
 TEST(MappingAlgorithm, ExploreReachableRespectsExpansionCap) {
@@ -387,7 +373,7 @@ TEST(MappingAlgorithm, ExploreReachableRespectsExpansionCap) {
     const Position3D start = pointCm(50, 50, 50);
 
     const detail::ReachabilityResult result =
-        frontier.exploreReachable(map, start, 4.0 * cm, {}, 1, 5);
+        frontier.exploreReachable(map, start, 4.0 * cm, {}, 5);
 
     EXPECT_TRUE(result.truncated);
 }
@@ -401,9 +387,9 @@ TEST(MappingAlgorithm, ExploreReachableReportsStartPassabilityWithCapOfOne) {
     map.set(pointCm(60, 50, 50), ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 50), 7.5 * cm, {}, 1, 1)
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 50), 7.5 * cm, {}, 1)
                      .start_passable);
-    EXPECT_TRUE(frontier.exploreReachable(map, pointCm(50, 50, 50), 4.0 * cm, {}, 1, 1)
+    EXPECT_TRUE(frontier.exploreReachable(map, pointCm(50, 50, 50), 4.0 * cm, {}, 1)
                     .start_passable);
 }
 
@@ -437,7 +423,7 @@ TEST(MappingAlgorithm, ExploreReachableTerminatesWithoutOccupancyBound) {
     const detail::MappingAlgorithmFrontier frontier;
     const Position3D start = pointCm(0, 0, 0);
     const detail::ReachabilityResult result =
-        frontier.exploreReachable(map, start, 4.0 * cm, {}, 3, 20000);
+        frontier.exploreReachable(map, start, 4.0 * cm, {}, 20000);
 
     EXPECT_TRUE(result.truncated);
 }
@@ -527,7 +513,7 @@ TEST(MappingAlgorithm, ExploreReachableClustersTwoRoomsSeparatedByAWall) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, pointCm(0, 0, 0), 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(0, 0, 0), 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     EXPECT_TRUE(result.start_passable);
     ASSERT_FALSE(result.clusters.empty());
@@ -545,7 +531,7 @@ TEST(MappingAlgorithm, ExploreReachableClusterCountEqualsFrontierSet) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, pointCm(0, 0, 0), 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(0, 0, 0), 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     std::size_t summed = 0;
     for (const detail::FrontierCluster& c : result.clusters) {
@@ -564,7 +550,7 @@ TEST(MappingAlgorithm, ExploreReachableApproachKeyIsLowestCostMember) {
     const detail::MappingAlgorithmFrontier frontier;
     const Position3D start = pointCm(0, 50, 50);
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, start, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, start, 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     ASSERT_FALSE(result.clusters.empty());
     const detail::FrontierCluster& cluster = result.clusters.front();
@@ -587,7 +573,7 @@ TEST(MappingAlgorithm, FrontierFlagIgnoresDiagonalOnlyUnmapped) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, pointCm(50, 50, 50), 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(50, 50, 50), 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     // Start's only Unmapped neighbour is diagonal, so start is not a 6-face frontier.
     // The pocket's face neighbours (and the reachable Unmapped cell) still are.
@@ -604,7 +590,7 @@ TEST(MappingAlgorithm, ExploreReachableIncludesStartWhenItBordersUnmapped) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const detail::ReachabilityResult result = frontier.exploreReachable(
-        map, start, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, start, 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     ASSERT_FALSE(result.clusters.empty());
     bool start_is_approach = false;
@@ -625,9 +611,9 @@ TEST(MappingAlgorithm, ExploreReachableClusteringIsDeterministic) {
 
     const detail::MappingAlgorithmFrontier frontier;
     const auto a = frontier.exploreReachable(
-        map, pointCm(0, 0, 0), 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(0, 0, 0), 4.0 * cm, {}, detail::maxExpansionsForMap(map));
     const auto b = frontier.exploreReachable(
-        map, pointCm(0, 0, 0), 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+        map, pointCm(0, 0, 0), 4.0 * cm, {}, detail::maxExpansionsForMap(map));
 
     ASSERT_EQ(a.clusters.size(), b.clusters.size());
     for (std::size_t i = 0; i < a.clusters.size(); ++i) {

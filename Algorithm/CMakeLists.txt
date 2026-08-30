@@ -2,7 +2,6 @@ add_library(Algorithm_207190406_209543255 SHARED
     src/MappingAlgorithmFrontier.cpp
     src/MappingAlgorithmImpl.cpp
     src/PathShaping.cpp
-    src/NbvPlanner.cpp
     src/WavefrontPlanner.cpp
     src/ScanPlanning.cpp
 )
@@ -20,14 +19,12 @@ add_executable(algorithm_test
     tests/test_lidar_cone.cpp
     tests/test_cone_template.cpp
     tests/test_path_shaping.cpp
-    tests/test_nbv_planner.cpp
     tests/test_wavefront_planner.cpp
     tests/test_scan_planning.cpp
     # Compile sources directly so tests are self-contained (no dlopen/shared lib).
     src/MappingAlgorithmFrontier.cpp
     src/MappingAlgorithmImpl.cpp
     src/PathShaping.cpp
-    src/NbvPlanner.cpp
     src/WavefrontPlanner.cpp
     src/ScanPlanning.cpp
     # Stub: satisfies MappingAlgorithmRegistration ctor (provided by Simulator in prod).
