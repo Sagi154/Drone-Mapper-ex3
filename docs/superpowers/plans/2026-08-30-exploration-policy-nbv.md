@@ -740,7 +740,7 @@ Smoothing merges only across segments at constant altitude, because `movementTow
   - `std::vector<common::Position3D> stringPullConstantAltitude(const common::IMap3D&, const std::vector<common::Position3D>& path, common::PhysicalLength drone_radius)`
   - `std::size_t stepCostForPath(const std::vector<common::Position3D>& waypoints, const common::Position3D& start_position, const common::Orientation& start_heading, const MovementLimits&)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `Algorithm/tests/test_path_shaping.cpp`:
 
@@ -876,12 +876,12 @@ TEST(PathShaping, StepCostOfEmptyPathIsZero) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cmake --build build -j`
 Expected: FAIL — `PathShaping.h` does not exist and the test target does not know the file.
 
-- [ ] **Step 3: Create the header**
+- [x] **Step 3: Create the header**
 
 `Algorithm/src/PathShaping.h`:
 
@@ -926,7 +926,7 @@ struct MovementLimits {
 } // namespace algorithm_207190406_209543255::detail
 ```
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `Algorithm/src/PathShaping.cpp`:
 
@@ -1049,7 +1049,7 @@ std::size_t stepCostForPath(const std::vector<Position3D>& waypoints,
 } // namespace algorithm_207190406_209543255::detail
 ```
 
-- [ ] **Step 5: Register the new sources**
+- [x] **Step 5: Register the new sources**
 
 In `Algorithm/CMakeLists.txt`, add `src/PathShaping.cpp` to both the `Algorithm_207190406_209543255` source list and the `algorithm_test` source list, and add `tests/test_path_shaping.cpp` to `algorithm_test`:
 
@@ -1074,12 +1074,12 @@ add_executable(algorithm_test
 )
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cmake -S . -B build && cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='PathShaping.*'`
 Expected: PASS (7 tests).
 
-- [ ] **Step 7: Stage and propose the commit**
+- [x] **Step 7: Stage and propose the commit**
 
 ```bash
 git add Algorithm/src/PathShaping.h Algorithm/src/PathShaping.cpp Algorithm/tests/test_path_shaping.cpp Algorithm/CMakeLists.txt

@@ -1,6 +1,7 @@
 add_library(Algorithm_207190406_209543255 SHARED
     src/MappingAlgorithmFrontier.cpp
     src/MappingAlgorithmImpl.cpp
+    src/PathShaping.cpp
 )
 set_target_properties(Algorithm_207190406_209543255 PROPERTIES PREFIX "")
 target_link_libraries(Algorithm_207190406_209543255 PRIVATE common::common)
@@ -14,9 +15,11 @@ add_executable(algorithm_test
     tests/test_mapping_algorithm.cpp
     tests/test_mapping_algorithm_frontier.cpp
     tests/test_lidar_cone.cpp
+    tests/test_path_shaping.cpp
     # Compile sources directly so tests are self-contained (no dlopen/shared lib).
     src/MappingAlgorithmFrontier.cpp
     src/MappingAlgorithmImpl.cpp
+    src/PathShaping.cpp
     # Stub: satisfies MappingAlgorithmRegistration ctor (provided by Simulator in prod).
     tests/StubPluginRegistration.cpp
 )
