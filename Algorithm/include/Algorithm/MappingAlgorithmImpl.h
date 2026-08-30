@@ -8,9 +8,9 @@
 
 namespace algorithm_207190406_209543255 {
 
-/// Budget-aware next-best-view exploration over a frontier reachability substrate.
-/// Each nextStep emits a movement and, when the resulting pose would observe something
-/// new, a scan in the same command.
+/// Wavefront Frontier Detection over the reachability substrate.
+/// Each nextStep emits a movement and, when the resulting pose would observe
+/// something new, a scan in the same command.
 class MappingAlgorithmImpl_207190406_209543255 final : public common::IMappingAlgorithm {
 public:
     /// @param dependencies Mission, sensor, drone, and output-map dependencies.
@@ -48,8 +48,8 @@ private:
     [[nodiscard]] common::types::DroneState predictPose(
         const common::types::DroneState& state,
         const common::types::MovementCommand& movement) const;
-    [[nodiscard]] std::optional<common::Orientation> bestTravelScan(
-        const common::types::DroneState& predicted) const;
+    void buildArrivalSweep(const common::types::DroneState& state);
+    [[nodiscard]] bool targetClusterAlive() const;
     [[nodiscard]] bool reachedWaypoint(const common::types::DroneState& state,
                                        const common::Position3D& target) const;
     [[nodiscard]] bool samePosition(const common::Position3D& a,
@@ -58,10 +58,11 @@ private:
     std::unique_ptr<Impl> impl_;
 
     static constexpr int kMaxMovingStallTicks = 2;
-    static constexpr std::size_t kReplanIntervalSteps = 10;
+    static constexpr std::size_t kReplanIntervalSteps = 25;
     static constexpr std::size_t kBlockedTtlSteps = 50;
     static constexpr int kRecoveryAttempts = 3;
-    static constexpr std::size_t kTravelScanProbes = 6;
+    static constexpr int kLowRateReplans = 3;
+    static constexpr double kMinInformationRate = 0.25;
 };
 
 } // namespace algorithm_207190406_209543255

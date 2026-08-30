@@ -1,20 +1,19 @@
 // MappingAlgorithmImpl.cpp
-// Budget-aware next-best-view exploration: hold a plan, emit one command per nextStep.
+// Wavefront frontier execution: hold a plan, emit one command per nextStep.
 
 #include <Algorithm/MappingAlgorithmImpl.h>
 
-#include "NbvPlanner.h"
+#include "ScanPlanning.h"
+#include "WavefrontPlanner.h"
 
-#include <user_common_207190406_209543255/LidarCone.h>
+#include <user_common_207190406_209543255/ConeTemplate.h>
 
 #include <Common/MappingAlgorithmRegistration.h>
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <numbers>
 #include <optional>
-#include <unordered_set>
 #include <vector>
 
 namespace algorithm_207190406_209543255 {
@@ -47,20 +46,23 @@ constexpr double kPositionEpsilon = 1e-6;
 } // namespace
 
 struct MappingAlgorithmImpl_207190406_209543255::Impl {
-    detail::NbvPlanner planner{};
+    detail::WavefrontPlanner planner{};
     detail::ExplorationPlan plan{};
+    detail::FrontierCells last_frontier{};
+    user_common_207190406_209543255::cone_template::ConeTemplateCache templates{};
+    user_common_207190406_209543255::cone_template::VoxelStamp stamp{};
+    std::vector<common::Orientation> arrival_scans{};
+    std::size_t arrival_scan_index = 0;
     std::size_t waypoint_index = 0;
-    std::size_t terminal_scan_index = 0;
     std::size_t steps_since_replan = 0;
     bool has_plan = false;
-
     int moving_stall_ticks = 0;
     Position3D last_position{};
     bool has_last_position = false;
-
     detail::BlockedCells blocked_cells{};
-    detail::GridIntMap blocked_since{};  ///< cell -> step_index of insertion (TTL)
+    detail::GridIntMap blocked_since{};
     int recovery_attempts = 0;
+    int low_rate_replans = 0;
     bool finished = false;
     bool planning_initialized = false;
 };
@@ -172,16 +174,32 @@ void MappingAlgorithmImpl_207190406_209543255::pruneExpiredBlockedCells(std::siz
 
 bool MappingAlgorithmImpl_207190406_209543255::replan(const types::DroneState& state,
                                                       bool ignore_blocked) {
-    const detail::NbvInputs inputs{
+    const detail::WavefrontInputs inputs{
         output_map_, state, lidar_config_, drone_config_,
         remainingSteps(state), impl_->blocked_cells, ignore_blocked,
     };
     impl_->plan = impl_->planner.plan(inputs);
     impl_->waypoint_index = 0;
-    impl_->terminal_scan_index = 0;
+    impl_->arrival_scans.clear();
+    impl_->arrival_scan_index = 0;
     impl_->steps_since_replan = 0;
     impl_->has_plan = impl_->plan.valid;
+    impl_->last_frontier = impl_->plan.frontier_cells;
     return impl_->has_plan;
+}
+
+void MappingAlgorithmImpl_207190406_209543255::buildArrivalSweep(
+    const types::DroneState& state) {
+    const auto& templates =
+        impl_->templates.get(lidar_config_, output_map_.getMapConfig().resolution);
+    impl_->arrival_scans = detail::buildSweepDirections(
+        output_map_, state.position, lidar_config_, impl_->last_frontier,
+        templates, impl_->stamp);
+    impl_->arrival_scan_index = 0;
+}
+
+bool MappingAlgorithmImpl_207190406_209543255::targetClusterAlive() const {
+    return detail::clusterStillFrontier(output_map_, impl_->plan.target_keys);
 }
 
 types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
@@ -222,34 +240,6 @@ types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
     return next;
 }
 
-std::optional<Orientation> MappingAlgorithmImpl_207190406_209543255::bestTravelScan(
-    const types::DroneState& predicted) const {
-    namespace lc = user_common_207190406_209543255::lidar_cone;
-    // Probe only the axis-aligned directions (always the first six emitted) so a
-    // per-step scan choice stays cheap; the viewpoint's scans were scored over the
-    // full direction set at plan time.
-    const std::vector<Orientation> world = detail::NbvPlanner::scanDirections(lidar_config_);
-    const std::size_t probes = std::min(kTravelScanProbes, world.size());
-
-    std::optional<Orientation> best;
-    std::size_t best_gain = 0;
-    for (std::size_t i = 0; i < probes; ++i) {
-        std::unordered_set<std::int64_t> seen;
-        const std::size_t gain = lc::countUnresolvedVoxels(
-            output_map_, predicted.position, Orientation{}, world[i], lidar_config_, seen);
-        if (gain > best_gain) {
-            best_gain = gain;
-            best = world[i];
-        }
-    }
-    if (!best.has_value()) {
-        return std::nullopt;
-    }
-    // Emit relative to the predicted heading: MissionControl scans after moving.
-    return Orientation{best->horizontal - predicted.heading.horizontal,
-                       best->altitude - predicted.heading.altitude};
-}
-
 types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     const types::DroneState& state, const types::LidarScanResult* latest_scan) {
     [[maybe_unused]] const types::LidarScanResult* unused_scan = latest_scan;
@@ -263,7 +253,6 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     ensurePlanningReady();
     pruneExpiredBlockedCells(state.step_index);
 
-    // Stall detection: the waypoint we are driving at is not reachable in practice.
     if (impl_->has_plan && impl_->waypoint_index < impl_->plan.waypoints.size() &&
         impl_->has_last_position && samePosition(impl_->last_position, state.position)) {
         if (++impl_->moving_stall_ticks >= kMaxMovingStallTicks) {
@@ -280,24 +269,39 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     impl_->last_position = state.position;
     impl_->has_last_position = true;
 
-    // Advance past waypoints already reached.
     while (impl_->has_plan && impl_->waypoint_index < impl_->plan.waypoints.size() &&
            reachedWaypoint(state, impl_->plan.waypoints[impl_->waypoint_index])) {
         ++impl_->waypoint_index;
     }
 
-    const bool plan_exhausted =
-        !impl_->has_plan ||
-        (impl_->waypoint_index >= impl_->plan.waypoints.size() &&
-         impl_->terminal_scan_index >= impl_->plan.terminal_scans.size());
-    const bool interval_elapsed = impl_->steps_since_replan >= kReplanIntervalSteps;
+    const bool waypoints_done =
+        impl_->has_plan && impl_->waypoint_index >= impl_->plan.waypoints.size();
+    if (waypoints_done && impl_->arrival_scans.empty() &&
+        impl_->arrival_scan_index == 0) {
+        buildArrivalSweep(state);
+    }
 
-    if (plan_exhausted || interval_elapsed) {
-        if (!replan(state, false)) {
-            // Nothing feasible with the blocked set honoured: try recovery, then decide.
-            if (impl_->recovery_attempts < kRecoveryAttempts && replan(state, true)) {
+    const bool scans_done =
+        impl_->arrival_scan_index >= impl_->arrival_scans.size();
+    const bool plan_exhausted =
+        !impl_->has_plan || (waypoints_done && scans_done);
+    const bool interval_elapsed = impl_->steps_since_replan >= kReplanIntervalSteps;
+    const bool cluster_dead =
+        impl_->has_plan && !targetClusterAlive();
+
+    if (plan_exhausted || interval_elapsed || cluster_dead) {
+        const bool have = replan(state, false);
+        const bool low = !have || impl_->plan.expected_rate < kMinInformationRate;
+        if (low) {
+            ++impl_->low_rate_replans;
+            if (!have && impl_->recovery_attempts < kRecoveryAttempts &&
+                replan(state, true)) {
                 ++impl_->recovery_attempts;
-            } else {
+                if (impl_->plan.expected_rate >= kMinInformationRate) {
+                    impl_->low_rate_replans = 0;
+                    impl_->recovery_attempts = 0;
+                }
+            } else if (impl_->low_rate_replans >= kLowRateReplans) {
                 impl_->finished = true;
                 types::MappingStepCommand cmd{};
                 cmd.status = detail::hasAnyNotMappedInBounds(output_map_)
@@ -306,8 +310,11 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
                 return cmd;
             }
         } else {
+            impl_->low_rate_replans = 0;
             impl_->recovery_attempts = 0;
         }
+        impl_->arrival_scans.clear();
+        impl_->arrival_scan_index = 0;
     }
 
     ++impl_->steps_since_replan;
@@ -319,20 +326,33 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
         const Position3D& target = impl_->plan.waypoints[impl_->waypoint_index];
         cmd.movement = movementToward(state, target);
         if (cmd.movement.has_value()) {
-            cmd.scan_orientation = bestTravelScan(predictPose(state, *cmd.movement));
+            const types::DroneState predicted = predictPose(state, *cmd.movement);
+            const auto& templates = impl_->templates.get(
+                lidar_config_, output_map_.getMapConfig().resolution);
+            const std::optional<Orientation> world = detail::bestTravelScan(
+                output_map_, predicted, target, lidar_config_, impl_->last_frontier,
+                templates, impl_->stamp);
+            if (world.has_value()) {
+                cmd.scan_orientation =
+                    Orientation{world->horizontal - predicted.heading.horizontal,
+                                world->altitude - predicted.heading.altitude};
+            }
         }
         return cmd;
     }
 
-    if (impl_->terminal_scan_index < impl_->plan.terminal_scans.size()) {
-        const Orientation& world = impl_->plan.terminal_scans[impl_->terminal_scan_index++];
+    if (impl_->arrival_scans.empty()) {
+        buildArrivalSweep(state);
+    }
+    if (impl_->arrival_scan_index < impl_->arrival_scans.size()) {
+        const Orientation& world = impl_->arrival_scans[impl_->arrival_scan_index++];
         cmd.scan_orientation = Orientation{world.horizontal - state.heading.horizontal,
                                            world.altitude - state.heading.altitude};
         return cmd;
     }
 
-    cmd.movement = types::MovementCommand{};  // Hover; the next call replans.
     impl_->has_plan = false;
+    cmd.movement = types::MovementCommand{};
     return cmd;
 }
 

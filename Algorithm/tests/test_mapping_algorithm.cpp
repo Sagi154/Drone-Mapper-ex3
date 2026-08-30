@@ -584,3 +584,45 @@ TEST(MappingAlgorithm, TerminatesWhenBudgetIsExhausted) {
     }
     EXPECT_NE(status, ct::AlgorithmStatus::Working);
 }
+
+TEST(MappingAlgorithm, FinishesAfterConsecutiveLowRateReplans) {
+    const ct::MapConfig config = makeCorridorConfig();
+    Map output_map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    // Isolated leftover far from start so travel+reserve keeps rate below 0.25.
+    output_map.set(gridPoint(9, 9, 9, config), ct::VoxelOccupancy::Unmapped);
+    fillStartBubble(output_map, 1, 1, 1, config);
+
+    const auto mc = makeMissionConfig();
+    const auto lc = makeLidarConfig();
+    const auto dc = makeDroneConfig();
+    Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
+
+    const ct::DroneState state{gridPoint(1, 1, 1, config), Orientation{0.0 * deg, 0.0 * deg}, 0};
+    const ct::AlgorithmStatus status = runUntilTerminal(algorithm, state, 200);
+    EXPECT_EQ(status, ct::AlgorithmStatus::FinishedWithUnmappableVoxels);
+}
+
+TEST(MappingAlgorithm, AbandonsPlanWhenTargetClusterIsResolved) {
+    const ct::MapConfig config = makeCorridorConfig();
+    Map output_map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    fillEmptyBox(output_map, 0, 8, 0, 10, 0, 10, config);
+    output_map.set(gridPoint(10, 5, 5, config), ct::VoxelOccupancy::Unmapped);
+
+    auto lc = makeLidarConfig();
+    lc.z_max = 40.0 * cm;
+    Impl algorithm{common::MappingAlgorithmDependencies{
+        makeMissionConfig(), lc, makeDroneConfig(), output_map}};
+
+    const ct::DroneState state{gridPoint(2, 5, 5, config), Orientation{0.0 * deg, 0.0 * deg}, 0};
+    const auto first = algorithm.nextStep(state, nullptr);
+    ASSERT_EQ(first.status, ct::AlgorithmStatus::Working);
+
+    // Resolve the only unknown. The stored cluster is no longer a frontier.
+    output_map.set(gridPoint(10, 5, 5, config), ct::VoxelOccupancy::Empty);
+
+    ct::AlgorithmStatus status = ct::AlgorithmStatus::Working;
+    for (int i = 0; i < 30 && status == ct::AlgorithmStatus::Working; ++i) {
+        status = algorithm.nextStep(state, nullptr).status;
+    }
+    EXPECT_NE(status, ct::AlgorithmStatus::Working);
+}
