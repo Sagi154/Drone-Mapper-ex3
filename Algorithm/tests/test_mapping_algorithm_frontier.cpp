@@ -337,3 +337,102 @@ TEST(MappingAlgorithm, FrontierHasUnmappedFaceNeighbourOnCm10Grid) {
     EXPECT_TRUE(detail::hasNotMappedInSphere(map, centre, 7.5 * cm));
     EXPECT_FALSE(detail::hasNotMappedInSphere(map, centre, 4.0 * cm));
 }
+
+TEST(MappingAlgorithm, ExploreReachableFindsFrontierAdjacentCandidates) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    // A single Unmapped pocket makes exactly its neighbours frontier-adjacent.
+    map.set(pointCm(50, 50, 50), ct::VoxelOccupancy::Unmapped);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const Position3D start = pointCm(0, 0, 0);
+    const detail::ReachabilityResult result = frontier.exploreReachable(
+        map, start, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map));
+
+    EXPECT_TRUE(result.start_passable);
+    EXPECT_FALSE(result.truncated);
+    ASSERT_FALSE(result.candidates.empty());
+    for (const detail::ReachableCell& cell : result.candidates) {
+        EXPECT_GT(cell.unmapped_neighbours, 0);
+        EXPECT_GT(cell.cost, 0);
+    }
+}
+
+TEST(MappingAlgorithm, ExploreReachableStrideDeduplicatesCandidates) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Unmapped};
+    // Everything Unmapped: every reachable cell is frontier-adjacent, so stride
+    // is the only thing bounding the candidate count.
+    const detail::MappingAlgorithmFrontier frontier;
+    const Position3D start = pointCm(50, 50, 50);
+
+    const std::size_t dense = frontier.exploreReachable(
+        map, start, 4.0 * cm, {}, 1, detail::maxExpansionsForMap(map)).candidates.size();
+    const std::size_t strided = frontier.exploreReachable(
+        map, start, 4.0 * cm, {}, 3, detail::maxExpansionsForMap(map)).candidates.size();
+
+    EXPECT_GT(dense, strided);
+    EXPECT_GT(strided, 0u);
+}
+
+TEST(MappingAlgorithm, ExploreReachableRespectsExpansionCap) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const detail::MappingAlgorithmFrontier frontier;
+    const Position3D start = pointCm(50, 50, 50);
+
+    const detail::ReachabilityResult result =
+        frontier.exploreReachable(map, start, 4.0 * cm, {}, 1, 5);
+
+    EXPECT_TRUE(result.truncated);
+}
+
+TEST(MappingAlgorithm, ExploreReachableReportsStartPassabilityWithCapOfOne) {
+    // A cap of 1 makes this an O(1) start-passability probe — the replacement for
+    // diagnose().start_passable, which task 6 deletes.
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config};
+    map.set(pointCm(50, 50, 50), ct::VoxelOccupancy::Empty);
+    map.set(pointCm(60, 50, 50), ct::VoxelOccupancy::Occupied);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 50), 7.5 * cm, {}, 1, 1)
+                     .start_passable);
+    EXPECT_TRUE(frontier.exploreReachable(map, pointCm(50, 50, 50), 4.0 * cm, {}, 1, 1)
+                    .start_passable);
+}
+
+TEST(MappingAlgorithm, LineOfSightBlockedByOccupiedVoxel) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D from = pointCm(0, 0, 0);
+    const Position3D to = pointCm(50, 0, 0);
+
+    EXPECT_TRUE(detail::hasClearLineOfSight(map, from, to, 4.0 * cm));
+
+    map.set(pointCm(30, 0, 0), ct::VoxelOccupancy::Occupied);
+    EXPECT_FALSE(detail::hasClearLineOfSight(map, from, to, 4.0 * cm));
+}
+
+TEST(MappingAlgorithm, MaxExpansionsCoversMapVolume) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    // 0..100 cm inclusive at 10 cm on three axes = 11^3.
+    EXPECT_GE(detail::maxExpansionsForMap(map), 11u * 11u * 11u);
+}
+
+TEST(MappingAlgorithm, ExploreReachableTerminatesWithoutOccupancyBound) {
+    ct::MapConfig config = makeCm10Config();
+    // Huge bounds, nothing Occupied: only the expansion cap can stop the walk.
+    config.boundaries.max_x = 100000.0 * x_extent[cm];
+    config.boundaries.max_y = 100000.0 * y_extent[cm];
+    config.boundaries.max_height = 100000.0 * z_extent[cm];
+    Map map{{10000, 10000, 10000}, config, ct::VoxelOccupancy::Unmapped};
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const Position3D start = pointCm(0, 0, 0);
+    const detail::ReachabilityResult result =
+        frontier.exploreReachable(map, start, 4.0 * cm, {}, 3, 20000);
+
+    EXPECT_TRUE(result.truncated);
+}

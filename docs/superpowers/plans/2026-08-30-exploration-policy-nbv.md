@@ -366,7 +366,7 @@ Additive only — nothing is deleted yet, so the existing algorithm keeps workin
   - `bool hasClearLineOfSight(const common::IMap3D&, const common::Position3D& from, const common::Position3D& to, common::PhysicalLength drone_radius)`
   - `std::size_t maxExpansionsForMap(const common::IMap3D&)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `Algorithm/tests/test_mapping_algorithm_frontier.cpp`. That file already provides `detail`, `Map`, `pointCm(x, y, z)`, `makeCm10Config()` (0..100 cm at 10 cm) and `ct` — reuse them; do not add parallel helpers.
 
@@ -457,12 +457,12 @@ TEST(MappingAlgorithm, MaxExpansionsCoversMapVolume) {
 
 If `makeCm10Config()` bounds differ from 0..100 cm, adjust the last assertion to that config's volume rather than changing the config — other tests depend on it.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='MappingAlgorithm.Explore*:MappingAlgorithm.LineOfSight*:MappingAlgorithm.MaxExpansions*'`
 Expected: compile error — `exploreReachable`, `hasClearLineOfSight`, `maxExpansionsForMap` do not exist.
 
-- [ ] **Step 3: Declare the new API**
+- [x] **Step 3: Declare the new API**
 
 In `MappingAlgorithmFrontier.h`, after `FrontierPathResult`:
 
@@ -519,7 +519,7 @@ And after the class, next to the other free functions:
 [[nodiscard]] std::size_t maxExpansionsForMap(const common::IMap3D& map);
 ```
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 In `MappingAlgorithmFrontier.cpp`, add `#include <cstddef>` and `#include <unordered_map>` if absent, then append these definitions inside `namespace algorithm_207190406_209543255::detail`:
 
@@ -683,12 +683,12 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
 
 There is deliberately **no** mid-search edge-set change here — unlike `findPath:456-460`, the edge set is fixed, so the Dijkstra costs are real shortest-path costs. Frontier preference lives in the NBV objective, not in the search.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cmake --build build -j && ./build/Algorithm/algorithm_test --gtest_filter='MappingAlgorithm.Explore*:MappingAlgorithm.LineOfSight*:MappingAlgorithm.MaxExpansions*'`
 Expected: PASS (5 tests).
 
-- [ ] **Step 6: Add the ALG28 regression test**
+- [x] **Step 6: Add the ALG28 regression test**
 
 The mutation the ex2 grader used was `isSpherePassable` → `return true`. We cannot mutate a static function from a test, so assert the property that makes the mutation survivable: a search on an all-`Unmapped` map with no occupancy anywhere terminates and reports truncation rather than running forever.
 
@@ -713,7 +713,7 @@ TEST(MappingAlgorithm, ExploreReachableTerminatesWithoutOccupancyBound) {
 Run: `./build/Algorithm/algorithm_test --gtest_filter='MappingAlgorithm.ExploreReachableTerminatesWithoutOccupancyBound'`
 Expected: PASS in well under a second.
 
-- [ ] **Step 7: Stage and propose the commit**
+- [x] **Step 7: Stage and propose the commit**
 
 ```bash
 git add Algorithm/src/MappingAlgorithmFrontier.h Algorithm/src/MappingAlgorithmFrontier.cpp Algorithm/tests/test_mapping_algorithm_frontier.cpp

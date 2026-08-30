@@ -42,6 +42,22 @@ struct FrontierPathResult {
     GridKey frontier_key{};
 };
 
+/// A reachable cell that borders unresolved space — an NBV viewpoint candidate.
+struct ReachableCell {
+    GridKey key{};
+    common::Position3D position{};
+    int cost = 0;                 ///< Dijkstra traversal cost from start.
+    int unmapped_neighbours = 0;  ///< Unmapped cells in the 26-neighbourhood (cheap prefilter).
+};
+
+struct ReachabilityResult {
+    bool start_passable = false;
+    bool truncated = false;  ///< Expansion cap hit; treat the result as partial.
+    GridKey start_key{};
+    ParentMap parent_of{};
+    std::vector<ReachableCell> candidates{};
+};
+
 struct PlanningDiagnostics {
     bool start_passable = false;
     std::size_t passable_reached = 0;
@@ -67,6 +83,18 @@ public:
         const common::Position3D& goal,
         common::PhysicalLength drone_radius,
         const BlockedCells& blocked_cells = {}) const;
+
+    /// Dijkstra over the passable component with a FIXED edge set, collecting
+    /// frontier-adjacent cells deduplicated onto a stride lattice (lowest cost per
+    /// bucket wins). Bounded by max_expansions so a broken passability check yields
+    /// a truncated result instead of an unbounded walk (ALG28).
+    [[nodiscard]] ReachabilityResult exploreReachable(
+        const common::IMap3D& map,
+        const common::Position3D& start,
+        common::PhysicalLength drone_radius,
+        const BlockedCells& blocked_cells,
+        int stride_cells,
+        std::size_t max_expansions) const;
 
     /// Like findPath but targets the deepest frontier in the passable component.
     [[nodiscard]] FrontierPathResult findFarthestPath(
@@ -119,5 +147,20 @@ public:
 [[nodiscard]] bool hasAnyNotMappedInBounds(const common::IMap3D& map);
 
 [[nodiscard]] std::size_t countUnmappedInBounds(const common::IMap3D& map);
+
+/// Walks parent links from goal back to start. Empty result when goal is unreachable.
+[[nodiscard]] FrontierPathResult reconstructPathTo(const ParentMap& parent_of,
+                                                   const GridKey& start_key,
+                                                   const GridKey& goal_key,
+                                                   const common::types::MapConfig& config);
+
+/// True when the straight segment from..to is sphere-passable at every half-resolution sample.
+[[nodiscard]] bool hasClearLineOfSight(const common::IMap3D& map,
+                                       const common::Position3D& from,
+                                       const common::Position3D& to,
+                                       common::PhysicalLength drone_radius);
+
+/// Voxel count of the mission bounds — the expansion cap for every search.
+[[nodiscard]] std::size_t maxExpansionsForMap(const common::IMap3D& map);
 
 } // namespace algorithm_207190406_209543255::detail

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <queue>
 #include <unordered_map>
@@ -883,6 +884,162 @@ PlanningDiagnostics MappingAlgorithmFrontier::diagnose(
     diag.nearest_unknown_steps = (nearest_unknown == kInf) ? -1 : nearest_unknown;
     diag.explore_path_available = (best_unknown_steps != kInf);
     return diag;
+}
+
+std::size_t maxExpansionsForMap(const IMap3D& map) {
+    const types::MapConfig config = map.getMapConfig();
+    const double step = gridStepCm(config);
+    if (!(step > 0.0)) {
+        return 1;
+    }
+    const types::MappingBounds& b = config.boundaries;
+    const auto span = [step](double lo, double hi) {
+        return static_cast<std::size_t>(std::max(0.0, std::floor((hi - lo) / step))) + 1U;
+    };
+    const std::size_t nx = span(b.min_x.force_numerical_value_in(cm),
+                                b.max_x.force_numerical_value_in(cm));
+    const std::size_t ny = span(b.min_y.force_numerical_value_in(cm),
+                                b.max_y.force_numerical_value_in(cm));
+    const std::size_t nz = span(b.min_height.force_numerical_value_in(cm),
+                                b.max_height.force_numerical_value_in(cm));
+    return nx * ny * nz;
+}
+
+bool hasClearLineOfSight(const IMap3D& map,
+                         const Position3D& from,
+                         const Position3D& to,
+                         PhysicalLength drone_radius) {
+    const types::MapConfig config = map.getMapConfig();
+    const double step = gridStepCm(config);
+    if (!(step > 0.0)) {
+        return false;
+    }
+    const double radius_cm = drone_radius.force_numerical_value_in(cm);
+    const double dx = to.x.force_numerical_value_in(cm) - from.x.force_numerical_value_in(cm);
+    const double dy = to.y.force_numerical_value_in(cm) - from.y.force_numerical_value_in(cm);
+    const double dz = to.z.force_numerical_value_in(cm) - from.z.force_numerical_value_in(cm);
+    const double length = std::sqrt(dx * dx + dy * dy + dz * dz);
+    const double sample = step * 0.5;
+    const int samples = static_cast<int>(std::ceil(length / sample));
+
+    for (int i = 0; i <= samples; ++i) {
+        const double t = (samples == 0) ? 0.0 : static_cast<double>(i) / samples;
+        const Position3D probe{
+            (from.x.force_numerical_value_in(cm) + dx * t) * x_extent[cm],
+            (from.y.force_numerical_value_in(cm) + dy * t) * y_extent[cm],
+            (from.z.force_numerical_value_in(cm) + dz * t) * z_extent[cm],
+        };
+        if (!isSpherePassable(map, probe, radius_cm, step, {})) {
+            return false;
+        }
+    }
+    return true;
+}
+
+FrontierPathResult reconstructPathTo(const ParentMap& parent_of,
+                                     const GridKey& start_key,
+                                     const GridKey& goal_key,
+                                     const types::MapConfig& config) {
+    if (!parent_of.contains(goal_key)) {
+        return {};
+    }
+    FrontierPathResult result = reconstructPath(start_key, goal_key, parent_of, config);
+    result.frontier_key = goal_key;
+    return result;
+}
+
+ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
+    const IMap3D& map,
+    const Position3D& start,
+    PhysicalLength drone_radius,
+    const BlockedCells& blocked_cells,
+    int stride_cells,
+    std::size_t max_expansions) const {
+    const types::MapConfig config = map.getMapConfig();
+    const double step = gridStepCm(config);
+    const double radius_cm = drone_radius.force_numerical_value_in(cm);
+    const int stride = std::max(1, stride_cells);
+
+    ReachabilityResult out;
+    out.start_key = quantizePosition(start, config);
+    const Position3D start_pt = keyToPoint(out.start_key, config);
+    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
+        return out;
+    }
+    out.start_passable = true;
+
+    GridIntMap cost_of;
+    CostQueue queue;
+    out.parent_of[out.start_key] = out.start_key;
+    cost_of[out.start_key] = 0;
+    queue.push({0, out.start_key});
+
+    // bucket key -> index into out.candidates, lowest cost per bucket wins.
+    std::unordered_map<GridKey, std::size_t, GridKeyHash> bucket_of;
+    std::size_t expansions = 0;
+
+    while (!queue.empty()) {
+        if (++expansions > max_expansions) {
+            out.truncated = true;
+            break;
+        }
+        const auto [current_cost, current] = queue.top();
+        queue.pop();
+        if (current_cost > cost_of.at(current)) {
+            continue;
+        }
+        const Position3D current_pt = keyToPoint(current, config);
+
+        if (!(current == out.start_key)) {
+            int unmapped = 0;
+            for (int dx = -1; dx <= 1; ++dx) {
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dz = -1; dz <= 1; ++dz) {
+                        if (dx == 0 && dy == 0 && dz == 0) {
+                            continue;
+                        }
+                        const Position3D nb = keyToPoint(
+                            GridKey{current.qx + dx, current.qy + dy, current.qz + dz}, config);
+                        if (occupancyAt(map, nb) == types::VoxelOccupancy::Unmapped) {
+                            ++unmapped;
+                        }
+                    }
+                }
+            }
+            if (unmapped > 0) {
+                const auto floor_div = [stride](int v) {
+                    return (v >= 0) ? (v / stride) : -(((-v) + stride - 1) / stride);
+                };
+                const GridKey bucket{floor_div(current.qx), floor_div(current.qy),
+                                     floor_div(current.qz)};
+                const ReachableCell cell{current, current_pt, current_cost, unmapped};
+                const auto it = bucket_of.find(bucket);
+                if (it == bucket_of.end()) {
+                    bucket_of[bucket] = out.candidates.size();
+                    out.candidates.push_back(cell);
+                } else if (current_cost < out.candidates[it->second].cost) {
+                    out.candidates[it->second] = cell;
+                }
+            }
+        }
+
+        for (const Offset& off : kOffsets) {
+            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
+            const Position3D neighbour_pt = keyToPoint(neighbour, config);
+            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
+                continue;
+            }
+            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
+            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
+                continue;
+            }
+            out.parent_of[neighbour] = current;
+            cost_of[neighbour] = new_cost;
+            queue.push({new_cost, neighbour});
+        }
+    }
+
+    return out;
 }
 
 } // namespace algorithm_207190406_209543255::detail
