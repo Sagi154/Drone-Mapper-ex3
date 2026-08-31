@@ -349,3 +349,65 @@ TEST(WavefrontPlanner, IgnoreBlockedRecoversWhenTheBlockedSetSealsTheDrone) {
     EXPECT_TRUE(sealed.waypoints.empty());
     EXPECT_TRUE(recovered.valid);
 }
+
+TEST(WavefrontPlanner, AlternatesExcludeBestAndAreSortedByRate) {
+    Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
+    // Near, tiny crumb: 1 cell well +Y of start — isolated from -Y pocket (no shared frontier glue).
+    map.set(at(50.0, 160.0, 0.0), ct::VoxelOccupancy::Unmapped);
+    // Near, medium crumb on the -Y side — a second distinct cluster.
+    map.set(at(50.0, 40.0, 0.0), ct::VoxelOccupancy::Unmapped);
+    map.set(at(40.0, 40.0, 0.0), ct::VoxelOccupancy::Unmapped);
+    // Far, big room — more cells but much longer travel.
+    fillUnmappedBox(map, 14, 20, 6, 13, 0, 5);
+
+    const detail::WavefrontPlanner planner;
+    const ct::DroneState state = stateAt(at(50.0, 50.0, 0.0));
+    const detail::BlockedCells blocked;
+    std::vector<detail::ExplorationPlan> alternates;
+    const detail::ExplorationPlan best = planner.plan(
+        {map, state, makeLidar(), makeDrone(), 1000, blocked, false}, &alternates);
+
+    ASSERT_TRUE(best.valid);
+    ASSERT_EQ(alternates.size(), 2u);
+    for (const detail::ExplorationPlan& alt : alternates) {
+        EXPECT_LE(alt.expected_rate, best.expected_rate);
+    }
+    EXPECT_GE(alternates[0].expected_rate, alternates[1].expected_rate);
+    for (const detail::ExplorationPlan& alt : alternates) {
+        EXPECT_NE(alt.target_keys, best.target_keys);
+    }
+}
+
+TEST(WavefrontPlanner, AlternatesEmptyWithOnlyOneCluster) {
+    Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
+    fillUnmappedBox(map, 16, 20, 8, 12, 0, 2);
+
+    const detail::WavefrontPlanner planner;
+    const ct::DroneState state = stateAt(at(50.0, 100.0, 0.0));
+    const detail::BlockedCells blocked;
+    std::vector<detail::ExplorationPlan> alternates;
+    const detail::ExplorationPlan best = planner.plan(
+        {map, state, makeLidar(), makeDrone(), 1000, blocked, false}, &alternates);
+
+    ASSERT_TRUE(best.valid);
+    EXPECT_TRUE(alternates.empty());
+}
+
+TEST(WavefrontPlanner, AlternatesOmitClustersTheRemainingBudgetCannotAfford) {
+    Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
+    fillUnmappedBox(map, 18, 20, 8, 12, 0, 2);
+    map.set(at(50.0, 110.0, 0.0), ct::VoxelOccupancy::Unmapped);
+
+    const detail::WavefrontPlanner planner;
+    const ct::DroneState state = stateAt(at(0.0, 100.0, 0.0));
+    const detail::BlockedCells blocked;
+    std::vector<detail::ExplorationPlan> alternates;
+    const detail::ExplorationPlan best = planner.plan(
+        {map, state, makeLidar(), makeDrone(), 2, blocked, false}, &alternates);
+
+    // Budget is 2 steps: any candidate kept (best or alternate) must be free to reach.
+    if (best.valid) {
+        EXPECT_TRUE(best.waypoints.empty());
+    }
+    EXPECT_TRUE(alternates.empty());
+}

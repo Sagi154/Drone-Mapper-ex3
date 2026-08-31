@@ -77,7 +77,8 @@ constexpr std::size_t kMaxSweepReserve = 8;
 
 } // namespace
 
-ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
+ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
+                                       std::vector<ExplorationPlan>* alternates) const {
     const BlockedCells empty_blocked;
     const BlockedCells& blocked = in.ignore_blocked ? empty_blocked : in.blocked;
     const types::MapConfig config = in.map.getMapConfig();
@@ -157,8 +158,8 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
         ranked.resize(kRankedClusters);
     }
 
-    ExplorationPlan best;
-    double best_rate = -1.0;
+    std::vector<ExplorationPlan> candidates;
+    candidates.reserve(ranked.size());
     for (const FrontierCluster* cluster : ranked) {
         GridKey approach = cluster->approach_key;
         if (open_volume && approach == reach.start_key && cluster->keys.size() > 1) {
@@ -213,17 +214,28 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
         }
         const double rate = static_cast<double>(cluster_score(cluster)) /
                             static_cast<double>(travel + reserve);
-        if (rate > best_rate) {
-            best_rate = rate;
-            best.valid = true;
-            best.waypoints = std::move(waypoints);
-            best.target_cluster_cells = cluster_score(cluster);
-            best.expected_rate = rate;
-            best.target_keys = cluster->keys;
-            best.frontier_cells = reach.frontier_cells;
-        }
+        ExplorationPlan candidate;
+        candidate.valid = true;
+        candidate.waypoints = std::move(waypoints);
+        candidate.target_cluster_cells = cluster_score(cluster);
+        candidate.expected_rate = rate;
+        candidate.target_keys = cluster->keys;
+        candidate.frontier_cells = reach.frontier_cells;
+        candidates.push_back(std::move(candidate));
     }
-    return best;
+    if (candidates.empty()) {
+        return {};
+    }
+    // Stable sort: ties keep `ranked`'s original order, matching the old
+    // strict `rate > best_rate` first-wins tie-break exactly.
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [](const ExplorationPlan& a, const ExplorationPlan& b) {
+                         return a.expected_rate > b.expected_rate;
+                     });
+    if (alternates != nullptr) {
+        alternates->assign(candidates.begin() + 1, candidates.end());
+    }
+    return std::move(candidates.front());
 }
 
 } // namespace algorithm_207190406_209543255::detail
