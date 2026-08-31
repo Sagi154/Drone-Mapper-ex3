@@ -15,6 +15,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <numbers>
 #include <optional>
 #include <vector>
 
@@ -662,43 +663,97 @@ TEST(MappingAlgorithm, VisitsMultipleDisjointCrumbsAndFinishes) {
     Map output_map{{11, 11, 11}, config};
     fillEmptyBox(output_map, 0, 10, 0, 10, 0, 10, config);
     // Three small, separated Unmapped crumbs so the first replan ranks >1 cluster.
-    output_map.set(gridPoint(2, 2, 5, config), ct::VoxelOccupancy::Unmapped);
-    output_map.set(gridPoint(8, 2, 5, config), ct::VoxelOccupancy::Unmapped);
-    output_map.set(gridPoint(5, 8, 5, config), ct::VoxelOccupancy::Unmapped);
+    const std::array<std::array<int, 3>, 3> crumbs{{
+        {2, 2, 5},
+        {8, 2, 5},
+        {5, 8, 5},
+    }};
+    for (const auto& crumb : crumbs) {
+        output_map.set(gridPoint(crumb[0], crumb[1], crumb[2], config),
+                       ct::VoxelOccupancy::Unmapped);
+    }
 
     const auto mc = makeMissionConfig();
     const auto lc = makeLidarConfig();
     const auto dc = makeDroneConfig();
     Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
 
-    const auto classify_one = [&]() {
-        for (int x = 0; x < 11; ++x) {
-            for (int y = 0; y < 11; ++y) {
-                for (int z = 0; z < 11; ++z) {
-                    const Position3D p = gridPoint(x, y, z, config);
-                    if (output_map.atVoxel(p) == ct::VoxelOccupancy::Unmapped) {
-                        output_map.set(p, ct::VoxelOccupancy::Empty);
-                        return;
-                    }
-                }
-            }
+    ct::DroneState state{
+        gridPoint(5, 5, 5, config), Orientation{0.0 * deg, 0.0 * deg}, 0};
+    const auto apply_movement = [](ct::DroneState& current,
+                                   const ct::MovementCommand& movement) {
+        switch (movement.type) {
+        case ct::MovementCommandType::Hover:
+            break;
+        case ct::MovementCommandType::Rotate: {
+            const double delta =
+                movement.angle.force_numerical_value_in(deg) *
+                ((movement.rotation == ct::RotationDirection::Left) ? 1.0 : -1.0);
+            current.heading.horizontal =
+                (current.heading.horizontal.force_numerical_value_in(deg) + delta) * deg;
+            break;
+        }
+        case ct::MovementCommandType::Advance: {
+            const double distance = movement.distance.force_numerical_value_in(cm);
+            const double heading_radians =
+                current.heading.horizontal.force_numerical_value_in(deg) *
+                (std::numbers::pi / 180.0);
+            current.position = Position3D{
+                (current.position.x.force_numerical_value_in(cm) +
+                 distance * std::cos(heading_radians)) *
+                    x_extent[cm],
+                (current.position.y.force_numerical_value_in(cm) +
+                 distance * std::sin(heading_radians)) *
+                    y_extent[cm],
+                current.position.z,
+            };
+            break;
+        }
+        case ct::MovementCommandType::Elevate:
+            current.position = Position3D{
+                current.position.x,
+                current.position.y,
+                (current.position.z.force_numerical_value_in(cm) +
+                 movement.distance.force_numerical_value_in(cm)) *
+                    z_extent[cm],
+            };
+            break;
         }
     };
 
     ct::AlgorithmStatus last = ct::AlgorithmStatus::Working;
     for (int step = 0; step < 400 && last == ct::AlgorithmStatus::Working; ++step) {
-        if (step > 0) {
-            classify_one();
+        const ct::MappingStepCommand command = algorithm.nextStep(state, nullptr);
+        last = command.status;
+        if (command.movement) {
+            apply_movement(state, *command.movement);
         }
-        const ct::DroneState state{gridPoint(5, 5, 5, config),
-                                   Orientation{0.0 * deg, 0.0 * deg},
-                                   static_cast<std::size_t>(step)};
-        last = algorithm.nextStep(state, nullptr).status;
+        state.step_index = static_cast<std::size_t>(step + 1);
+
+        const double resolution = config.resolution.force_numerical_value_in(cm);
+        const int drone_x = static_cast<int>(
+            std::lround(state.position.x.force_numerical_value_in(cm) / resolution));
+        const int drone_y = static_cast<int>(
+            std::lround(state.position.y.force_numerical_value_in(cm) / resolution));
+        const int drone_z = static_cast<int>(
+            std::lround(state.position.z.force_numerical_value_in(cm) / resolution));
+        for (const auto& crumb : crumbs) {
+            const Position3D crumb_position =
+                gridPoint(crumb[0], crumb[1], crumb[2], config);
+            const int manhattan_distance = std::abs(drone_x - crumb[0]) +
+                                           std::abs(drone_y - crumb[1]) +
+                                           std::abs(drone_z - crumb[2]);
+            if (manhattan_distance <= 1 &&
+                output_map.atVoxel(crumb_position) == ct::VoxelOccupancy::Unmapped) {
+                output_map.set(crumb_position, ct::VoxelOccupancy::Empty);
+            }
+        }
     }
     EXPECT_NE(last, ct::AlgorithmStatus::Working) << "did not finish within budget";
-    EXPECT_EQ(output_map.atVoxel(gridPoint(2, 2, 5, config)), ct::VoxelOccupancy::Empty);
-    EXPECT_EQ(output_map.atVoxel(gridPoint(8, 2, 5, config)), ct::VoxelOccupancy::Empty);
-    EXPECT_EQ(output_map.atVoxel(gridPoint(5, 8, 5, config)), ct::VoxelOccupancy::Empty);
+    for (const auto& crumb : crumbs) {
+        EXPECT_EQ(output_map.atVoxel(gridPoint(crumb[0], crumb[1], crumb[2], config)),
+                  ct::VoxelOccupancy::Empty);
+    }
 }
 
 TEST(MappingAlgorithm, FinishesAfterConsecutiveLowRateReplans) {
