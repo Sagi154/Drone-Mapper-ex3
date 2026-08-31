@@ -373,8 +373,16 @@ Honest sum **1589.4** (`docs/benchmarks/2026-08-31-score_aware_nav.{csv,md}`). T
 `house_full` cells were start-sphere OOB / Occupied-floor quits plus ceiling-trapped
 horizontal sweeping. Fixes: OOB does not fail an in-bounds centre; unstick; Empty-surface
 ranking; no downward cones at `max_height` plus a forced descend. Do not unmask cone gain
-globally (measured room collapse). Ex2 bands still missed on house_full / outdoor /
-`small_out`. Pickup: `docs/mapping-algorithm-rewrite-pickup.md`.
+globally (measured room collapse).
+
+### Outdoor Empty-carve (2026-08-31)
+
+Honest sum **1793.4** (`docs/benchmarks/2026-08-31-outdoor-empty-carve.{csv,md}`).
+`small_out` mean 30→73 (gap 2 vs band 75–89) by volume-carving non-downward cones on the
+200 cm cube and capping arrival sweeps at 4. `large_out` short-lidar horizon volume puts
+large+short at **85.6** (inside 80–88); long-lidar horizon volume on the 300 cm cube was
+measured and reverted. `house_full` unchanged at 30.46. Rooms / `house_lower` 100 held.
+Pickup: `docs/mapping-algorithm-rewrite-pickup.md`.
 
 ## Related docs
 

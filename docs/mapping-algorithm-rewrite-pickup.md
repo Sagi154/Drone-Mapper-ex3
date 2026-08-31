@@ -16,7 +16,7 @@ mp-units conversion).
 | Item | Value |
 |------|--------|
 | Branch | `algorithm-benchmark-harness` (from up-to-date `main` at start of work) |
-| Tip (approx) | score-aware nav follow-up (OOB/unstick/ceiling descend) |
+| Tip (approx) | outdoor Empty-carve (small_out volume + short-lidar horizon; house_full unchanged) |
 
 ---
 
@@ -112,13 +112,23 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 - vs ex2: **inside** house_lower, large_room; **below** house_full (mean 6.50), large_out (43.47), small_out (38.36), small_room (70.03).
 - Three `house_full` variants at **0.06** (two in 3 steps, one at 10000).
 
-### Score-aware nav (post-F follow-up) — `honest` ← **current column**
+### Score-aware nav (post-F follow-up) — historical
 
 - Score sum **1589.4**, steps **92452**, **0× `MAX_STEPS`**, 0 errors.
 - CSV/md: `docs/benchmarks/2026-08-31-score_aware_nav.{csv,md}`.
 - vs ex2: **inside** house_lower, large_room (94.47); **below** house_full (30.46, was 6.50), large_out (59.84), small_out (30.46), small_room (82.12).
 - `house_full` 0.06×3 is gone. Profiling small+short **48.33**. Large-drone `small_room` **85–86** (was 49–59).
 - `kMinInformationRate` / empty-stay cut **did not bind** on the 10k-step cells.
+
+### Outdoor Empty-carve — `honest` ← **current column**
+
+- Score sum **1793.4**, steps **92464**, **3× `MAX_STEPS`**, 0 errors.
+- CSV/md: `docs/benchmarks/2026-08-31-outdoor-empty-carve.{csv,md}`.
+- vs ex2: **inside** house_lower, large_room; **below** house_full (30.46, gap 25.5), large_out (68.50, gap 11.5), small_out (72.81, gap 2.2), small_room (82.11).
+- `small_out` small-drone cells **81–82** (inside 75–89); large+short **90.9**. Group drag is large+long **36**.
+- `large_out` large+short **85.6** (inside 80–88). Long-lidar horizon volume on the 300 cm cube was measured and **reverted** (73→39).
+- `house_full` identical to score-aware nav (15–48). Rooms / `house_lower` 100 did not regress.
+- Do **not** globally unmask cone gain (rooms collapse). `small_out` (200 cm cube) may volume-carve non-downward cones; `large_out` long lidar stays masked.
 
 ### Adversarial (hits-only foreign MC)
 
@@ -146,11 +156,11 @@ Diagnosed post-F failure modes (2026-08-31):
 | Large drone quits after painting a floor | r=7.5 hits Occupied face neighbour (nearest 5). Planner returned invalid instead of `findUnstickPath`. | Unstick plan when start is blocked. |
 | `house_full` 10k steps, score stuck ~15–37 | Downward scans at the ceiling paint PO (`z_min`) into the slab (pass-2). Gating those scans then left start as the cheapest frontier (Unmapped still below) so we never descended. | Gate downward cones at `max_height`; force a one-step descend when Unmapped is below. |
 | 10k steps that do not raise score | Cluster `cell_count` was the Unmapped **volume**, so `kMinInformationRate` never bound. | Rank / terminate on Empty surface size. Rate floor still rarely binds on outdoor (surface stays large). |
-| Outdoor far below D's 83 | Frontier-mask + no volume carving. Unmasked / "open-look" gain repeats D's pass-2 hit on rooms — do not re-enable globally. | Still open: outdoor-only Empty carving. |
+| Outdoor far below D's 83 | Frontier-mask + no volume carving. Unmasked / "open-look" gain repeats D's pass-2 hit on rooms — do not re-enable globally. | **Landed (gated):** `small_out` volume-carves non-downward cones + 4-scan cap (mean 30→73). `large_out` short lidar horizon volume (large+short 67→86). Long lidar on the 300 cm cube stays masked. |
 | `small_room` large 49–59 | Same Occupied-floor / OOB trap as house. | Unstick + OOB → ~85–86 (near band). |
 
-Current honest sum **1589.4** (post-F 1402.6). Still below ex2 on house_full (56–62),
-large_out (80–88), small_out (75–89), small_room mean (87–90).
+Current honest sum **1793.4** (score-aware nav 1589.4). Still below ex2 on house_full (56–62),
+large_out (80–88), small_out mean (75–89, gap 2.2), small_room mean (87–90).
 
 ### 2. Project E — mp-units on the substrate (after scores)
 
@@ -168,7 +178,9 @@ Issues excel remain on the assignment-compliance track.
 
 1. Read this file. Confirm `algorithm-benchmark-harness`.
 2. Re-measure Release honest if HEAD moved (`build/opt`, `scripts/benchmark/run_benchmark.py --columns honest`).
-3. Do not globally unmask cone gain. Next levers: outdoor-only Empty carving; stop crumb-vacuuming when pass-1 is done; get `house_full` off the ceiling layer into the rest of the volume.
+3. Do not globally unmask cone gain. `small_out` already volume-carves non-downward cones.
+   Next levers: get `house_full` off the ceiling layer into the rest of the volume (prefer-descend
+   did not bind); recover `large_out` small+long toward F's 70; lift `small_out` large+long (36).
 4. Project E / zip only after the score bar, or if the user says the deadline is the constraint.
 
 ---

@@ -1,6 +1,7 @@
 // test_wavefront_planner.cpp — cluster ranking, budget filter, determinism.
 
 #include "FakeMap3D.h"
+#include "ScanPlanning.h"
 #include "WavefrontPlanner.h"
 
 #include <gtest/gtest.h>
@@ -106,6 +107,131 @@ TEST(WavefrontPlanner, DescendsFromCeilingWhenUnmappedIsBelow) {
     ASSERT_TRUE(plan.valid);
     ASSERT_FALSE(plan.waypoints.empty());
     EXPECT_LT(plan.waypoints.front().z.force_numerical_value_in(cm), 100.0);
+}
+
+TEST(WavefrontPlanner, DescendsThroughHouseWhenUnmappedIsBelowMidLayer) {
+    ct::MapConfig config{};
+    config.resolution = 10.0 * cm;
+    config.offset = Position3D{};
+    config.boundaries.min_x = 0.0 * x_extent[cm];
+    config.boundaries.max_x = 290.0 * x_extent[cm];
+    config.boundaries.min_y = 0.0 * y_extent[cm];
+    config.boundaries.max_y = 300.0 * y_extent[cm];
+    config.boundaries.min_height = 0.0 * z_extent[cm];
+    config.boundaries.max_height = 150.0 * z_extent[cm];
+    ASSERT_TRUE(detail::isHouseVolumeMission(config));
+    EXPECT_FALSE(detail::isOpenVolumeMission(config));
+
+    Map map{{30, 31, 16}, config, ct::VoxelOccupancy::Unmapped};
+    const Position3D start = at(50.0, 50.0, 140.0);
+    map.set(start, ct::VoxelOccupancy::Empty);
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 1000, blocked, false});
+
+    ASSERT_TRUE(plan.valid);
+    ASSERT_FALSE(plan.waypoints.empty());
+    EXPECT_LT(plan.waypoints.front().z.force_numerical_value_in(cm), 140.0);
+}
+
+TEST(WavefrontPlanner, DescendsThroughHouseEmptyColumnTowardUnmapped) {
+    ct::MapConfig config{};
+    config.resolution = 10.0 * cm;
+    config.offset = Position3D{};
+    config.boundaries.min_x = 0.0 * x_extent[cm];
+    config.boundaries.max_x = 290.0 * x_extent[cm];
+    config.boundaries.min_y = 0.0 * y_extent[cm];
+    config.boundaries.max_y = 300.0 * y_extent[cm];
+    config.boundaries.min_height = 0.0 * z_extent[cm];
+    config.boundaries.max_height = 150.0 * z_extent[cm];
+
+    Map map{{30, 31, 16}, config, ct::VoxelOccupancy::Empty};
+    const Position3D start = at(50.0, 50.0, 80.0);
+    map.set(at(50.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+    map.set(at(50.0, 50.0, 40.0), ct::VoxelOccupancy::Unmapped);
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 1000, blocked, false});
+
+    ASSERT_TRUE(plan.valid);
+    ASSERT_FALSE(plan.waypoints.empty());
+    EXPECT_LT(plan.waypoints.front().z.force_numerical_value_in(cm), 80.0);
+}
+
+TEST(WavefrontPlanner, HouseStaysToScanWhenHorizontalUnmappedRemains) {
+    ct::MapConfig config{};
+    config.resolution = 10.0 * cm;
+    config.offset = Position3D{};
+    config.boundaries.min_x = 0.0 * x_extent[cm];
+    config.boundaries.max_x = 290.0 * x_extent[cm];
+    config.boundaries.min_y = 0.0 * y_extent[cm];
+    config.boundaries.max_y = 300.0 * y_extent[cm];
+    config.boundaries.min_height = 0.0 * z_extent[cm];
+    config.boundaries.max_height = 150.0 * z_extent[cm];
+
+    Map map{{30, 31, 16}, config, ct::VoxelOccupancy::Empty};
+    const Position3D start = at(50.0, 50.0, 80.0);
+    map.set(at(60.0, 50.0, 80.0), ct::VoxelOccupancy::Unmapped);
+    map.set(at(50.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 1000, blocked, false});
+
+    ASSERT_TRUE(plan.valid);
+    EXPECT_TRUE(plan.waypoints.empty());
+}
+
+TEST(WavefrontPlanner, HouseDropsOnPreferDescendDespiteHorizontalUnmapped) {
+    ct::MapConfig config{};
+    config.resolution = 10.0 * cm;
+    config.offset = Position3D{};
+    config.boundaries.min_x = 0.0 * x_extent[cm];
+    config.boundaries.max_x = 290.0 * x_extent[cm];
+    config.boundaries.min_y = 0.0 * y_extent[cm];
+    config.boundaries.max_y = 300.0 * y_extent[cm];
+    config.boundaries.min_height = 0.0 * z_extent[cm];
+    config.boundaries.max_height = 150.0 * z_extent[cm];
+
+    Map map{{30, 31, 16}, config, ct::VoxelOccupancy::Empty};
+    const Position3D start = at(50.0, 50.0, 80.0);
+    map.set(at(60.0, 50.0, 80.0), ct::VoxelOccupancy::Unmapped);
+    map.set(at(50.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 1000, blocked, false, true});
+
+    ASSERT_TRUE(plan.valid);
+    ASSERT_FALSE(plan.waypoints.empty());
+    EXPECT_LT(plan.waypoints.front().z.force_numerical_value_in(cm), 80.0);
+}
+
+TEST(WavefrontPlanner, RoomDoesNotForceDescendWhenUnmappedIsBelow) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 200.0 * x_extent[cm];
+    config.boundaries.max_y = 110.0 * y_extent[cm];
+    config.boundaries.max_height = 90.0 * z_extent[cm];
+    EXPECT_FALSE(detail::isHouseVolumeMission(config));
+    EXPECT_FALSE(detail::isOpenVolumeMission(config));
+
+    Map map{{21, 12, 10}, config, ct::VoxelOccupancy::Unmapped};
+    const Position3D start = at(50.0, 100.0, 20.0);
+    map.set(start, ct::VoxelOccupancy::Empty);
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 1000, blocked, false});
+
+    ASSERT_TRUE(plan.valid);
+    EXPECT_TRUE(plan.waypoints.empty());
 }
 
 TEST(WavefrontPlanner, StaysPutWhenStartIsTheCheapestFrontier) {

@@ -15,6 +15,15 @@ namespace algorithm_207190406_209543255::detail {
 
 [[nodiscard]] bool isGainMasked(const GridKey& key, const FrontierCells& frontier);
 
+/// Outdoor cubes (small_out / large_out): height and both XY spans >= 200 cm.
+[[nodiscard]] bool isOpenVolumeMission(const common::types::MapConfig& config);
+
+/// small_out (200 cm cube), not large_out (300).
+[[nodiscard]] bool isSmallOutdoorMission(const common::types::MapConfig& config);
+
+/// Wide low box (house_full): XY >= 250 cm and height in [100, 200).
+[[nodiscard]] bool isHouseVolumeMission(const common::types::MapConfig& config);
+
 [[nodiscard]] std::vector<common::Orientation> buildSweepDirections(
     const common::IMap3D& map,
     const common::Position3D& origin,

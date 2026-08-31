@@ -45,6 +45,13 @@ namespace ct = common::types;
     return cfg;
 }
 
+[[nodiscard]] ct::LidarConfigData makeLongLidar() {
+    ct::LidarConfigData cfg = makeLidar();
+    cfg.z_max = 150.0 * cm;
+    cfg.fov_circles = 3;
+    return cfg;
+}
+
 [[nodiscard]] Position3D at(double x, double y, double z) {
     return Position3D{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]};
 }
@@ -74,6 +81,7 @@ TEST(ScanPlanning, SweepIgnoresUnmappedBeyondFrontierShell) {
     frontier.insert(detail::quantizePosition(origin, config));
     EXPECT_FALSE(detail::isGainMasked(detail::quantizePosition(at(80.0, 50.0, 50.0), config),
                                       frontier));
+    EXPECT_FALSE(detail::isOpenVolumeMission(config));
 
     ctpl::ConeTemplateCache cache;
     const auto& templates = cache.get(makeLidar(), config.resolution);
@@ -82,6 +90,134 @@ TEST(ScanPlanning, SweepIgnoresUnmappedBeyondFrontierShell) {
         map, origin, makeLidar(), frontier, templates, stamp);
 
     EXPECT_TRUE(dirs.empty());
+}
+
+TEST(ScanPlanning, SweepCountsUnmappedVolumeOnOpenSkyMission) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 200.0 * x_extent[cm];
+    config.boundaries.max_y = 200.0 * y_extent[cm];
+    config.boundaries.max_height = 200.0 * z_extent[cm];
+    ASSERT_TRUE(detail::isOpenVolumeMission(config));
+    EXPECT_TRUE(detail::isSmallOutdoorMission(config));
+
+    Map map{{21, 21, 21}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin = at(50.0, 50.0, 50.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+    map.set(at(80.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+    EXPECT_FALSE(detail::isGainMasked(detail::quantizePosition(at(80.0, 50.0, 50.0), config),
+                                      frontier));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLidar(), frontier, templates, stamp);
+
+    EXPECT_FALSE(dirs.empty());
+}
+
+TEST(ScanPlanning, SweepCountsUnmappedVolumeOnSmallOutdoorEvenWithLongLidar) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 200.0 * x_extent[cm];
+    config.boundaries.max_y = 200.0 * y_extent[cm];
+    config.boundaries.max_height = 200.0 * z_extent[cm];
+    ASSERT_TRUE(detail::isSmallOutdoorMission(config));
+
+    Map map{{21, 21, 21}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin = at(50.0, 50.0, 50.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+    map.set(at(80.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLongLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLongLidar(), frontier, templates, stamp);
+
+    EXPECT_FALSE(dirs.empty());
+}
+
+TEST(ScanPlanning, SweepDoesNotVolumeCarveDownwardOnOpenSkyMission) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 200.0 * x_extent[cm];
+    config.boundaries.max_y = 200.0 * y_extent[cm];
+    config.boundaries.max_height = 200.0 * z_extent[cm];
+    ASSERT_TRUE(detail::isOpenVolumeMission(config));
+
+    Map map{{21, 21, 21}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin = at(50.0, 50.0, 80.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+    map.set(at(50.0, 50.0, 20.0), ct::VoxelOccupancy::Unmapped);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+    EXPECT_FALSE(detail::isGainMasked(detail::quantizePosition(at(50.0, 50.0, 20.0), config),
+                                      frontier));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLidar(), frontier, templates, stamp);
+
+    EXPECT_TRUE(dirs.empty());
+}
+
+TEST(ScanPlanning, SweepIgnoresHorizontalVolumeOnLongLidarOpenSky) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 300.0 * x_extent[cm];
+    config.boundaries.max_y = 300.0 * y_extent[cm];
+    config.boundaries.max_height = 300.0 * z_extent[cm];
+    ASSERT_TRUE(detail::isOpenVolumeMission(config));
+    EXPECT_FALSE(detail::isSmallOutdoorMission(config));
+
+    Map map{{21, 21, 21}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin = at(50.0, 50.0, 50.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+    map.set(at(80.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLongLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLongLidar(), frontier, templates, stamp);
+
+    EXPECT_TRUE(dirs.empty());
+}
+
+TEST(ScanPlanning, SweepRejectsDownwardOnHouseMissionEvenMidLayer) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 290.0 * x_extent[cm];
+    config.boundaries.max_y = 300.0 * y_extent[cm];
+    config.boundaries.max_height = 150.0 * z_extent[cm];
+    ASSERT_TRUE(detail::isHouseVolumeMission(config));
+
+    Map map{{30, 31, 16}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin = at(50.0, 50.0, 80.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+    map.set(at(50.0, 50.0, 70.0), ct::VoxelOccupancy::Unmapped);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLidar(), frontier, templates, stamp);
+
+    for (const Orientation& dir : dirs) {
+        EXPECT_GE(dir.altitude.force_numerical_value_in(deg), -10.0);
+    }
 }
 
 TEST(ScanPlanning, SweepRejectsDownwardWhenOriginIsOnMaxHeight) {

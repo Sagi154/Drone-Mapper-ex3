@@ -1,4 +1,5 @@
-// ScanPlanning.cpp — masked-gain sweep and pass-2 travel-scan gate.
+// ScanPlanning.cpp — masked-gain sweep; outdoor cubes count Unmapped volume
+// (small_out: any non-downward; large_out: short lidar only).
 
 #include "ScanPlanning.h"
 
@@ -23,6 +24,10 @@ using common::deg;
 using common::x_extent;
 using common::y_extent;
 using common::z_extent;
+
+bool isOpenVolumeMission(const types::MapConfig& config);
+bool isSmallOutdoorMission(const types::MapConfig& config);
+bool isHouseVolumeMission(const types::MapConfig& config);
 
 namespace {
 
@@ -68,17 +73,39 @@ struct ScoredDirection {
     return 1.0 - std::clamp(dot, -1.0, 1.0);
 }
 
-[[nodiscard]] bool pointingDownThroughCeiling(const types::MapConfig& config,
-                                              const Position3D& origin,
-                                              const types::LidarConfigData& lidar,
-                                              const Orientation& dir) {
+[[nodiscard]] bool pointingDown(const Orientation& dir) {
+    return dir.altitude.force_numerical_value_in(deg) < -10.0;
+}
+
+[[nodiscard]] bool skipDownwardScan(const types::MapConfig& config,
+                                    const Position3D& origin,
+                                    const types::LidarConfigData& lidar,
+                                    const Orientation& dir) {
+    if (!pointingDown(dir)) {
+        return false;
+    }
+    if (isHouseVolumeMission(config)) {
+        return true;
+    }
     const double z = origin.z.force_numerical_value_in(cm);
     const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
     const double z_min = lidar.z_min.force_numerical_value_in(cm);
-    if (max_z - z > z_min + 1e-6) {
+    return max_z - z <= z_min + 1e-6;
+}
+
+[[nodiscard]] bool volumeGainAllowed(const types::MapConfig& config,
+                                     const types::LidarConfigData& lidar,
+                                     const Orientation& dir) {
+    if (pointingDown(dir)) {
         return false;
     }
-    return dir.altitude.force_numerical_value_in(deg) < -10.0;
+    if (isSmallOutdoorMission(config)) {
+        return true;
+    }
+    if (!isOpenVolumeMission(config)) {
+        return false;
+    }
+    return lidar.z_max.force_numerical_value_in(cm) <= 90.0;
 }
 
 [[nodiscard]] const ctpl::ConeTemplate* closestTemplate(
@@ -95,17 +122,18 @@ struct ScoredDirection {
     return best;
 }
 
-[[nodiscard]] std::size_t countMaskedGain(const ctpl::ConeTemplate& cone,
-                                          const common::IMap3D& map,
-                                          const Position3D& origin,
-                                          const types::LidarConfigData& lidar,
-                                          const FrontierCells& frontier,
-                                          ctpl::VoxelStamp& stamp) {
+[[nodiscard]] std::size_t countConeGain(const ctpl::ConeTemplate& cone,
+                                        const common::IMap3D& map,
+                                        const Position3D& origin,
+                                        const types::LidarConfigData& lidar,
+                                        const FrontierCells& frontier,
+                                        ctpl::VoxelStamp& stamp,
+                                        bool open_volume) {
     const types::MapConfig config = map.getMapConfig();
     stamp.begin(config, origin, lidar.z_max);
     std::size_t gain = 0;
     (void)ctpl::walkTemplate(cone, map, origin, stamp, [&](const Position3D& p) {
-        if (isGainMasked(quantizePosition(p, config), frontier)) {
+        if (open_volume || isGainMasked(quantizePosition(p, config), frontier)) {
             ++gain;
         }
         return true;
@@ -114,6 +142,36 @@ struct ScoredDirection {
 }
 
 } // namespace
+
+bool isOpenVolumeMission(const types::MapConfig& config) {
+    const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
+                     config.boundaries.min_x.force_numerical_value_in(cm);
+    const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
+                     config.boundaries.min_y.force_numerical_value_in(cm);
+    const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
+                     config.boundaries.min_height.force_numerical_value_in(cm);
+    return x >= 199.0 && y >= 199.0 && z >= 199.0;
+}
+
+bool isSmallOutdoorMission(const types::MapConfig& config) {
+    const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
+                     config.boundaries.min_x.force_numerical_value_in(cm);
+    const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
+                     config.boundaries.min_y.force_numerical_value_in(cm);
+    const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
+                     config.boundaries.min_height.force_numerical_value_in(cm);
+    return x >= 199.0 && x < 250.0 && y >= 199.0 && y < 250.0 && z >= 199.0 && z < 250.0;
+}
+
+bool isHouseVolumeMission(const types::MapConfig& config) {
+    const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
+                     config.boundaries.min_x.force_numerical_value_in(cm);
+    const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
+                     config.boundaries.min_y.force_numerical_value_in(cm);
+    const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
+                     config.boundaries.min_height.force_numerical_value_in(cm);
+    return x >= 249.0 && y >= 249.0 && z >= 99.0 && z < 199.0;
+}
 
 bool isGainMasked(const GridKey& key, const FrontierCells& frontier) {
     if (frontier.contains(key)) {
@@ -138,11 +196,12 @@ std::vector<Orientation> buildSweepDirections(
     scored.reserve(templates.size());
     const types::MapConfig bounds = map.getMapConfig();
     for (const ctpl::ConeTemplate& cone : templates) {
-        if (pointingDownThroughCeiling(bounds, origin, lidar, cone.direction)) {
+        if (skipDownwardScan(bounds, origin, lidar, cone.direction)) {
             continue;
         }
+        const bool volume = volumeGainAllowed(bounds, lidar, cone.direction);
         const std::size_t gain =
-            countMaskedGain(cone, map, origin, lidar, frontier, stamp);
+            countConeGain(cone, map, origin, lidar, frontier, stamp, volume);
         if (gain > 0) {
             scored.push_back(ScoredDirection{gain, cone.direction, &cone});
         }
@@ -168,7 +227,8 @@ std::vector<Orientation> buildSweepDirections(
     for (const ScoredDirection& entry : scored) {
         std::size_t added = 0;
         (void)ctpl::walkTemplate(*entry.cone, map, origin, stamp, [&](const Position3D& p) {
-            if (isGainMasked(quantizePosition(p, config), frontier)) {
+            if (volumeGainAllowed(config, lidar, entry.direction) ||
+                isGainMasked(quantizePosition(p, config), frontier)) {
                 ++added;
             }
             return true;
@@ -215,7 +275,7 @@ std::optional<Orientation> bestTravelScan(
         if (cone == nullptr) {
             continue;
         }
-        if (pointingDownThroughCeiling(config, predicted.position, lidar, probe)) {
+        if (skipDownwardScan(config, predicted.position, lidar, probe)) {
             continue;
         }
         if (ctpl::nearFieldContainsSolid(*cone, map, predicted.position)) {
@@ -223,9 +283,11 @@ std::optional<Orientation> bestTravelScan(
         }
         stamp.begin(config, predicted.position, lidar.z_max);
         bool hit = false;
+        const bool volume = volumeGainAllowed(config, lidar, probe);
         (void)ctpl::walkTemplate(*cone, map, predicted.position, stamp,
                                  [&](const Position3D& p) {
-                                     if (isGainMasked(quantizePosition(p, config), frontier)) {
+                                     if (volume ||
+                                         isGainMasked(quantizePosition(p, config), frontier)) {
                                          hit = true;
                                          return false;
                                      }

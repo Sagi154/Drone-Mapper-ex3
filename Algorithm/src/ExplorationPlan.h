@@ -29,6 +29,7 @@ struct WavefrontInputs {
     std::size_t remaining_steps = 0;
     const BlockedCells& blocked;
     bool ignore_blocked = false;
+    bool prefer_descend = false;
 };
 
 } // namespace algorithm_207190406_209543255::detail

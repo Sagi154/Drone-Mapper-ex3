@@ -275,6 +275,8 @@ makes WFD the primary exploration policy: cluster reachable frontiers, rank by c
 step, and scan toward the chosen cluster. Post-F measurement then showed three `house_full`
 cells at score 0.06 (start sphere vs mission AABB / Occupied floor, and a ceiling trap).
 The score-aware nav follow-up is recorded in `docs/benchmarks/2026-08-31-score_aware_nav.md`.
+Outdoor Empty-carve (gated volume gain, no global unmask) is
+`docs/benchmarks/2026-08-31-outdoor-empty-carve.md` (honest sum 1793.4).
 
 ### 4. Any-angle path smoothing
 

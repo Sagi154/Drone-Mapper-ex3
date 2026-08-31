@@ -46,6 +46,7 @@ using FrontierCells = std::unordered_set<GridKey, GridKeyHash>;
 
 struct FrontierCluster {
     std::size_t cell_count = 0;
+    std::size_t volume_count = 0;
     GridKey approach_key{};
     common::Position3D approach_position{};
     int approach_cost = 0;

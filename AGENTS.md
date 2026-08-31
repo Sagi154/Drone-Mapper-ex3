@@ -16,10 +16,11 @@ not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
 **Mapping-algorithm track (separate from zip):** beat ex2's recorded 24-cell score bands on the
 honest MissionControl column. Pickup: `docs/mapping-algorithm-rewrite-pickup.md`. Do not treat
-`mission_score >= 0` as done for this track. Post-F wavefront left `house_full` / outdoor /
-large-drone cells below the bands; the standing work is score-aware exploration (not project E
-mp-units) until those bands are met without regressing `house_lower` 100 or the room cells that
-are already inside/near-band.
+`mission_score >= 0` as done for this track. Current honest column is outdoor Empty-carve
+(`docs/benchmarks/2026-08-31-outdoor-empty-carve.csv`, sum **1793.4**): `small_out` mean 72.81
+(was 30; gap 2 vs band 75–89), `large_out` 68.50 (was 60), `house_full` still 30.46. Do not
+globally unmask cone gain. Do not start Project E until `house_full` / `large_out` means
+clearly approach the bands.
 
 ## Start here
 

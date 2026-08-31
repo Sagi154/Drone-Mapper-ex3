@@ -655,6 +655,7 @@ TEST(MappingAlgorithm, ExploreReachableClusterCountIsEmptySurfaceNotVolume) {
     ASSERT_FALSE(result.clusters.empty());
     EXPECT_LE(result.clusters.front().cell_count, 27u);
     EXPECT_EQ(result.clusters.front().cell_count, result.clusters.front().keys.size());
+    EXPECT_GT(result.clusters.front().volume_count, result.clusters.front().cell_count);
 }
 
 TEST(MappingAlgorithm, ExploreReachableClusteringIsDeterministic) {

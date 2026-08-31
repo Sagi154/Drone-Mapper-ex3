@@ -174,9 +174,10 @@ void MappingAlgorithmImpl_207190406_209543255::pruneExpiredBlockedCells(std::siz
 
 bool MappingAlgorithmImpl_207190406_209543255::replan(const types::DroneState& state,
                                                       bool ignore_blocked) {
+    const bool prev_stay = impl_->has_plan && impl_->plan.waypoints.empty();
     const detail::WavefrontInputs inputs{
         output_map_, state, lidar_config_, drone_config_,
-        remainingSteps(state), impl_->blocked_cells, ignore_blocked,
+        remainingSteps(state), impl_->blocked_cells, ignore_blocked, prev_stay,
     };
     impl_->plan = impl_->planner.plan(inputs);
     impl_->waypoint_index = 0;
@@ -201,6 +202,10 @@ void MappingAlgorithmImpl_207190406_209543255::buildArrivalSweep(
     impl_->arrival_scans = detail::buildSweepDirections(
         output_map_, state.position, lidar_config_, impl_->last_frontier,
         templates, impl_->stamp);
+    if (detail::isSmallOutdoorMission(output_map_.getMapConfig()) &&
+        impl_->arrival_scans.size() > 4) {
+        impl_->arrival_scans.resize(4);
+    }
     impl_->arrival_scan_index = 0;
 }
 

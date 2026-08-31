@@ -558,6 +558,7 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
                 bfs.push(neighbour);
             }
         }
+        cluster.volume_count = cluster.keys.size();
         std::vector<GridKey> surface;
         surface.reserve(cluster.keys.size());
         bool have_surface = false;
