@@ -60,7 +60,7 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 | Plan | `docs/superpowers/plans/2026-08-29-missioncontrol-step-honesty.md` |
 | Code | `MissionControl/src/DroneControlImpl.cpp` — no scan-batch loop; `nextStep` once; move then scan |
 | Tests | `MissionControl/tests/test_drone_control.cpp` — co-emission, recoverable+scan, hard-fail skips scan, one scan/step |
-| Docs | HLD, known-issues #20/#21, mapping-algorithm-analysis portability section, VAR-02 table |
+| Docs | HLD, mapping-algorithm-analysis portability section, VAR-02 table (former known-issues #20/#21 removed 2026-09-01) |
 | Post-B baseline | `docs/benchmarks/2026-08-29-post_b_honest.{csv,md}` |
 
 ### Project C — sensor model + clearance

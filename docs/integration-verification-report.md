@@ -116,7 +116,7 @@ Scoring / verbose FAIL notes above are historical for the Aug 25 run; compositio
 
 - ~~20/24 `sim_compose.yaml` cells Error / `MISSION_EXCEPTION`.~~ **Resolved 2026-08-27:**
   comparative 24/24 `COMPLETED`, all scores ≥ 0, `MISSION_EXCEPTION` 0 (~276s). See
-  `docs/known-issues.md` row 2 and
+  pickup Fixed 2026-08-27 (former known-issues row 2, since removed) and
   `docs/superpowers/specs/2026-08-27-wall-collision-recovery-and-planner-design.md`.
 - ~~Instructor-catalog harness gaps (Point 2) / orchestrator (Point 4).~~ **Resolved 2026-08-28** —
   see roadmap and addendum above.

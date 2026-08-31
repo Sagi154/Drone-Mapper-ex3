@@ -504,7 +504,7 @@ Harness: `Simulator/tests/manual/` (`run_all.sh`, `docker_verify_default.sh`, `d
 
 | Check | Result |
 |---|---|
-| Both CLI modes (`-comparative` / `-competition`) | **PASS** — artifacts written; **24/24 `COMPLETED`** with `mission_score >= 0` on comparative re-measure 2026-08-27 (~276s); see `docs/known-issues.md` row 2 (resolved) |
+| Both CLI modes (`-comparative` / `-competition`) | **PASS** — artifacts written; **24/24 `COMPLETED`** with `mission_score >= 0` on comparative re-measure 2026-08-27 (~276s); see pickup Fixed 2026-08-27 |
 | Re-run output-dir collision | **PASS** — distinct `comparative_results_<time>` dirs |
 | `-verbose` on/off | **PASS** — flag reaches `MissionControlDependencies` via factory ctor (unit); `check_verbose.sh` file-list: `*.verbose.txt` with `-verbose`, absent without (completing house cell). See `docs/assignment-compliance-pickup.md`. |
 | Threading determinism (`num_threads` absent/1/2/8) | **PASS** — reports identical after stripping timestamps / scratch paths |

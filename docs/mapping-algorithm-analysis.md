@@ -8,7 +8,9 @@ shipped `inputs/`. Cleaned up the scratch docx extract afterwards.
 
 **Status at time of writing:** Default composition `inputs/sim_compose.yaml` scores 24/24
 `COMPLETED` with `mission_score >= 0` under our MissionControl. Competitive performance
-and foreign-host step counts are weaker — see Known Issues #20.
+and foreign-host step counts were weaker under scan-batching (former Known Issues #20,
+removed after project B). Remaining listed gap is plan-batching on `large_out` short lidar
+(`docs/known-issues.md` #14).
 
 ---
 
@@ -137,7 +139,7 @@ greedy about gain-per-step when it's tight.
 **Historical finding (at time of writing):** Our own `DroneControlImpl::step()` batched up to 16
 consecutive scans into a single mission step (`kMaxScansPerStep=16`). A foreign MissionControl does
 one scan per step — VAR-02 ("Batch consecutive scan commands into one step | Exactly one scan per
-step"). Known Issues #20 recorded **209 steps vs 42** on `small_simulation_room` under a hits-only
+step"). Former Known Issues #20 recorded **209 steps vs 42** on `small_simulation_room` under a hits-only
 foreign MC (~5×), largely from that asymmetry.
 
 **Resolution (project B):** The batching loop was removed. `step()` now calls `nextStep` once and
@@ -306,9 +308,10 @@ scan-direction problem into the same objective.
 
 ### 8. Build our own belief map from `latest_scan`
 
-Raycasting the hits ourselves instead of relying on the host's fusion fixes Known Issues #20
-at the root, decouples us from a foreign MC's carving policy, and makes "is this move into
-unknown space safe?" answerable locally. It needs the beam math moved from
+Raycasting the hits ourselves instead of relying on the host's fusion would have
+fixed the former foreign-MC step-inflation gap at the root, decoupled us from a
+foreign MC's carving policy, and made "is this move into unknown space safe?"
+answerable locally. It needs the beam math moved from
 `MissionControl/src/ScanResultToVoxels` into `UserCommon/` so both projects share one copy
 — which is also what the no-duplicate-logic rule (e10) wants.
 
@@ -330,7 +333,7 @@ two blacklists an expiry. FUEL/NBV are a different timeline.
 | **Incremental replanning (D* Lite / LPA*)** | Avoid full re-search each cycle | Medium–high |
 | **Frontier clustering + tour (FUEL, TARE)** | Eliminates revisit oscillation by construction | High (rewrite) |
 | **Receding-horizon NBV (Bircher et al.)** | Optimizes coverage-per-step directly | High |
-| **Own belief map from `latest_scan`** | Fixes #20 root cause; decouples from foreign MC fusion | Medium (beam math → `UserCommon/`) |
+| **Own belief map from `latest_scan`** | Decouples from foreign MC fusion (former #20 root cause) | Medium (beam math → `UserCommon/`) |
 
 ---
 
@@ -346,7 +349,7 @@ two blacklists an expiry. FUEL/NBV are a different timeline.
 | `Simulator/src/MapsComparison.cpp` | 0–100 mission score |
 | `Simulator/src/MockLidar.cpp` | Cone geometry from `fov_circles`, `d`, `z_min` |
 | `Simulator/src/SimulationRunFactoryImpl.cpp` | Output map resolution from mission config |
-| `docs/known-issues.md` | #20 (foreign MC steps), #21 (scan-batch hang, resolved) |
+| `docs/known-issues.md` | Remaining rows (optional matrix skips, unused `ISimulation`, Unmapped-as-passable, plan-batching #14). Former #20/#21 removed. |
 | `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md` | VAR-02 foreign MC contract |
 
 ---
