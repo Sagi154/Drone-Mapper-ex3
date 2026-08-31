@@ -194,7 +194,7 @@ target_include_directories(simulator_work PUBLIC
 target_link_libraries(simulator_work PUBLIC Threads::Threads)
 drone_warnings(simulator_work)
 
-# Map scoring (stub body returns -1 until full BFS port).
+# Map scoring (0–100 BFS/reachability; Error runs stay -1 at the caller).
 add_library(simulator_scoring STATIC
     src/MapsComparison.cpp
 )

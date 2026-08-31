@@ -1,9 +1,10 @@
 // MapsComparison.h — per-run map scoring API for SimulationRunImpl.
-// Signature is frozen for Yoav (Y10); body is a stub until scoring is filled in.
+// 0–100 BFS/reachability scorer (ported from ex2). Callers use -1 as the
+// failure sentinel for Error runs; this function itself returns [0, 100]
+// (an empty comparison universe scores 100).
 //
 // Contract:
-//   - Returns a score in [0, 100] on success.
-//   - Returns -1 on failure (empty maps, incompatible configs, etc.).
+//   - Returns a score in [0, 100].
 //   - `spawn` is the drone start in **world** coordinates (local spawn + map_axes_offset).
 //     When set, only cells reachable from spawn through Empty voxels in `origin` count.
 //     When nullopt, every known cell in `origin` counts (raw / utility mode).

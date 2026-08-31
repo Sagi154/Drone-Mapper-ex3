@@ -17,8 +17,8 @@ namespace simulator {
 
 /// Holds all per-run dependencies and drives one simulation run.
 ///
-/// Scoring (MapsComparison) is deferred to Y10 — run() returns mission_score = -1.0
-/// until that step is implemented.
+/// Completed/MaxSteps runs are scored with MapsComparison (0–100 BFS).
+/// Error (including caught runMission()/save failures) stays at mission_score = -1.0.
 class SimulationRunImpl final : public ISimulationRun {
 public:
     SimulationRunImpl(std::unique_ptr<common::IMap3D>          hidden_map,

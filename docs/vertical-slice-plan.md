@@ -1,5 +1,9 @@
 # Vertical Slice — Implementation Plan
 
+**Historical.** The slice (including real `MapsComparison` BFS scoring) has landed.
+Pickup is `docs/assignment-compliance-pickup.md`. Status tables below are as of
+this milestone, not current.
+
 **Goal:** Build and run the real `simulator_207190406_209543255` binary end-to-end: load both
 real plugin `.so`s via `dlopen`, run one complete mission through the full call chain, write the
 output map, verify no crash. This proves `ENABLE_EXPORTS`, factory plumbing, and the full

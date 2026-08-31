@@ -149,7 +149,7 @@ No open mandatory code or doc gaps before zip packaging.)*
   `blocked`/`boundary` throws → Continue; `SimulationRunImpl` remains the backstop.
 - No `new`/`delete` in production sources; C++20 + `-Wall -Wextra -Werror -pedantic`;
   `students.txt` filled; `UserCommon/` has no build file.
-- `MapsComparison` is a real 0–100 BFS scorer (the CMake “stub returns -1” comment is stale).
+- `MapsComparison` is a real 0–100 BFS scorer.
 
 ---
 
@@ -192,7 +192,7 @@ do not submit the markdown.
 
 | Doc | What is stale |
 |-----|----------------|
-| `docs/work-split-status.md` | Written 2026-08-13; pickup is this file. |
+| `docs/work-split-status.md` | Written 2026-08-13; header points here. |
 | `docs/workplan.md` | Historical S/Y queue; header points here. Do not treat item codes as open work. |
+| `docs/vertical-slice-plan.md` | Historical milestone plan; header points here. |
 | `docs/integration-verification-report.md` Aug 25 body | Baseline only; see 2026-08-28 addendum + `run_all.sh`. |
-| `Simulator/CMakeLists.txt` comment “MapsComparison stub returns -1” | Body is the full BFS port. |

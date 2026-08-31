@@ -1,5 +1,9 @@
 # Work Split — Current Status & Next Steps
 
+**Historical (2026-08-13).** Pickup is `docs/assignment-compliance-pickup.md`.
+Do not treat this file as the current queue (README/HLD and default-composition
+scoring have landed since).
+
 Generated against the real source tree on 2026-08-13.
 
 ---
