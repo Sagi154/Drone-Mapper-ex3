@@ -27,7 +27,8 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 ## Start here
 
 1. Read `.cursor/rules/project-context.mdc` (always applies) and `docs/assignment3-checklist.md`.
-2. Packaging / zip: `docs/assignment-compliance-pickup.md`. Mapping scores vs ex2:
+2. Packaging / zip: `docs/assignment-compliance-pickup.md`. What not to put in the zip
+   (agent docs, `tmp/`, dead leftovers): `docs/submission-junk-audit.md`. Mapping scores vs ex2:
    `docs/mapping-algorithm-rewrite-pickup.md` — that track is not done when `mission_score >= 0`.
 3. Before claiming a mapping-algorithm change is fast enough: `verify-cell-runtime` (per-cell
    wall, ~60 s grader-risk / ~10 s small maps — not 8-thread compose wall).
@@ -62,6 +63,7 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 | Path | Purpose |
 |------|---------|
 | `docs/assignment-compliance-pickup.md` | Where to pick up: instructor-doc audit verdict and ordered remaining work |
+| `docs/submission-junk-audit.md` | Pre-zip junk/exclusion inventory (2026-09-01): five-folder leftovers vs working-tree paths that must not ship |
 | `docs/instructor-test-catalog-followup-roadmap.md` | Catalog follow-up Points 1–4 — **done 2026-08-28** (harness gaps, skills, orchestrator) |
 | `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md` | Blind foreign host / MC / adversarial / baseline independence design |
 | `docs/superpowers/plans/2026-08-28-independent-component-variants.md` | Implementation plan + execution notes (VAR-01…04) |
