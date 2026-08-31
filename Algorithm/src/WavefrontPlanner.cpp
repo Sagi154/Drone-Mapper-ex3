@@ -79,6 +79,9 @@ constexpr std::size_t kMaxSweepReserve = 8;
 
 ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
                                        std::vector<ExplorationPlan>* alternates) const {
+    if (alternates != nullptr) {
+        alternates->clear();
+    }
     const BlockedCells empty_blocked;
     const BlockedCells& blocked = in.ignore_blocked ? empty_blocked : in.blocked;
     const types::MapConfig config = in.map.getMapConfig();

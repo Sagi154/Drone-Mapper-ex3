@@ -328,6 +328,23 @@ TEST(WavefrontPlanner, ReportsInvalidWhenNothingIsUnresolved) {
     EXPECT_EQ(plan.target_cluster_cells, 0u);
 }
 
+TEST(WavefrontPlanner, ClearsStaleAlternatesOnEarlyReturn) {
+    Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
+    const detail::WavefrontPlanner planner;
+    const ct::DroneState state = stateAt(at(100.0, 100.0, 100.0));
+    const detail::BlockedCells blocked;
+    std::vector<detail::ExplorationPlan> alternates;
+    detail::ExplorationPlan dummy;
+    dummy.valid = true;
+    dummy.target_cluster_cells = 99;
+    alternates.push_back(std::move(dummy));
+    const detail::ExplorationPlan best = planner.plan(
+        {map, state, makeLidar(), makeDrone(), 1000, blocked, false}, &alternates);
+
+    EXPECT_FALSE(best.valid);
+    EXPECT_TRUE(alternates.empty());
+}
+
 TEST(WavefrontPlanner, IgnoreBlockedRecoversWhenTheBlockedSetSealsTheDrone) {
     Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
     fillUnmappedBox(map, 16, 20, 8, 12, 0, 2);
