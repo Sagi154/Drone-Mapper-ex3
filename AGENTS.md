@@ -20,23 +20,27 @@ honest MissionControl column. Pickup: `docs/mapping-algorithm-rewrite-pickup.md`
 (`docs/benchmarks/2026-08-31-outdoor-empty-carve.csv`, sum **1793.4**): `small_out` mean 72.81
 (was 30; gap 2 vs band 75–89), `large_out` 68.50 (was 60), `house_full` still 30.46. Do not
 globally unmask cone gain. Do not start Project E until `house_full` / `large_out` means
-clearly approach the bands.
+clearly approach the bands. After algorithm changes, re-time cells with `verify-cell-runtime`
+(Release, serial, one process per cell). Do not treat `num_threads=8` compose wall as per-cell
+time, and do not add a wall-clock abort in Algorithm or MissionControl.
 
 ## Start here
 
 1. Read `.cursor/rules/project-context.mdc` (always applies) and `docs/assignment3-checklist.md`.
 2. Packaging / zip: `docs/assignment-compliance-pickup.md`. Mapping scores vs ex2:
    `docs/mapping-algorithm-rewrite-pickup.md` — that track is not done when `mission_score >= 0`.
-3. Read `docs/workplan.md` for the historical Sagi/Yoav split (do not restart that split unless
+3. Before claiming a mapping-algorithm change is fast enough: `verify-cell-runtime` (per-cell
+   wall, ~60 s grader-risk / ~10 s small maps — not 8-thread compose wall).
+4. Read `docs/workplan.md` for the historical Sagi/Yoav split (do not restart that split unless
    the pickup file says so).
-3. Before git branches, commits, or PRs: `git-workflow.mdc`.
-4. Before touching a published header: `frozen-interfaces.mdc` and `docs/api-delta-ex2-to-ex3.md` —
+5. Before git branches, commits, or PRs: `git-workflow.mdc`.
+6. Before touching a published header: `frozen-interfaces.mdc` and `docs/api-delta-ex2-to-ex3.md` —
    ex2 code does not compile as-is (moved headers, changed namespaces, changed types).
-5. Before deciding where new code lives: `docs/component-placement.md`.
-6. Before writing the plugin loader, CLI, or threading: `plugin-architecture.mdc`,
+7. Before deciding where new code lives: `docs/component-placement.md`.
+8. Before writing the plugin loader, CLI, or threading: `plugin-architecture.mdc`,
    `simulator-cli-and-outputs.mdc`, `threading-model.mdc`.
-7. Before error paths: `error-handling-logging.mdc` and `docs/error-handling-matrix.md`.
-8. Before editing C++: `adv-cpp-standards.mdc`, `mp-units-strong-types.mdc`.
+9. Before error paths: `error-handling-logging.mdc` and `docs/error-handling-matrix.md`.
+10. Before editing C++: `adv-cpp-standards.mdc`, `mp-units-strong-types.mdc`.
 
 ## Skills (invoke by name)
 
@@ -51,6 +55,7 @@ clearly approach the bands.
 | `advcpp-rubric-review` | Subjective AdvCpp rubric review (`e01`–`e23`): dispatches one explore subagent per code group (headers/API, C++ idiom, structure/flow, HLD alignment), reports findings as a judgment-call table — not a pass/fail script. Run before submission or after major refactors. |
 | `verify-instructor-test-catalog` | End-to-end instructor-catalog verification: Docker build + `ctest` + `run_all.sh` + `pre-submission-review` + `advcpp-rubric-review` → one PASS/FAIL/AMBIGUOUS report keyed by catalog ID |
 | `verify-independent-component-variants` | Independence harness (VAR-01…04): Docker build + `check_foreign_host` / `check_foreign_mission_control` / `check_adversarial_plugins` / optional `check_baseline_algorithm` → PASS/FAIL/SKIP per variant (not catalog IDs) |
+| `verify-cell-runtime` | Per-cell wall-clock vs the ~60 s / ~10 s small-map bar: Release serial 24-cell timing (not 8-thread compose wall). Use after algorithm changes, after a 24-cell score column, or when checking b05 timeout risk. Do not invent a smaller `max_steps` or a wall-clock abort in Algorithm/MC |
 
 ## Key docs
 
