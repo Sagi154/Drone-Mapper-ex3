@@ -6,6 +6,8 @@
 
 #include <Algorithm/MappingAlgorithmImpl.h>
 
+#include "MappingAlgorithmFrontier.h"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -756,29 +758,63 @@ TEST(MappingAlgorithm, VisitsMultipleDisjointCrumbsAndFinishes) {
     }
 }
 
+// What: a queued runner-up's waypoints start next to the ORIGINAL spawn. Repathing
+// from crumb A to B's goal must not reuse that stale first hop.
+TEST(MappingAlgorithm, RepathFromCrumbADoesNotStartAtOriginalSpawn) {
+    const ct::MapConfig config = makeCorridorConfig();
+    Map output_map{{11, 11, 11}, config};
+    fillEmptyBox(output_map, 0, 10, 0, 10, 0, 10, config);
+    const Position3D spawn = gridPoint(5, 2, 5, config);
+    const Position3D crumb_a = gridPoint(5, 8, 5, config);
+    const Position3D crumb_b = gridPoint(8, 8, 5, config);
+    output_map.set(crumb_a, ct::VoxelOccupancy::Unmapped);
+    output_map.set(crumb_b, ct::VoxelOccupancy::Unmapped);
+
+    const Algo::detail::MappingAlgorithmFrontier frontier;
+    const auto from_spawn = frontier.findPathTo(output_map, spawn, crumb_b, 5.0 * cm);
+    ASSERT_TRUE(from_spawn.found);
+    ASSERT_FALSE(from_spawn.path.empty());
+    const double spawn_to_first = std::hypot(
+        from_spawn.path.front().x.force_numerical_value_in(cm) - spawn.x.force_numerical_value_in(cm),
+        from_spawn.path.front().y.force_numerical_value_in(cm) - spawn.y.force_numerical_value_in(cm));
+    EXPECT_LE(spawn_to_first, 15.0) << "stale queued path should begin next to spawn";
+
+    const auto from_a = frontier.findPathTo(output_map, crumb_a, crumb_b, 5.0 * cm);
+    ASSERT_TRUE(from_a.found);
+    ASSERT_FALSE(from_a.path.empty());
+    const double a_to_first = std::hypot(
+        from_a.path.front().x.force_numerical_value_in(cm) - crumb_a.x.force_numerical_value_in(cm),
+        from_a.path.front().y.force_numerical_value_in(cm) - crumb_a.y.force_numerical_value_in(cm));
+    const double spawn_to_repath_first = std::hypot(
+        from_a.path.front().x.force_numerical_value_in(cm) - spawn.x.force_numerical_value_in(cm),
+        from_a.path.front().y.force_numerical_value_in(cm) - spawn.y.force_numerical_value_in(cm));
+    EXPECT_LE(a_to_first, 15.0) << "repath from A must begin at a neighbour of A";
+    EXPECT_GT(spawn_to_repath_first, 15.0) << "repath from A must not begin at spawn";
+}
+
 // What: several disjoint Unmapped crumbs so the first replan queues low-rate runner-ups.
 // Expected: adopting those queued plans must not trip kLowRateReplans; still Working
 // after more than three plan exhaustions.
 TEST(MappingAlgorithm, QueuedLowRateRunnerUpsDoNotFinishEarly) {
     const ct::MapConfig config = makeCorridorConfig();
-    // Occupied default so each crumb's Empty shell is a single approach cell;
-    // cell_count=1 keeps expected_rate < kMinInformationRate even on a 1-step hop.
-    Map output_map{{11, 11, 11}, config, ct::VoxelOccupancy::Occupied};
-    fillEmptyBox(output_map, 3, 7, 3, 7, 3, 7, config);
+    Map output_map{{11, 11, 11}, config};
+    fillEmptyBox(output_map, 0, 10, 0, 10, 0, 10, config);
     const std::array<std::array<int, 3>, 5> crumbs{{
-        {8, 5, 5},
-        {2, 5, 5},
-        {5, 8, 5},
-        {5, 2, 5},
-        {5, 5, 8},
+        {1, 5, 5},
+        {9, 5, 5},
+        {5, 1, 5},
+        {5, 9, 5},
+        {5, 5, 9},
     }};
     for (const auto& crumb : crumbs) {
         output_map.set(gridPoint(crumb[0], crumb[1], crumb[2], config),
                        ct::VoxelOccupancy::Unmapped);
     }
 
+    auto lc = makeLidarConfig();
+    lc.z_max = 15.0 * cm;
     Impl algorithm{common::MappingAlgorithmDependencies{
-        makeMissionConfig(), makeLidarConfig(), makeDroneConfig(), output_map}};
+        makeMissionConfig(), lc, makeDroneConfig(), output_map}};
 
     ct::DroneState state{
         gridPoint(5, 5, 5, config), Orientation{0.0 * deg, 0.0 * deg}, 0};
