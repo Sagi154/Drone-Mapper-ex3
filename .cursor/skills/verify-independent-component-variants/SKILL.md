@@ -29,11 +29,11 @@ This is **not** the instructor-catalog orchestrator
 
 VAR-02 is **diagnostic**: script PASS means crash-free + findings dumped. Do **not**
 auto-fail on low score / Empty=0 (foreign hits-only by design). Paste findings path
-into the report; Known Issues **#20** documents step inflation under hits-only MC.
+into the report. Hits-only step inflation was former Known Issues #20 (removed after
+project B one-scan-per-step). Do not expect `docs/known-issues.md` to still list it.
 
-VAR-03 regression canary: Known Issues **#21** (resolved) — `bad_scan` must finish
-within timeout (`kMaxScansPerStep` + angle wrap). Timeout on `bad_scan` → FAIL and
-reopen #21.
+VAR-03 regression canary: former Known Issues #21 (removed — hang class is structurally
+gone). `bad_scan` must finish within timeout. Timeout on `bad_scan` → FAIL.
 
 ## Prerequisites
 
@@ -122,8 +122,8 @@ Switches: …
 | Variant | Script | Status | Notes |
 |---------|--------|--------|-------|
 | VAR-01 | check_foreign_host.sh | PASS/FAIL/SKIP | |
-| VAR-02 | check_foreign_mission_control.sh | PASS/FAIL/SKIP | findings; KI #20 |
-| VAR-03 | check_adversarial_plugins.sh | PASS/FAIL/SKIP | KI #21 canary |
+| VAR-02 | check_foreign_mission_control.sh | PASS/FAIL/SKIP | findings (hits-only) |
+| VAR-03 | check_adversarial_plugins.sh | PASS/FAIL/SKIP | `bad_scan` canary |
 | VAR-04 | check_baseline_algorithm.sh | PASS/FAIL/SKIP | slow ~5m |
 
 Overall: PASS only if every **selected** (non-SKIP) row is PASS.
@@ -135,13 +135,13 @@ Overall: PASS only if every **selected** (non-SKIP) row is PASS.
 |---------|--------|-------------------------|
 | VAR-01 | `check_foreign_host.sh` | Plugins couple to our Map3D/GPS/lidar semantics |
 | VAR-02 | `check_foreign_mission_control.sh` | Algorithm assumes Empty-carve / non-null scans |
-| VAR-03 | `check_adversarial_plugins.sh` | Containment / scan-batch hang (#21) |
+| VAR-03 | `check_adversarial_plugins.sh` | Containment / `bad_scan` hang |
 | VAR-04 | `check_baseline_algorithm.sh` | Competition multi-algorithm wiring |
 
 ## Related
 
 - Spec: `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md`
 - Plan: `docs/superpowers/plans/2026-08-28-independent-component-variants.md`
-- Known Issues: `#20` (open), `#21` (resolved audit)
+- Known Issues: `docs/known-issues.md` (former #20/#21 removed; current #14 is plan-batching)
 - Manual README: `Simulator/tests/manual/README.md`
 - Catalog orchestrator (different): `verify-instructor-test-catalog`

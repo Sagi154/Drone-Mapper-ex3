@@ -57,8 +57,8 @@ Highest-leverage next work is below.
 - **Independent component variants (VAR-01…04)** on branch `independent-component-variants`
   (VAR-04 check green; commit may still be pending). Blind fixtures + `skeleton_host`,
   `check_foreign_host.sh`, `check_foreign_mission_control.sh`, `check_adversarial_plugins.sh`,
-  `check_baseline_algorithm.sh`. Findings: Known Issues **#20** (hits-only step inflation);
-  **#21** resolved (scan-batch hang). Re-verify:
+  `check_baseline_algorithm.sh`. Findings then: hits-only step inflation and a scan-batch
+  hang (former known-issues #20/#21; both removed 2026-09-01 after project B). Re-verify:
   `.cursor/skills/verify-independent-component-variants/SKILL.md`. Spec/plan:
   `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md`,
   `docs/superpowers/plans/2026-08-28-independent-component-variants.md`.
@@ -80,7 +80,7 @@ Highest-leverage next work is below.
   default` build/run, both CLI invocations, `.so`/exe names, and the existing output-naming section.
   Root `HLD.pdf` (AdvCpp e14/e15) with class and sequence diagrams for the three-project plugin
   layout; editable source `docs/HLD.md`, render script `scripts/render_hld_pdf.sh`. Evidence:
-  `README.md`, `HLD.pdf`, `docs/known-issues.md` rows 3–4 (resolved).
+  `README.md`, `HLD.pdf` (former known-issues rows 3–4; removed 2026-09-01).
 - **Default composition scoring (full matrix).** `inputs/sim_compose.yaml` comparative:
   **24/24 `COMPLETED`**, `mission_score >= 0`, `MISSION_EXCEPTION` 0, wall-clock ~276s (8 threads).
   Design: `docs/superpowers/specs/2026-08-27-wall-collision-recovery-and-planner-design.md`.
@@ -180,10 +180,11 @@ is explicitly allowed.
 
 ## Known Issues (working file, not the excel)
 
-`docs/known-issues.md` — staff example-table columns. Rows 2, 3–4, and 17–18 record 2026-08-27
-fixes (full matrix, README, HLD) — kept for audit trail, not open bugs. Rows 5–14 are skipped
-optional Common-issues PDF scenarios (one row each). English only. At zip time, copy into the Google
-Sheet and export `.xlsx` to the zip root — do not submit the markdown.
+`docs/known-issues.md` — staff example-table columns. Resolved/stale rows removed and
+renumbered `1..n` (2026-09-01). Remaining: optional Common-issues PDF skips, lazy `.so`
+load, unused `ISimulation`, Unmapped-as-passable, plan-batching short-lidar score drop.
+English only. At zip time, copy into the Google Sheet and export `.xlsx` to the zip root —
+do not submit the markdown.
 
 ---
 
