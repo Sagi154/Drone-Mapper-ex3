@@ -42,25 +42,30 @@ struct FrontierPathResult {
     GridKey frontier_key{};
 };
 
-struct PlanningDiagnostics {
-    bool start_passable = false;
-    std::size_t passable_reached = 0;
-    std::size_t reachable_frontiers = 0;
-    bool explore_path_available = false;
-    int nearest_unknown_steps = -1;
+using FrontierCells = std::unordered_set<GridKey, GridKeyHash>;
+
+struct FrontierCluster {
+    std::size_t cell_count = 0;
+    std::size_t volume_count = 0;
+    GridKey approach_key{};
+    common::Position3D approach_position{};
+    int approach_cost = 0;
+    std::vector<GridKey> keys{};
 };
 
-/// BFS frontier search through confirmed-empty cells on a read-only output map.
+struct ReachabilityResult {
+    bool start_passable = false;
+    bool truncated = false;  ///< Expansion cap hit; treat the result as partial.
+    GridKey start_key{};
+    ParentMap parent_of{};
+    FrontierCells frontier_cells{};
+    std::vector<FrontierCluster> clusters{};
+};
+
+/// BFS / Dijkstra reachability through confirmed-empty cells on a read-only output map.
 class MappingAlgorithmFrontier {
 public:
-    [[nodiscard]] FrontierPathResult findPath(
-        const common::IMap3D& map,
-        const common::Position3D& start,
-        common::PhysicalLength drone_radius,
-        const BlockedCells& blocked_cells = {},
-        const GridIntMap& frontier_visits = {}) const;
-
-    /// BFS path from start to a specific goal cell (same passability rules as findPath).
+    /// Bounded Dijkstra from start to a specific goal cell.
     [[nodiscard]] FrontierPathResult findPathTo(
         const common::IMap3D& map,
         const common::Position3D& start,
@@ -68,46 +73,23 @@ public:
         common::PhysicalLength drone_radius,
         const BlockedCells& blocked_cells = {}) const;
 
-    /// Like findPath but targets the deepest frontier in the passable component.
-    [[nodiscard]] FrontierPathResult findFarthestPath(
+    /// Dijkstra over the passable component with a FIXED edge set, collecting
+    /// frontier-adjacent cells and clustering them. Bounded by max_expansions so a
+    /// broken passability check yields a truncated result instead of an unbounded
+    /// walk (ALG28).
+    [[nodiscard]] ReachabilityResult exploreReachable(
         const common::IMap3D& map,
         const common::Position3D& start,
         common::PhysicalLength drone_radius,
-        const BlockedCells& blocked_cells = {}) const;
+        const BlockedCells& blocked_cells,
+        std::size_t max_expansions) const;
 
-    /// When dist_cache is non-null the pre-built unknown-distance field is reused if
-    /// non-empty; otherwise it is built and stored into *dist_cache for future calls.
-    [[nodiscard]] FrontierPathResult findExplorePath(
-        const common::IMap3D& map,
-        const common::Position3D& start,
-        common::PhysicalLength drone_radius,
-        const BlockedCells& blocked_cells = {},
-        GridIntMap* dist_cache = nullptr) const;
-
+    /// One-step face-neighbour escape when the start sphere is blocked.
+    /// Returns a path of length 1 to the first sphere-passable 6-neighbour, or empty.
     [[nodiscard]] FrontierPathResult findUnstickPath(
         const common::IMap3D& map,
         const common::Position3D& start,
         common::PhysicalLength drone_radius) const;
-
-    /// One grid step toward a passable neighbor with lower (or equal) unknown distance.
-    [[nodiscard]] FrontierPathResult findGreedyUnknownStep(
-        const common::IMap3D& map,
-        const common::Position3D& start,
-        common::PhysicalLength drone_radius,
-        const BlockedCells& blocked_cells = {}) const;
-
-    /// Any single passable grid step — breaks deadlocks when unknown remains.
-    [[nodiscard]] FrontierPathResult findAnyPassableNeighbor(
-        const common::IMap3D& map,
-        const common::Position3D& start,
-        common::PhysicalLength drone_radius,
-        const BlockedCells& blocked_cells = {}) const;
-
-    [[nodiscard]] PlanningDiagnostics diagnose(
-        const common::IMap3D& map,
-        const common::Position3D& start,
-        common::PhysicalLength drone_radius,
-        const BlockedCells& blocked_cells = {}) const;
 };
 
 [[nodiscard]] GridKey quantizePosition(const common::Position3D& pos, const common::types::MapConfig& config);
@@ -119,5 +101,20 @@ public:
 [[nodiscard]] bool hasAnyNotMappedInBounds(const common::IMap3D& map);
 
 [[nodiscard]] std::size_t countUnmappedInBounds(const common::IMap3D& map);
+
+/// Walks parent links from goal back to start. Empty result when goal is unreachable.
+[[nodiscard]] FrontierPathResult reconstructPathTo(const ParentMap& parent_of,
+                                                   const GridKey& start_key,
+                                                   const GridKey& goal_key,
+                                                   const common::types::MapConfig& config);
+
+/// True when the straight segment from..to is sphere-passable at every half-resolution sample.
+[[nodiscard]] bool hasClearLineOfSight(const common::IMap3D& map,
+                                       const common::Position3D& from,
+                                       const common::Position3D& to,
+                                       common::PhysicalLength drone_radius);
+
+/// Voxel count of the mission bounds — the expansion cap for every search.
+[[nodiscard]] std::size_t maxExpansionsForMap(const common::IMap3D& map);
 
 } // namespace algorithm_207190406_209543255::detail

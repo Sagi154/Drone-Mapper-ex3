@@ -109,7 +109,7 @@ A blind `IMissionControl` (+ optional `IDroneControl`-shaped helper inside the s
 | Our behavior (contamination risk) | Foreign variant |
 |-----------------------------------|-----------------|
 | Ray-carve `Empty` along lidar beams | Write only hits as `Occupied`; never carve free space |
-| Batch consecutive scan commands into one step | Exactly one scan per step |
+| Exactly one scan per step (movement then scan) | Exactly one scan per step |
 | Cache last scan → pass non-null `latest_scan` | Pass `latest_scan = nullptr` every `nextStep` |
 | Output resolution from our mission wiring | Honor a coarser output resolution |
 

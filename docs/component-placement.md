@@ -74,6 +74,7 @@ Only put something here once a **second** project actually needs it. Genuine can
 | `src/io/TimeFormat.cpp` | ISO-8601 UTC timestamps for error logs (all three projects) and the `<time>` in output folder names |
 | `src/io/RunErrorLog.cpp`, `include/.../io/IRunErrorLog.h` | immediate-flush error log; mission control and algorithm may both write error logs |
 | a `ConfigParseResult<T>` type | replaces the removed `config_load_error` fields (see `docs/api-delta-ex2-to-ex3.md`) |
+| `BeamMath.h` / lidar cone helpers | beam stepping + cone FOV math shared by Algorithm (gain-gating) and MissionControl (fusion) |
 
 `UserCommon/` has **no build file**. Each project's CMakeLists adds the `UserCommon` include directory
 and compiles the `.cpp` files it needs. That means a `UserCommon` translation unit can end up compiled

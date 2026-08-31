@@ -2,7 +2,7 @@
 
 #include <MissionControl/ScanResultToVoxels.h>
 
-#include "BeamMath.hpp"
+#include <user_common_207190406_209543255/BeamMath.h>
 
 #include <cmath>
 #include <exception>
@@ -19,7 +19,7 @@ using common::cm;
 using common::x_extent;
 using common::y_extent;
 using common::z_extent;
-namespace bm = beam_math;
+namespace bm = user_common_207190406_209543255::beam_math;
 
 void markDroneFootprintEmpty(common::IMutableMap3D& map,
                              const Position3D& centre,
@@ -184,35 +184,9 @@ common::types::DroneStepResult DroneControlImpl::step() {
         return common::types::DroneStepResult{common::types::DroneStepStatus::Completed, {}};
     }
 
-    // Batch consecutive scan commands into a single mission step.
-    // Cap the batch: an algorithm that always returns Working+scan (VAR-03
-    // adversarial_bad_scan) would otherwise loop forever inside one step.
-    constexpr std::size_t kMaxScansPerStep = 16;
-    std::size_t scans_this_step = 0;
-    while (command.scan_orientation.has_value() &&
-           command.status == common::types::AlgorithmStatus::Working &&
-           scans_this_step < kMaxScansPerStep) {
-        latest_scan_ = lidar_sensor_.scan(*command.scan_orientation);
-        has_latest_scan_ = true;
-        ++scans_this_step;
-        // fusion_max removed in ex3 — always fuse at full lidar z_max.
-        ScanResultToVoxels::applyToMap(
-            output_map_, gps_.position(), gps_.heading(), latest_scan_, lidar_);
-        supplementGridAlignedFusion(
-            output_map_, gps_.position(), gps_.heading(), latest_scan_, lidar_.z_max);
-        markDroneFootprintEmpty(output_map_, gps_.position(), drone_.radius);
-
-        const common::types::DroneState post_scan_state = state();
-        latest_scan_ptr = &latest_scan_;
-        command = mapping_algorithm_.nextStep(post_scan_state, latest_scan_ptr);
-
-        if (command.status == common::types::AlgorithmStatus::Finished ||
-            command.status == common::types::AlgorithmStatus::FinishedWithUnmappableVoxels) {
-            ++step_index_;
-            return common::types::DroneStepResult{common::types::DroneStepStatus::Completed, {}};
-        }
-    }
-
+    // One nextStep per step: movement then at most one scan (documented contract).
+    // No inner scan-batching loop — hang class from always-Working+scan is impossible here;
+    // MissionControlImpl::runMission bounds iterations via max_steps.
     if (command.movement.has_value()) {
         if (!movementWithinLimits(*command.movement, drone_)) {
             return common::types::DroneStepResult{
@@ -225,27 +199,32 @@ common::types::DroneStepResult DroneControlImpl::step() {
             const common::types::MovementResult movement_result =
                 executeMovement(movement_, *command.movement);
             if (!movement_result) {
-                if (isRecoverableMovementFailure(movement_result.message)) {
-                    ++step_index_;
+                if (!isRecoverableMovementFailure(movement_result.message)) {
                     return common::types::DroneStepResult{
-                        common::types::DroneStepStatus::Continue, {}};
+                        common::types::DroneStepStatus::Error,
+                        movement_result.message.empty() ? "Movement failed."
+                                                        : movement_result.message,
+                    };
                 }
-                return common::types::DroneStepResult{
-                    common::types::DroneStepStatus::Error,
-                    movement_result.message.empty() ? "Movement failed."
-                                                    : movement_result.message,
-                };
+                // Recoverable blocked/boundary: stay put, still honor an optional scan.
             }
         } catch (const std::exception& ex) {
             // MockMovement throws on wall/boundary; recover like a false MovementResult.
             // Non-recoverable exceptions rethrow for SimulationRunImpl.
-            if (isRecoverableMovementFailure(ex.what())) {
-                ++step_index_;
-                return common::types::DroneStepResult{
-                    common::types::DroneStepStatus::Continue, {}};
+            if (!isRecoverableMovementFailure(ex.what())) {
+                throw;
             }
-            throw;
         }
+    }
+
+    if (command.scan_orientation.has_value()) {
+        latest_scan_ = lidar_sensor_.scan(*command.scan_orientation);
+        has_latest_scan_ = true;
+        ScanResultToVoxels::applyToMap(
+            output_map_, gps_.position(), gps_.heading(), latest_scan_, lidar_);
+        supplementGridAlignedFusion(
+            output_map_, gps_.position(), gps_.heading(), latest_scan_, lidar_.z_max);
+        markDroneFootprintEmpty(output_map_, gps_.position(), drone_.radius);
     }
 
     ++step_index_;

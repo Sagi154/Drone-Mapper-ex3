@@ -88,11 +88,12 @@ public:
     }
 
     common::types::MovementResult advance(PhysicalLength /*distance*/) override {
+        ++advance_count_;
         if (throw_on_advance_) {
             throw std::runtime_error(advance_throw_message_);
         }
         if (!advance_ok_) {
-            return {false, "Movement failed."};
+            return {false, advance_fail_message_};
         }
         return {true, {}};
     }
@@ -103,6 +104,8 @@ public:
 
     bool throw_on_advance_ = false;
     bool advance_ok_ = true;
+    int advance_count_ = 0;
+    std::string advance_fail_message_ = "Movement failed.";
     std::string advance_throw_message_ =
         "advance: destination blocked by obstacle or map boundary";
 };
@@ -362,4 +365,154 @@ TEST(DroneControl, ExecutesScanThenContinues) {
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
     EXPECT_EQ(fixture.lidar.scan_count_, 1);
     EXPECT_GE(fixture.output_map.set_count_, 1);
+}
+
+TEST(DroneControl, ExecutesMovementAndScanInOneStep) {
+    Fixture fixture;
+    const auto mission = defaultMission();
+    const auto lidar_cfg = defaultLidar();
+    const auto drone_cfg = defaultDrone();
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{mission, lidar_cfg, drone_cfg, fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 10.0 * cm,
+                },
+            .scan_orientation =
+                Orientation{0.0 * horizontal_angle[deg], 0.0 * altitude_angle[deg]},
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(),
+        defaultMission(),
+        defaultLidar(),
+        fixture.lidar,
+        fixture.gps,
+        fixture.movement,
+        fixture.output_map,
+        algorithm,
+    };
+
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.advance_count_, 1);
+    EXPECT_EQ(fixture.lidar.scan_count_, 1);
+    EXPECT_EQ(algorithm.call_index_, 1U);
+    EXPECT_EQ(control.state().step_index, 1U);
+}
+
+TEST(DroneControl, RecoverableBlockedStillScans) {
+    Fixture fixture;
+    fixture.movement.throw_on_advance_ = true;
+    fixture.movement.advance_throw_message_ =
+        "advance: destination blocked by obstacle or map boundary";
+
+    const auto mission = defaultMission();
+    const auto lidar_cfg = defaultLidar();
+    const auto drone_cfg = defaultDrone();
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{mission, lidar_cfg, drone_cfg, fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 10.0 * cm,
+                },
+            .scan_orientation =
+                Orientation{45.0 * horizontal_angle[deg], 0.0 * altitude_angle[deg]},
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(),
+        defaultMission(),
+        defaultLidar(),
+        fixture.lidar,
+        fixture.gps,
+        fixture.movement,
+        fixture.output_map,
+        algorithm,
+    };
+
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.lidar.scan_count_, 1);
+    EXPECT_EQ(control.state().step_index, 1U);
+}
+
+TEST(DroneControl, HardMovementFailureSkipsScan) {
+    Fixture fixture;
+    fixture.movement.advance_ok_ = false;
+    fixture.movement.advance_fail_message_ = "actuator fault";
+
+    const auto mission = defaultMission();
+    const auto lidar_cfg = defaultLidar();
+    const auto drone_cfg = defaultDrone();
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{mission, lidar_cfg, drone_cfg, fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 10.0 * cm,
+                },
+            .scan_orientation =
+                Orientation{0.0 * horizontal_angle[deg], 0.0 * altitude_angle[deg]},
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(),
+        defaultMission(),
+        defaultLidar(),
+        fixture.lidar,
+        fixture.gps,
+        fixture.movement,
+        fixture.output_map,
+        algorithm,
+    };
+
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Error);
+    EXPECT_EQ(fixture.lidar.scan_count_, 0);
+    EXPECT_EQ(control.state().step_index, 0U);
+}
+
+TEST(DroneControl, AlwaysScanAlgorithmScansOncePerStep) {
+    Fixture fixture;
+    const auto mission = defaultMission();
+    const auto lidar_cfg = defaultLidar();
+    const auto drone_cfg = defaultDrone();
+    std::vector<common::types::MappingStepCommand> script;
+    for (int i = 0; i < 5; ++i) {
+        script.push_back(common::types::MappingStepCommand{
+            .scan_orientation =
+                Orientation{0.0 * horizontal_angle[deg], 0.0 * altitude_angle[deg]},
+            .status = common::types::AlgorithmStatus::Working,
+        });
+    }
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{mission, lidar_cfg, drone_cfg, fixture.stand_in_map},
+        std::move(script),
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(),
+        defaultMission(),
+        defaultLidar(),
+        fixture.lidar,
+        fixture.gps,
+        fixture.movement,
+        fixture.output_map,
+        algorithm,
+    };
+
+    for (int i = 0; i < 5; ++i) {
+        EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    }
+    EXPECT_EQ(fixture.lidar.scan_count_, 5);
+    EXPECT_EQ(algorithm.call_index_, 5U);
 }

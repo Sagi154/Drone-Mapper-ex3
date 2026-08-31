@@ -2,14 +2,19 @@
 
 #include <Common/IMappingAlgorithm.h>
 
+#include <cstddef>
 #include <memory>
 #include <optional>
-#include <vector>
 
 namespace algorithm_207190406_209543255 {
 
-/// 26-direction scan batch + density-scored BFS frontier cleanup.
-/// Each nextStep emits at most one scan orientation or one movement command.
+namespace detail {
+struct ExplorationPlan;
+} // namespace detail
+
+/// Wavefront Frontier Detection over the reachability substrate.
+/// Each nextStep emits a movement and, when the resulting pose would observe
+/// something new, a scan in the same command.
 class MappingAlgorithmImpl_207190406_209543255 final : public common::IMappingAlgorithm {
 public:
     /// @param dependencies Mission, sensor, drone, and output-map dependencies.
@@ -36,32 +41,39 @@ public:
         MappingAlgorithmImpl_207190406_209543255&&) = delete;
 
 private:
-    enum class Phase { Scanning, Planning, Moving };
-
     struct Impl;
 
-    [[nodiscard]] common::types::MappingStepCommand handleScanningPhase(
-        const common::types::DroneState& state);
-    [[nodiscard]] common::types::MappingStepCommand handlePlanningPhase(
-        const common::types::DroneState& state);
-    [[nodiscard]] common::types::MappingStepCommand handleMovingPhase(
-        const common::types::DroneState& state);
-    [[nodiscard]] common::types::MappingStepCommand handleFrontierCleanupPhase(
-        const common::types::DroneState& state);
-
     void ensurePlanningReady();
-
-    void buildScanOrientations(const common::Orientation& heading,
-                               const common::Position3D& position);
+    [[nodiscard]] std::size_t remainingSteps(const common::types::DroneState& state) const;
+    void pruneExpiredBlockedCells(std::size_t step_index);
+    [[nodiscard]] bool replan(const common::types::DroneState& state, bool ignore_blocked);
+    void adoptPlan(detail::ExplorationPlan plan, const common::types::DroneState& state);
+    [[nodiscard]] bool popPendingPlan(const common::types::DroneState& state);
     [[nodiscard]] std::optional<common::types::MovementCommand> movementToward(
         const common::types::DroneState& state, const common::Position3D& target) const;
+    [[nodiscard]] common::types::DroneState predictPose(
+        const common::types::DroneState& state,
+        const common::types::MovementCommand& movement) const;
+    void buildArrivalSweep(const common::types::DroneState& state);
+    [[nodiscard]] bool targetClusterAlive() const;
     [[nodiscard]] bool reachedWaypoint(const common::types::DroneState& state,
                                        const common::Position3D& target) const;
-    [[nodiscard]] bool samePosition(const common::Position3D& a, const common::Position3D& b) const;
+    [[nodiscard]] bool samePosition(const common::Position3D& a,
+                                    const common::Position3D& b) const;
 
     std::unique_ptr<Impl> impl_;
 
     static constexpr int kMaxMovingStallTicks = 2;
+    static constexpr std::size_t kReplanIntervalSteps = 25;
+    static constexpr std::size_t kBlockedTtlSteps = 50;
+    static constexpr int kRecoveryAttempts = 3;
+    static constexpr int kLowRateReplans = 3;
+    static constexpr std::size_t kObservedWindowSteps = 100;
+    /// Consecutive observed windows with Unmapped-drop below kMinObservedInformationRate.
+    static constexpr int kLowObservedWindows = 4;
+    static constexpr double kMinInformationRate = 0.25;
+    /// Observed Unmapped-drop rate (cells/step). Separate from predicted kMinInformationRate.
+    static constexpr double kMinObservedInformationRate = 0.05;
 };
 
 } // namespace algorithm_207190406_209543255

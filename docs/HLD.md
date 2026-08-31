@@ -88,8 +88,9 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 
 - **`MappingAlgorithmImpl_207190406_209543255`** — Plugin entry point implementing
   `common::IMappingAlgorithm`. Reads the world through `const common::IMap3D&` only.
-  Uses an internal BFS frontier planner (`MappingAlgorithmFrontier`) to choose scan
-  orientations and movement toward unexplored voxels.
+  Uses Wavefront Frontier Detection over a reachability substrate
+  (`MappingAlgorithmFrontier`) to pick a cluster, then emits movement plus a
+  score-aware scan toward that cluster.
 
 **Note on `simulator::ISimulation`:** The course publishes
 `Simulator/common_simulator/include/Simulator/ISimulation.h`, but we do **not**
@@ -249,8 +250,9 @@ algorithm in a folder is varied; the same orchestrator/factory/run path applies.
 ## Sequence: DroneControl step loop
 
 Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration calls
-`DroneControlImpl::step()`. The algorithm may return scan commands (batched in one step)
-or a movement command.
+`DroneControlImpl::step()`. Each step invokes `nextStep` once and may execute an optional
+movement followed by at most one scan (then voxel fusion), matching the published
+movement → scan → fuse contract.
 
 ![Drone step sequence](hld/seq-drone-step.png)
 
