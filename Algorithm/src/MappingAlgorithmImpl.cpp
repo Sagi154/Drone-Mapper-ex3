@@ -239,16 +239,6 @@ bool MappingAlgorithmImpl_207190406_209543255::popPendingPlan(const types::Drone
             !detail::clusterStillFrontier(output_map_, candidate.target_keys)) {
             continue;
         }
-        if (candidate.waypoints.empty()) {
-            continue;
-        }
-        const Position3D goal = candidate.waypoints.back();
-        const detail::FrontierPathResult repath = detail::MappingAlgorithmFrontier{}.findPathTo(
-            output_map_, state.position, goal, drone_config_.radius, impl_->blocked_cells);
-        if (!repath.found || repath.path.empty()) {
-            continue;
-        }
-        candidate.waypoints = repath.path;
         adoptPlan(std::move(candidate), state);
         return true;
     }
