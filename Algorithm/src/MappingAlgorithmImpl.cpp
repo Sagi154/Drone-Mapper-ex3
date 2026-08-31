@@ -383,28 +383,36 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
         // elapsed interval or a dead target cluster means the map or the current
         // target's assumptions may be stale, so those always force a fresh search.
         const bool can_reuse_queue = plan_exhausted && !interval_elapsed && !cluster_dead;
-        const bool have = (can_reuse_queue && popPendingPlan(state)) || replan(state, false);
-        const bool low = !have || impl_->plan.expected_rate < kMinInformationRate;
-        if (low) {
-            ++impl_->low_rate_replans;
-            if (!have && impl_->recovery_attempts < kRecoveryAttempts &&
-                replan(state, true)) {
-                ++impl_->recovery_attempts;
-                if (impl_->plan.expected_rate >= kMinInformationRate) {
-                    impl_->low_rate_replans = 0;
-                    impl_->recovery_attempts = 0;
-                }
-            } else if (impl_->low_rate_replans >= kLowRateReplans) {
-                impl_->finished = true;
-                types::MappingStepCommand cmd{};
-                cmd.status = detail::hasAnyNotMappedInBounds(output_map_)
-                                 ? types::AlgorithmStatus::FinishedWithUnmappableVoxels
-                                 : types::AlgorithmStatus::Finished;
-                return cmd;
-            }
-        } else {
+        const bool reused_queue = can_reuse_queue && popPendingPlan(state);
+        const bool have = reused_queue || replan(state, false);
+        // Queued runner-ups are leftover from the same ranked search, not a new
+        // low-rate replan; counting them toward kLowRateReplans aborts early.
+        if (reused_queue) {
             impl_->low_rate_replans = 0;
             impl_->recovery_attempts = 0;
+        } else {
+            const bool low = !have || impl_->plan.expected_rate < kMinInformationRate;
+            if (low) {
+                ++impl_->low_rate_replans;
+                if (!have && impl_->recovery_attempts < kRecoveryAttempts &&
+                    replan(state, true)) {
+                    ++impl_->recovery_attempts;
+                    if (impl_->plan.expected_rate >= kMinInformationRate) {
+                        impl_->low_rate_replans = 0;
+                        impl_->recovery_attempts = 0;
+                    }
+                } else if (impl_->low_rate_replans >= kLowRateReplans) {
+                    impl_->finished = true;
+                    types::MappingStepCommand cmd{};
+                    cmd.status = detail::hasAnyNotMappedInBounds(output_map_)
+                                     ? types::AlgorithmStatus::FinishedWithUnmappableVoxels
+                                     : types::AlgorithmStatus::Finished;
+                    return cmd;
+                }
+            } else {
+                impl_->low_rate_replans = 0;
+                impl_->recovery_attempts = 0;
+            }
         }
         impl_->arrival_scans.clear();
         impl_->arrival_scan_index = 0;

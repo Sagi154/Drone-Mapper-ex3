@@ -756,6 +756,85 @@ TEST(MappingAlgorithm, VisitsMultipleDisjointCrumbsAndFinishes) {
     }
 }
 
+// What: several disjoint Unmapped crumbs so the first replan queues low-rate runner-ups.
+// Expected: adopting those queued plans must not trip kLowRateReplans; still Working
+// after more than three plan exhaustions.
+TEST(MappingAlgorithm, QueuedLowRateRunnerUpsDoNotFinishEarly) {
+    const ct::MapConfig config = makeCorridorConfig();
+    // Occupied default so each crumb's Empty shell is a single approach cell;
+    // cell_count=1 keeps expected_rate < kMinInformationRate even on a 1-step hop.
+    Map output_map{{11, 11, 11}, config, ct::VoxelOccupancy::Occupied};
+    fillEmptyBox(output_map, 3, 7, 3, 7, 3, 7, config);
+    const std::array<std::array<int, 3>, 5> crumbs{{
+        {8, 5, 5},
+        {2, 5, 5},
+        {5, 8, 5},
+        {5, 2, 5},
+        {5, 5, 8},
+    }};
+    for (const auto& crumb : crumbs) {
+        output_map.set(gridPoint(crumb[0], crumb[1], crumb[2], config),
+                       ct::VoxelOccupancy::Unmapped);
+    }
+
+    Impl algorithm{common::MappingAlgorithmDependencies{
+        makeMissionConfig(), makeLidarConfig(), makeDroneConfig(), output_map}};
+
+    ct::DroneState state{
+        gridPoint(5, 5, 5, config), Orientation{0.0 * deg, 0.0 * deg}, 0};
+    const auto apply_movement = [](ct::DroneState& current,
+                                   const ct::MovementCommand& movement) {
+        switch (movement.type) {
+        case ct::MovementCommandType::Hover:
+            break;
+        case ct::MovementCommandType::Rotate: {
+            const double delta =
+                movement.angle.force_numerical_value_in(deg) *
+                ((movement.rotation == ct::RotationDirection::Left) ? 1.0 : -1.0);
+            current.heading.horizontal =
+                (current.heading.horizontal.force_numerical_value_in(deg) + delta) * deg;
+            break;
+        }
+        case ct::MovementCommandType::Advance: {
+            const double distance = movement.distance.force_numerical_value_in(cm);
+            const double heading_radians =
+                current.heading.horizontal.force_numerical_value_in(deg) *
+                (std::numbers::pi / 180.0);
+            current.position = Position3D{
+                (current.position.x.force_numerical_value_in(cm) +
+                 distance * std::cos(heading_radians)) *
+                    x_extent[cm],
+                (current.position.y.force_numerical_value_in(cm) +
+                 distance * std::sin(heading_radians)) *
+                    y_extent[cm],
+                current.position.z,
+            };
+            break;
+        }
+        case ct::MovementCommandType::Elevate:
+            current.position = Position3D{
+                current.position.x,
+                current.position.y,
+                (current.position.z.force_numerical_value_in(cm) +
+                 movement.distance.force_numerical_value_in(cm)) *
+                    z_extent[cm],
+            };
+            break;
+        }
+    };
+
+    constexpr int kStepsPastLowRateLimit = 20;
+    for (int step = 0; step < kStepsPastLowRateLimit; ++step) {
+        const ct::MappingStepCommand command = algorithm.nextStep(state, nullptr);
+        ASSERT_EQ(command.status, ct::AlgorithmStatus::Working)
+            << "finished at step " << step << " after queued low-rate runner-ups";
+        if (command.movement) {
+            apply_movement(state, *command.movement);
+        }
+        state.step_index = static_cast<std::size_t>(step + 1);
+    }
+}
+
 TEST(MappingAlgorithm, FinishesAfterConsecutiveLowRateReplans) {
     const ct::MapConfig config = makeCorridorConfig();
     Map output_map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
