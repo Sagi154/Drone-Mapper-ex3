@@ -2,6 +2,7 @@
 
 Measured 2026-08-31 against `3ca01e7` plugins, Docker `drone-mapper-ex3-dev`,
 `build/opt` **Release** (`CMAKE_BUILD_TYPE=Release`, CMake default `-O3 -DNDEBUG`).
+The F plan's “`-O2`” meant this Release tree, not a separate `-O2` build.
 Harness: `python scripts/benchmark/run_benchmark.py --build-dir build/opt --columns honest`
 then `--columns adversarial`. Composition: `inputs/sim_compose.yaml` (24 cells),
 `num_threads=8`. `kMinInformationRate` kept at **0.25**.

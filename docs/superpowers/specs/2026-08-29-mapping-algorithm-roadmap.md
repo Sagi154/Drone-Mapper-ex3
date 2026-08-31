@@ -15,7 +15,7 @@ when picking up this work cold.
 
 ---
 
-## Why four projects, and why this order
+## Why this sequence (A–F, E deferred)
 
 `docs/mapping-algorithm-analysis.md` (2026-08-29 review of `Algorithm/`) concluded the frontier idea
 is sound but the action policy on top of it is weak: ~26 of every ~28 `nextStep` calls scan, movement
@@ -354,7 +354,10 @@ Measured column: `docs/benchmarks/2026-08-31-post_f_honest.{csv,md}`.
 WFD over `MappingAlgorithmFrontier` picks a frontier cluster, then the executor
 emits movement plus a score-aware scan toward that cluster.
 
-### Measured outcome (honest, Release `-O3`, 2026-08-31)
+### Measured outcome (honest, Release, 2026-08-31)
+
+F's plan said `-O2`; the measured `build/opt` tree is CMake `Release` (this toolchain
+defaults to `-O3 -DNDEBUG`). Same configuration as `docs/benchmarks/2026-08-31-post_f_honest.md`.
 
 - Score sum **1402.6** vs post-C 1331.0 vs lawnmower 646.4. Zero `ERROR`. 2× `MAX_STEPS`.
 - Profiling `small_room` **85.60** (COMPLETED) vs post-C 82.57 / D 76.37.
