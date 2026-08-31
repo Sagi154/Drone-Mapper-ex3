@@ -109,6 +109,7 @@ struct MappingAlgorithmImpl_207190406_209543255::Impl {
     std::size_t progress_window_steps = 0;
     int low_observed_windows = 0;
     bool has_progress_baseline = false;
+    std::vector<detail::ExplorationPlan> pending_plans{};
     bool finished = false;
     bool planning_initialized = false;
 };
@@ -225,8 +226,23 @@ bool MappingAlgorithmImpl_207190406_209543255::replan(const types::DroneState& s
         output_map_, state, lidar_config_, drone_config_,
         remainingSteps(state), impl_->blocked_cells, ignore_blocked, prev_stay,
     };
-    adoptPlan(impl_->planner.plan(inputs), state);
+    impl_->pending_plans.clear();
+    adoptPlan(impl_->planner.plan(inputs, &impl_->pending_plans), state);
     return impl_->has_plan;
+}
+
+bool MappingAlgorithmImpl_207190406_209543255::popPendingPlan(const types::DroneState& state) {
+    while (!impl_->pending_plans.empty()) {
+        detail::ExplorationPlan candidate = std::move(impl_->pending_plans.front());
+        impl_->pending_plans.erase(impl_->pending_plans.begin());
+        if (!candidate.target_keys.empty() &&
+            !detail::clusterStillFrontier(output_map_, candidate.target_keys)) {
+            continue;
+        }
+        adoptPlan(std::move(candidate), state);
+        return true;
+    }
+    return false;
 }
 
 void MappingAlgorithmImpl_207190406_209543255::adoptPlan(detail::ExplorationPlan plan,
@@ -363,7 +379,11 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
         if (plan_exhausted) ++g_profile.replans_plan_exhausted;
         if (interval_elapsed) ++g_profile.replans_interval_elapsed;
         if (cluster_dead) ++g_profile.replans_cluster_dead;
-        const bool have = replan(state, false);
+        // Only a plan finishing on its own is safe to serve from the queue: an
+        // elapsed interval or a dead target cluster means the map or the current
+        // target's assumptions may be stale, so those always force a fresh search.
+        const bool can_reuse_queue = plan_exhausted && !interval_elapsed && !cluster_dead;
+        const bool have = (can_reuse_queue && popPendingPlan(state)) || replan(state, false);
         const bool low = !have || impl_->plan.expected_rate < kMinInformationRate;
         if (low) {
             ++impl_->low_rate_replans;

@@ -657,6 +657,50 @@ TEST(MappingAlgorithm, TerminatesWhenBudgetIsExhausted) {
     EXPECT_NE(status, ct::AlgorithmStatus::Working);
 }
 
+TEST(MappingAlgorithm, VisitsMultipleDisjointCrumbsAndFinishes) {
+    const ct::MapConfig config = makeCorridorConfig();
+    Map output_map{{11, 11, 11}, config};
+    fillEmptyBox(output_map, 0, 10, 0, 10, 0, 10, config);
+    // Three small, separated Unmapped crumbs so the first replan ranks >1 cluster.
+    output_map.set(gridPoint(2, 2, 5, config), ct::VoxelOccupancy::Unmapped);
+    output_map.set(gridPoint(8, 2, 5, config), ct::VoxelOccupancy::Unmapped);
+    output_map.set(gridPoint(5, 8, 5, config), ct::VoxelOccupancy::Unmapped);
+
+    const auto mc = makeMissionConfig();
+    const auto lc = makeLidarConfig();
+    const auto dc = makeDroneConfig();
+    Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
+
+    const auto classify_one = [&]() {
+        for (int x = 0; x < 11; ++x) {
+            for (int y = 0; y < 11; ++y) {
+                for (int z = 0; z < 11; ++z) {
+                    const Position3D p = gridPoint(x, y, z, config);
+                    if (output_map.atVoxel(p) == ct::VoxelOccupancy::Unmapped) {
+                        output_map.set(p, ct::VoxelOccupancy::Empty);
+                        return;
+                    }
+                }
+            }
+        }
+    };
+
+    ct::AlgorithmStatus last = ct::AlgorithmStatus::Working;
+    for (int step = 0; step < 400 && last == ct::AlgorithmStatus::Working; ++step) {
+        if (step > 0) {
+            classify_one();
+        }
+        const ct::DroneState state{gridPoint(5, 5, 5, config),
+                                   Orientation{0.0 * deg, 0.0 * deg},
+                                   static_cast<std::size_t>(step)};
+        last = algorithm.nextStep(state, nullptr).status;
+    }
+    EXPECT_NE(last, ct::AlgorithmStatus::Working) << "did not finish within budget";
+    EXPECT_EQ(output_map.atVoxel(gridPoint(2, 2, 5, config)), ct::VoxelOccupancy::Empty);
+    EXPECT_EQ(output_map.atVoxel(gridPoint(8, 2, 5, config)), ct::VoxelOccupancy::Empty);
+    EXPECT_EQ(output_map.atVoxel(gridPoint(5, 8, 5, config)), ct::VoxelOccupancy::Empty);
+}
+
 TEST(MappingAlgorithm, FinishesAfterConsecutiveLowRateReplans) {
     const ct::MapConfig config = makeCorridorConfig();
     Map output_map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};

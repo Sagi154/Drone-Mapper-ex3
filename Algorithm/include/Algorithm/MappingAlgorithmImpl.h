@@ -48,6 +48,7 @@ private:
     void pruneExpiredBlockedCells(std::size_t step_index);
     [[nodiscard]] bool replan(const common::types::DroneState& state, bool ignore_blocked);
     void adoptPlan(detail::ExplorationPlan plan, const common::types::DroneState& state);
+    [[nodiscard]] bool popPendingPlan(const common::types::DroneState& state);
     [[nodiscard]] std::optional<common::types::MovementCommand> movementToward(
         const common::types::DroneState& state, const common::Position3D& target) const;
     [[nodiscard]] common::types::DroneState predictPose(
