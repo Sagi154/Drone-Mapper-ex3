@@ -11,10 +11,7 @@
 #include <Common/MappingAlgorithmRegistration.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
 #include <numbers>
 #include <optional>
 #include <vector>
@@ -45,45 +42,6 @@ constexpr double kPositionEpsilon = 1e-6;
     }
     return 0;
 }
-
-// TEMP PROFILING (ALGO_PROFILE=1): remove before submit. Coarse phase timers for
-// diagnosing large_out per-step wall time; printed to stderr at process exit.
-struct ProfileScope {
-    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-    double* bucket;
-    explicit ProfileScope(double* b) : bucket(b) {}
-    ~ProfileScope() {
-        *bucket += std::chrono::duration<double, std::milli>(
-                       std::chrono::steady_clock::now() - t0)
-                       .count();
-    }
-};
-struct ProfileTotals {
-    double replan_ms = 0.0;
-    double target_alive_ms = 0.0;
-    double travel_scan_ms = 0.0;
-    double arrival_sweep_ms = 0.0;
-    double progress_count_ms = 0.0;
-    long steps = 0;
-    long replans = 0;
-    long replans_plan_exhausted = 0;
-    long replans_interval_elapsed = 0;
-    long replans_cluster_dead = 0;
-    bool enabled = std::getenv("ALGO_PROFILE") != nullptr;
-    ~ProfileTotals() {
-        if (!enabled) {
-            return;
-        }
-        std::fprintf(stderr,
-                      "[ALGO_PROFILE] steps=%ld replans=%ld (exhausted=%ld interval=%ld "
-                      "cluster_dead=%ld) replan_ms=%.1f target_alive_ms=%.1f "
-                      "travel_scan_ms=%.1f arrival_sweep_ms=%.1f progress_count_ms=%.1f\n",
-                      steps, replans, replans_plan_exhausted, replans_interval_elapsed,
-                      replans_cluster_dead, replan_ms, target_alive_ms, travel_scan_ms,
-                      arrival_sweep_ms, progress_count_ms);
-    }
-};
-ProfileTotals g_profile;
 
 } // namespace
 
@@ -367,18 +325,9 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     const bool plan_exhausted =
         !impl_->has_plan || (waypoints_done && scans_done);
     const bool interval_elapsed = impl_->steps_since_replan >= kReplanIntervalSteps;
-    bool cluster_dead = false;
-    {
-        ProfileScope prof(&g_profile.target_alive_ms);
-        cluster_dead = impl_->has_plan && !targetClusterAlive();
-    }
+    const bool cluster_dead = impl_->has_plan && !targetClusterAlive();
 
     if (plan_exhausted || interval_elapsed || cluster_dead) {
-        ProfileScope prof(&g_profile.replan_ms);
-        ++g_profile.replans;
-        if (plan_exhausted) ++g_profile.replans_plan_exhausted;
-        if (interval_elapsed) ++g_profile.replans_interval_elapsed;
-        if (cluster_dead) ++g_profile.replans_cluster_dead;
         // Only a plan finishing on its own is safe to serve from the queue: an
         // elapsed interval or a dead target cluster means the map or the current
         // target's assumptions may be stale, so those always force a fresh search.
@@ -419,9 +368,7 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     }
 
     ++impl_->steps_since_replan;
-    ++g_profile.steps;
 
-    ProfileScope progress_prof(&g_profile.progress_count_ms);
     if (!impl_->has_progress_baseline) {
         impl_->unmapped_at_progress_mark = detail::countUnmappedInBounds(output_map_);
         impl_->has_progress_baseline = true;
@@ -460,7 +407,6 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
             const types::DroneState predicted = predictPose(state, *cmd.movement);
             const auto& templates = impl_->templates.get(
                 lidar_config_, output_map_.getMapConfig().resolution);
-            ProfileScope prof(&g_profile.travel_scan_ms);
             const std::optional<Orientation> world = detail::bestTravelScan(
                 output_map_, predicted, target, lidar_config_, impl_->last_frontier,
                 templates, impl_->stamp);
@@ -474,7 +420,6 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     }
 
     if (impl_->arrival_scans.empty()) {
-        ProfileScope prof(&g_profile.arrival_sweep_ms);
         buildArrivalSweep(state);
     }
     if (impl_->arrival_scan_index < impl_->arrival_scans.size()) {
