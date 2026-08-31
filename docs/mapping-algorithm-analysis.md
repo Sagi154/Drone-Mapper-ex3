@@ -272,7 +272,9 @@ Wavefront Frontier Detection (Keidar & Kaminka). At the time of this review it w
 relegated to the fallback path while a full Dijkstra did the main work.
 **Project F** (`docs/superpowers/specs/2026-08-31-wavefront-frontier-exploration-design.md`)
 makes WFD the primary exploration policy: cluster reachable frontiers, rank by cells per
-step, and scan toward the chosen cluster.
+step, and scan toward the chosen cluster. Post-F measurement then showed three `house_full`
+cells at score 0.06 (start sphere vs mission AABB / Occupied floor, and a ceiling trap).
+The score-aware nav follow-up is recorded in `docs/benchmarks/2026-08-31-score_aware_nav.md`.
 
 ### 4. Any-angle path smoothing
 

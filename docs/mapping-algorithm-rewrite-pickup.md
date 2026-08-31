@@ -16,7 +16,7 @@ mp-units conversion).
 | Item | Value |
 |------|--------|
 | Branch | `algorithm-benchmark-harness` (from up-to-date `main` at start of work) |
-| Tip (approx) | `docs: record post-F wavefront benchmark against ex2` |
+| Tip (approx) | score-aware nav follow-up (OOB/unstick/ceiling descend) |
 
 ---
 
@@ -106,12 +106,19 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 
 - `-O2` `house_full` / `large_out` killed at 120 s. Profiling `small_room` 76.37; `small_out` 83.49.
 
-### Post-F (WFD) — `honest` ← **current column**
+### Post-F (WFD) — historical
 
 - Score sum **1402.6**, steps **50632**, **2× `MAX_STEPS`**, 0 errors.
 - vs ex2: **inside** house_lower, large_room; **below** house_full (mean 6.50), large_out (43.47), small_out (38.36), small_room (70.03).
-- Profiling `small_room` **85.60** (≥ post-C 82.57). Profiling `house_full` **25.81** in **65.4 s** (60 s gate **failed**). Profiling `small_out` **34.54** (not the 80s).
-- `kMinInformationRate` kept **0.25** (0.10 / 0.25 / 0.50 identical on the six-cell sweep).
+- Three `house_full` variants at **0.06** (two in 3 steps, one at 10000).
+
+### Score-aware nav (post-F follow-up) — `honest` ← **current column**
+
+- Score sum **1589.4**, steps **92452**, **0× `MAX_STEPS`**, 0 errors.
+- CSV/md: `docs/benchmarks/2026-08-31-score_aware_nav.{csv,md}`.
+- vs ex2: **inside** house_lower, large_room (94.47); **below** house_full (30.46, was 6.50), large_out (59.84), small_out (30.46), small_room (82.12).
+- `house_full` 0.06×3 is gone. Profiling small+short **48.33**. Large-drone `small_room` **85–86** (was 49–59).
+- `kMinInformationRate` / empty-stay cut **did not bind** on the 10k-step cells.
 
 ### Adversarial (hits-only foreign MC)
 
@@ -126,12 +133,31 @@ Do **not** kill cells at 60 s.
 
 ## Left to do (in order)
 
-### 1. Project E — mp-units on the substrate (next)
+### 1. Close the remaining ex2-band gaps (this is the standing work)
+
+Do **not** start Project E until house_full / outdoor / small_room means are inside
+or clearly approaching the ex2 bands. E is type cleanup; it will not raise scores.
+
+Diagnosed post-F failure modes (2026-08-31):
+
+| Symptom | Cause | Fix landed / still open |
+|---------|--------|-------------------------|
+| `house_full` large drone 0.06 in **3** steps | Spawn world-z = `max_height` (300 cm). r=7.5 sphere clips +Z OOB; `start_passable` false; 3 low-rate replans; footprint-only score. `house_lower` 100 is the empty-universe artifact (spawn above that box). | OOB no longer blocks an in-bounds centre. Occupied still does. |
+| Large drone quits after painting a floor | r=7.5 hits Occupied face neighbour (nearest 5). Planner returned invalid instead of `findUnstickPath`. | Unstick plan when start is blocked. |
+| `house_full` 10k steps, score stuck ~15–37 | Downward scans at the ceiling paint PO (`z_min`) into the slab (pass-2). Gating those scans then left start as the cheapest frontier (Unmapped still below) so we never descended. | Gate downward cones at `max_height`; force a one-step descend when Unmapped is below. |
+| 10k steps that do not raise score | Cluster `cell_count` was the Unmapped **volume**, so `kMinInformationRate` never bound. | Rank / terminate on Empty surface size. Rate floor still rarely binds on outdoor (surface stays large). |
+| Outdoor far below D's 83 | Frontier-mask + no volume carving. Unmasked / "open-look" gain repeats D's pass-2 hit on rooms — do not re-enable globally. | Still open: outdoor-only Empty carving. |
+| `small_room` large 49–59 | Same Occupied-floor / OOB trap as house. | Unstick + OOB → ~85–86 (near band). |
+
+Current honest sum **1589.4** (post-F 1402.6). Still below ex2 on house_full (56–62),
+large_out (80–88), small_out (75–89), small_room mean (87–90).
+
+### 2. Project E — mp-units on the substrate (after scores)
 
 Strong-type the remaining frontier / reachability substrate. Packaging / zip / Known
 Issues excel remain on the assignment-compliance track.
 
-### 2. After E / packaging
+### 3. After E / packaging
 
 - Open PR(s) for `algorithm-benchmark-harness` — **do not push to `main`**.
 - Separate track: zip packaging / Known Issues excel (`assignment-compliance-pickup.md`).
@@ -140,9 +166,10 @@ Issues excel remain on the assignment-compliance track.
 
 ## Next session — concrete first steps
 
-1. Read this file + roadmap Project E note.
-2. Confirm on `algorithm-benchmark-harness`, `git status` clean.
-3. Start **E** (mp-units on the substrate), or packaging if the deadline is the constraint.
+1. Read this file. Confirm `algorithm-benchmark-harness`.
+2. Re-measure Release honest if HEAD moved (`build/opt`, `scripts/benchmark/run_benchmark.py --columns honest`).
+3. Do not globally unmask cone gain. Next levers: outdoor-only Empty carving; stop crumb-vacuuming when pass-1 is done; get `house_full` off the ceiling layer into the rest of the volume.
+4. Project E / zip only after the score bar, or if the user says the deadline is the constraint.
 
 ---
 

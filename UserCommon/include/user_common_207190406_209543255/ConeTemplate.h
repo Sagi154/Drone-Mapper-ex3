@@ -254,8 +254,7 @@ inline std::size_t walkTemplate(const ConeTemplate& cone,
                 (oz + dist * beam.uz) * z_extent[cm],
             };
             const auto occ = map.atVoxel(p);
-            if (occ == common::types::VoxelOccupancy::Occupied ||
-                occ == common::types::VoxelOccupancy::OutOfBounds) {
+            if (occ == common::types::VoxelOccupancy::Occupied) {
                 return true;
             }
         }

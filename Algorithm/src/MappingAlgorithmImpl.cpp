@@ -185,6 +185,12 @@ bool MappingAlgorithmImpl_207190406_209543255::replan(const types::DroneState& s
     impl_->steps_since_replan = 0;
     impl_->has_plan = impl_->plan.valid;
     impl_->last_frontier = impl_->plan.frontier_cells;
+    if (impl_->has_plan && impl_->plan.waypoints.empty()) {
+        buildArrivalSweep(state);
+        if (impl_->arrival_scans.empty()) {
+            impl_->plan.expected_rate = 0.0;
+        }
+    }
     return impl_->has_plan;
 }
 
@@ -199,6 +205,9 @@ void MappingAlgorithmImpl_207190406_209543255::buildArrivalSweep(
 }
 
 bool MappingAlgorithmImpl_207190406_209543255::targetClusterAlive() const {
+    if (impl_->plan.target_keys.empty()) {
+        return true;
+    }
     return detail::clusterStillFrontier(output_map_, impl_->plan.target_keys);
 }
 

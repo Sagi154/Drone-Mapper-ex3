@@ -364,6 +364,15 @@ emits movement plus a score-aware scan toward that cluster.
 - Profiling `large_out` **36.92** in **154.2 s** (COMPLETED).
 - `kMinInformationRate` sweep {0.10, 0.25, 0.50} was **identical** on all six profiling cells; kept **0.25**.
 
+### Score-aware nav follow-up (2026-08-31)
+
+Honest sum **1589.4** (`docs/benchmarks/2026-08-31-score_aware_nav.{csv,md}`). The 0.06
+`house_full` cells were start-sphere OOB / Occupied-floor quits plus ceiling-trapped
+horizontal sweeping. Fixes: OOB does not fail an in-bounds centre; unstick; Empty-surface
+ranking; no downward cones at `max_height` plus a forced descend. Do not unmask cone gain
+globally (measured room collapse). Ex2 bands still missed on house_full / outdoor /
+`small_out`. Pickup: `docs/mapping-algorithm-rewrite-pickup.md`.
+
 ## Related docs
 
 - `docs/mapping-algorithm-analysis.md` — the review that this whole roadmap responds to

@@ -159,8 +159,10 @@ constexpr Offset kOffsets[6] = {
                     (cz + oz) * z_extent[cm],
                 };
                 const types::VoxelOccupancy probe_occ = occupancyAt(map, probe);
-                if (probe_occ == types::VoxelOccupancy::Occupied ||
-                    probe_occ == types::VoxelOccupancy::OutOfBounds) {
+                // Occupied is a wall. OutOfBounds is the mission AABB — the drone
+                // centre is already in-bounds, so a sphere that clips the box is
+                // not a collision (house_full spawn sits on max_height).
+                if (probe_occ == types::VoxelOccupancy::Occupied) {
                     return false;
                 }
             }
@@ -556,10 +558,35 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
                 bfs.push(neighbour);
             }
         }
+        std::vector<GridKey> surface;
+        surface.reserve(cluster.keys.size());
+        bool have_surface = false;
+        int surface_best_cost = 0;
+        GridKey surface_best = cluster.keys.front();
+        for (const GridKey& key : cluster.keys) {
+            const types::VoxelOccupancy occ = occupancyAt(map, keyToPoint(key, config));
+            if (occ != types::VoxelOccupancy::Empty) {
+                continue;
+            }
+            surface.push_back(key);
+            const int cell_cost = cost_of.at(key);
+            if (!have_surface || cell_cost < surface_best_cost) {
+                have_surface = true;
+                surface_best_cost = cell_cost;
+                surface_best = key;
+            }
+        }
+        if (!have_surface) {
+            // All-Unmapped start: stand on the cheapest cluster member (usually start).
+            surface.push_back(best_key);
+            surface_best = best_key;
+            surface_best_cost = best_cost;
+        }
+        cluster.keys = std::move(surface);
         cluster.cell_count = cluster.keys.size();
-        cluster.approach_key = best_key;
-        cluster.approach_position = keyToPoint(best_key, config);
-        cluster.approach_cost = best_cost;
+        cluster.approach_key = surface_best;
+        cluster.approach_position = keyToPoint(surface_best, config);
+        cluster.approach_cost = surface_best_cost;
         out.clusters.push_back(std::move(cluster));
     }
 

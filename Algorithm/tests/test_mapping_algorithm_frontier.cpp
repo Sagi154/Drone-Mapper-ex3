@@ -538,7 +538,9 @@ TEST(MappingAlgorithm, ExploreReachableClusterCountEqualsFrontierSet) {
         summed += c.cell_count;
         EXPECT_EQ(c.cell_count, c.keys.size());
     }
-    EXPECT_EQ(summed, result.frontier_cells.size());
+    // keys/cell_count are the Empty surface; frontier_cells also hold Unmapped
+    // glue cells so a 1-voxel pocket stays one cluster.
+    EXPECT_LE(summed, result.frontier_cells.size());
     EXPECT_FALSE(result.frontier_cells.empty());
 }
 
@@ -601,6 +603,58 @@ TEST(MappingAlgorithm, ExploreReachableIncludesStartWhenItBordersUnmapped) {
     }
     EXPECT_TRUE(start_is_approach);
     EXPECT_TRUE(result.frontier_cells.contains(result.start_key));
+}
+
+// What: house_full spawn sits on max_height. Large-drone sphere (7.5 cm)
+// clips the +Z OutOfBounds cell (nearest 5 ≤ 7.5). Mission AABB is not a wall.
+// Expected: start stays passable so we can expand in XY and −Z.
+TEST(MappingAlgorithm, FrontierAllowsInBoundsStartWhenSphereClipsOutOfBounds) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Unmapped};
+    const Position3D start = pointCm(50, 50, 100);
+    map.set(start, ct::VoxelOccupancy::Empty);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const auto result = frontier.exploreReachable(map, start, 7.5 * cm, {}, 64);
+
+    EXPECT_TRUE(result.start_passable);
+    EXPECT_FALSE(result.clusters.empty());
+}
+
+// What: start centre itself is outside the output map (house_lower spawn vs
+// a shorter mission box). Expected: still not passable — do not scan into a
+// volume we are not in.
+TEST(MappingAlgorithm, FrontierRejectsStartWhoseCentreIsOutOfBounds) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D start = pointCm(50, 50, 200);
+
+    const detail::MappingAlgorithmFrontier frontier;
+    EXPECT_FALSE(frontier.exploreReachable(map, start, 4.0 * cm, {}, 8).start_passable);
+}
+
+// What: a large Unmapped volume with a small Empty bubble at start.
+// Expected: cluster cell_count is the Empty/Unmapped surface, not the volume
+// (volume ranking never lets kMinInformationRate fire).
+TEST(MappingAlgorithm, ExploreReachableClusterCountIsEmptySurfaceNotVolume) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Unmapped};
+    const Position3D start = pointCm(50, 50, 50);
+    for (int x = 4; x <= 6; ++x) {
+        for (int y = 4; y <= 6; ++y) {
+            for (int z = 4; z <= 6; ++z) {
+                map.set(pointCm(x * 10, y * 10, z * 10), ct::VoxelOccupancy::Empty);
+            }
+        }
+    }
+
+    const detail::MappingAlgorithmFrontier frontier;
+    const auto result = frontier.exploreReachable(
+        map, start, 4.0 * cm, {}, detail::maxExpansionsForMap(map));
+
+    ASSERT_FALSE(result.clusters.empty());
+    EXPECT_LE(result.clusters.front().cell_count, 27u);
+    EXPECT_EQ(result.clusters.front().cell_count, result.clusters.front().keys.size());
 }
 
 TEST(MappingAlgorithm, ExploreReachableClusteringIsDeterministic) {

@@ -68,6 +68,19 @@ struct ScoredDirection {
     return 1.0 - std::clamp(dot, -1.0, 1.0);
 }
 
+[[nodiscard]] bool pointingDownThroughCeiling(const types::MapConfig& config,
+                                              const Position3D& origin,
+                                              const types::LidarConfigData& lidar,
+                                              const Orientation& dir) {
+    const double z = origin.z.force_numerical_value_in(cm);
+    const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
+    const double z_min = lidar.z_min.force_numerical_value_in(cm);
+    if (max_z - z > z_min + 1e-6) {
+        return false;
+    }
+    return dir.altitude.force_numerical_value_in(deg) < -10.0;
+}
+
 [[nodiscard]] const ctpl::ConeTemplate* closestTemplate(
     const std::vector<ctpl::ConeTemplate>& templates, const Orientation& probe) {
     const ctpl::ConeTemplate* best = nullptr;
@@ -123,7 +136,11 @@ std::vector<Orientation> buildSweepDirections(
     ctpl::VoxelStamp& stamp) {
     std::vector<ScoredDirection> scored;
     scored.reserve(templates.size());
+    const types::MapConfig bounds = map.getMapConfig();
     for (const ctpl::ConeTemplate& cone : templates) {
+        if (pointingDownThroughCeiling(bounds, origin, lidar, cone.direction)) {
+            continue;
+        }
         const std::size_t gain =
             countMaskedGain(cone, map, origin, lidar, frontier, stamp);
         if (gain > 0) {
@@ -198,6 +215,9 @@ std::optional<Orientation> bestTravelScan(
         if (cone == nullptr) {
             continue;
         }
+        if (pointingDownThroughCeiling(config, predicted.position, lidar, probe)) {
+            continue;
+        }
         if (ctpl::nearFieldContainsSolid(*cone, map, predicted.position)) {
             continue;
         }
@@ -221,6 +241,10 @@ std::optional<Orientation> bestTravelScan(
 bool clusterStillFrontier(const common::IMap3D& map, const std::vector<GridKey>& keys) {
     const types::MapConfig config = map.getMapConfig();
     for (const GridKey& key : keys) {
+        const Position3D cell = keyToPoint(key, config);
+        if (map.atVoxel(cell) != types::VoxelOccupancy::Empty) {
+            continue;
+        }
         for (const Offset& off : kFaceOffsets) {
             const GridKey neighbour{key.qx + off.dx, key.qy + off.dy, key.qz + off.dz};
             const Position3D nb = keyToPoint(neighbour, config);

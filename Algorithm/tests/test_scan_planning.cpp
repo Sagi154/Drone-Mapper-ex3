@@ -63,6 +63,48 @@ TEST(ScanPlanning, MaskRejectsUnmappedBehindOccupied) {
     EXPECT_FALSE(detail::isGainMasked(behind, frontier));
 }
 
+TEST(ScanPlanning, SweepIgnoresUnmappedBeyondFrontierShell) {
+    const ct::MapConfig config = makeConfig();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    map.set(at(80.0, 50.0, 50.0), ct::VoxelOccupancy::Unmapped);
+    const Position3D origin = at(50.0, 50.0, 50.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+    EXPECT_FALSE(detail::isGainMasked(detail::quantizePosition(at(80.0, 50.0, 50.0), config),
+                                      frontier));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLidar(), frontier, templates, stamp);
+
+    EXPECT_TRUE(dirs.empty());
+}
+
+TEST(ScanPlanning, SweepRejectsDownwardWhenOriginIsOnMaxHeight) {
+    const ct::MapConfig config = makeConfig();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    const Position3D origin = at(50.0, 50.0, 100.0);
+    map.set(origin, ct::VoxelOccupancy::Empty);
+    map.set(at(50.0, 50.0, 90.0), ct::VoxelOccupancy::Unmapped);
+
+    detail::FrontierCells frontier;
+    frontier.insert(detail::quantizePosition(origin, config));
+
+    ctpl::ConeTemplateCache cache;
+    const auto& templates = cache.get(makeLidar(), config.resolution);
+    ctpl::VoxelStamp stamp;
+    const auto dirs = detail::buildSweepDirections(
+        map, origin, makeLidar(), frontier, templates, stamp);
+
+    for (const Orientation& dir : dirs) {
+        EXPECT_GE(dir.altitude.force_numerical_value_in(deg), -10.0);
+    }
+}
+
 TEST(ScanPlanning, SweepOrdersByIndependentGainNotEnumerationOrder) {
     const ct::MapConfig config = makeConfig();
     Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};

@@ -91,6 +91,23 @@ TEST(WavefrontPlanner, PrefersDistantRoomOverNearbyCrumb) {
     EXPECT_GT(plan.target_cluster_cells, 20u);
 }
 
+TEST(WavefrontPlanner, DescendsFromCeilingWhenUnmappedIsBelow) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_height = 100.0 * z_extent[cm];
+    Map map{{21, 21, 11}, config, ct::VoxelOccupancy::Unmapped};
+    const Position3D start = at(50.0, 50.0, 100.0);
+    map.set(start, ct::VoxelOccupancy::Empty);
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 1000, blocked, false});
+
+    ASSERT_TRUE(plan.valid);
+    ASSERT_FALSE(plan.waypoints.empty());
+    EXPECT_LT(plan.waypoints.front().z.force_numerical_value_in(cm), 100.0);
+}
+
 TEST(WavefrontPlanner, StaysPutWhenStartIsTheCheapestFrontier) {
     Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Unmapped};
     const detail::WavefrontPlanner planner;
@@ -147,6 +164,30 @@ TEST(WavefrontPlanner, IsDeterministicAcrossIdenticalCalls) {
     EXPECT_EQ(a.target_cluster_cells, b.target_cluster_cells);
     EXPECT_DOUBLE_EQ(a.expected_rate, b.expected_rate);
     ASSERT_EQ(a.target_keys.size(), b.target_keys.size());
+}
+
+TEST(WavefrontPlanner, UnsticksWhenStartSphereHitsOccupiedFloor) {
+    Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
+    fillUnmappedBox(map, 16, 20, 8, 12, 2, 5);
+    const Position3D start = at(50.0, 100.0, 50.0);
+    for (int x = 0; x <= 20; ++x) {
+        for (int y = 0; y <= 20; ++y) {
+            map.set(at(x * 10.0, y * 10.0, 40.0), ct::VoxelOccupancy::Occupied);
+        }
+    }
+
+    ct::DroneConfigData drone = makeDrone();
+    drone.radius = 7.5 * cm;
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan plan = planner.plan(
+        {map, stateAt(start), makeLidar(), drone, 1000, blocked, false});
+
+    ASSERT_TRUE(plan.valid);
+    ASSERT_FALSE(plan.waypoints.empty());
+    EXPECT_GT(plan.waypoints.front().z.force_numerical_value_in(cm), 50.0);
+    EXPECT_GE(plan.expected_rate, 0.25);
 }
 
 TEST(WavefrontPlanner, ReportsInvalidWhenNothingIsUnresolved) {

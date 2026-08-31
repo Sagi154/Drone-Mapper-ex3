@@ -5,7 +5,7 @@ separately built projects — `simulator_<ids>` executable that `dlopen`s an `Al
 `MissionControl_<ids>.so` — and adds multithreaded comparative/competitive run modes.
 
 **Status:** implementation is feature-complete enough for a full instructor-doc audit
-(`docs/assignment-compliance-pickup.md` — **start there**). Default composition
+(`docs/assignment-compliance-pickup.md` — **start there** for packaging). Default composition
 `inputs/sim_compose.yaml` scores **24/24 Completed** with `mission_score >= 0`. Submission
 `README.md` and root `HLD.pdf` are done (2026-08-27). Instructor-catalog follow-up Points 1–4 are
 done (2026-08-28) — see `docs/instructor-test-catalog-followup-roadmap.md`; re-verify with
@@ -14,11 +14,20 @@ branch `independent-component-variants` — re-verify with `verify-independent-c
 Remaining mandatory work is Known Issues excel export at zip time and pre-submission packaging,
 not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
+**Mapping-algorithm track (separate from zip):** beat ex2's recorded 24-cell score bands on the
+honest MissionControl column. Pickup: `docs/mapping-algorithm-rewrite-pickup.md`. Do not treat
+`mission_score >= 0` as done for this track. Post-F wavefront left `house_full` / outdoor /
+large-drone cells below the bands; the standing work is score-aware exploration (not project E
+mp-units) until those bands are met without regressing `house_lower` 100 or the room cells that
+are already inside/near-band.
+
 ## Start here
 
 1. Read `.cursor/rules/project-context.mdc` (always applies) and `docs/assignment3-checklist.md`.
-2. Read `docs/assignment-compliance-pickup.md` for where we left off, then `docs/workplan.md` for
-   the historical Sagi/Yoav split (do not restart that split unless the pickup file says so).
+2. Packaging / zip: `docs/assignment-compliance-pickup.md`. Mapping scores vs ex2:
+   `docs/mapping-algorithm-rewrite-pickup.md` — that track is not done when `mission_score >= 0`.
+3. Read `docs/workplan.md` for the historical Sagi/Yoav split (do not restart that split unless
+   the pickup file says so).
 3. Before git branches, commits, or PRs: `git-workflow.mdc`.
 4. Before touching a published header: `frozen-interfaces.mdc` and `docs/api-delta-ex2-to-ex3.md` —
    ex2 code does not compile as-is (moved headers, changed namespaces, changed types).

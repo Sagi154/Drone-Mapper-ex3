@@ -10,6 +10,7 @@ namespace algorithm_207190406_209543255::detail {
 
 namespace lc = user_common_207190406_209543255::lidar_cone;
 namespace types = common::types;
+using common::cm;
 
 namespace {
 
@@ -37,7 +38,20 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
     const ReachabilityResult reach = frontier_.exploreReachable(
         in.map, in.state.position, in.drone.radius, blocked,
         maxExpansionsForMap(in.map));
-    if (!reach.start_passable || reach.clusters.empty()) {
+    if (!reach.start_passable) {
+        const FrontierPathResult unstick =
+            frontier_.findUnstickPath(in.map, in.state.position, in.drone.radius);
+        if (!unstick.found || unstick.path.empty()) {
+            return {};
+        }
+        ExplorationPlan escape;
+        escape.valid = true;
+        escape.waypoints = unstick.path;
+        escape.target_cluster_cells = 1;
+        escape.expected_rate = 1.0;
+        return escape;
+    }
+    if (reach.clusters.empty()) {
         return {};
     }
 
@@ -74,6 +88,19 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in) const {
         std::vector<common::Position3D> waypoints;
         if (cluster->approach_key == reach.start_key) {
             waypoints.clear();
+            const GridKey down{reach.start_key.qx, reach.start_key.qy,
+                               reach.start_key.qz - 1};
+            const double z = in.state.position.z.force_numerical_value_in(cm);
+            const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
+            const double z_min = in.lidar.z_min.force_numerical_value_in(cm);
+            if (max_z - z <= z_min + 1e-6 && reach.parent_of.contains(down)) {
+                const FrontierPathResult drop =
+                    reconstructPathTo(reach.parent_of, reach.start_key, down, config);
+                if (drop.found) {
+                    waypoints = stringPullConstantAltitude(
+                        in.map, drop.path, in.drone.radius);
+                }
+            }
         } else {
             if (!raw.found) {
                 continue;
