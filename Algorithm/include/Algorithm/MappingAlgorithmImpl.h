@@ -8,6 +8,10 @@
 
 namespace algorithm_207190406_209543255 {
 
+namespace detail {
+struct ExplorationPlan;
+} // namespace detail
+
 /// Wavefront Frontier Detection over the reachability substrate.
 /// Each nextStep emits a movement and, when the resulting pose would observe
 /// something new, a scan in the same command.
@@ -43,6 +47,7 @@ private:
     [[nodiscard]] std::size_t remainingSteps(const common::types::DroneState& state) const;
     void pruneExpiredBlockedCells(std::size_t step_index);
     [[nodiscard]] bool replan(const common::types::DroneState& state, bool ignore_blocked);
+    void adoptPlan(detail::ExplorationPlan plan, const common::types::DroneState& state);
     [[nodiscard]] std::optional<common::types::MovementCommand> movementToward(
         const common::types::DroneState& state, const common::Position3D& target) const;
     [[nodiscard]] common::types::DroneState predictPose(
@@ -62,7 +67,12 @@ private:
     static constexpr std::size_t kBlockedTtlSteps = 50;
     static constexpr int kRecoveryAttempts = 3;
     static constexpr int kLowRateReplans = 3;
+    static constexpr std::size_t kObservedWindowSteps = 100;
+    /// Consecutive observed windows with Unmapped-drop below kMinObservedInformationRate.
+    static constexpr int kLowObservedWindows = 4;
     static constexpr double kMinInformationRate = 0.25;
+    /// Observed Unmapped-drop rate (cells/step). Separate from predicted kMinInformationRate.
+    static constexpr double kMinObservedInformationRate = 0.05;
 };
 
 } // namespace algorithm_207190406_209543255

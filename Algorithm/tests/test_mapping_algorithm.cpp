@@ -534,9 +534,81 @@ TEST(MappingAlgorithm, DoesNotFinishWhileUnresolvedSpaceRemainsAndBudgetIsLarge)
     const auto dc = makeDroneConfig();
     Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
 
-    // The map never changes here (no MissionControl fusing scans), so this also proves
-    // the policy does not need observed progress to keep trying.
+    // Short window: still Working (must not repeat the 3-step house_full quit).
+    // A frozen map that never drops Unmapped is required to stop later — see
+    // FinishesWhenUnmappedCountDoesNotDropAcrossReplans.
     for (int step = 0; step < 50; ++step) {
+        const ct::DroneState state{gridPoint(2, 5, 5, config),
+                                   Orientation{0.0 * deg, 0.0 * deg},
+                                   static_cast<std::size_t>(step)};
+        const ct::MappingStepCommand cmd = algorithm.nextStep(state, nullptr);
+        ASSERT_EQ(cmd.status, ct::AlgorithmStatus::Working) << "gave up at step " << step;
+    }
+}
+
+// What: Unmapped remains and the planner still finds a high predicted rate (large
+// Empty surface), but MissionControl never classifies new cells so Unmapped
+// never drops.
+// Expected: FinishedWithUnmappableVoxels after several full replan intervals,
+// not a 10k-step burn and not a 3-step quit.
+TEST(MappingAlgorithm, FinishesWhenUnmappedCountDoesNotDropAcrossReplans) {
+    const ct::MapConfig config = makeCorridorConfig();
+    Map output_map{{11, 11, 11}, config};
+    fillEmptyBox(output_map, 0, 8, 0, 10, 0, 10, config);
+
+    const auto mc = makeMissionConfig();
+    const auto lc = makeLidarConfig();
+    const auto dc = makeDroneConfig();
+    Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
+
+    int finished_at = -1;
+    ct::AlgorithmStatus last = ct::AlgorithmStatus::Working;
+    for (int step = 0; step < 400; ++step) {
+        const ct::DroneState state{gridPoint(2, 5, 5, config),
+                                   Orientation{0.0 * deg, 0.0 * deg},
+                                   static_cast<std::size_t>(step)};
+        last = algorithm.nextStep(state, nullptr).status;
+        if (last != ct::AlgorithmStatus::Working) {
+            finished_at = step;
+            break;
+        }
+    }
+    EXPECT_EQ(last, ct::AlgorithmStatus::FinishedWithUnmappableVoxels);
+    ASSERT_GE(finished_at, 50) << "quit before the keep-working window";
+    EXPECT_LT(finished_at, 450) << "must not burn the mission budget";
+}
+
+// What: same large Empty surface as the stall fixture, but Unmapped drops every
+// step (as if MissionControl fused new cells).
+// Expected: still Working well past the stall horizon.
+TEST(MappingAlgorithm, KeepsWorkingWhenUnmappedCountKeepsDropping) {
+    const ct::MapConfig config = makeCorridorConfig();
+    Map output_map{{11, 11, 11}, config};
+    fillEmptyBox(output_map, 0, 8, 0, 10, 0, 10, config);
+
+    const auto mc = makeMissionConfig();
+    const auto lc = makeLidarConfig();
+    const auto dc = makeDroneConfig();
+    Impl algorithm{common::MappingAlgorithmDependencies{mc, lc, dc, output_map}};
+
+    const auto classify_one = [&]() {
+        for (int x = 0; x < 11; ++x) {
+            for (int y = 0; y < 11; ++y) {
+                for (int z = 0; z < 11; ++z) {
+                    const Position3D p = gridPoint(x, y, z, config);
+                    if (output_map.atVoxel(p) == ct::VoxelOccupancy::Unmapped) {
+                        output_map.set(p, ct::VoxelOccupancy::Empty);
+                        return;
+                    }
+                }
+            }
+        }
+    };
+
+    for (int step = 0; step < 200; ++step) {
+        if (step > 0) {
+            classify_one();
+        }
         const ct::DroneState state{gridPoint(2, 5, 5, config),
                                    Orientation{0.0 * deg, 0.0 * deg},
                                    static_cast<std::size_t>(step)};
