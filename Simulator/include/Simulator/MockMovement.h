@@ -15,7 +15,7 @@ class MockMovement final : public common::IDroneMovement {
 public:
     MockMovement(MockGPS& gps,
                  const common::IMap3D& hidden_map,
-                 common::types::DroneConfigData drone_config);
+                 const common::types::DroneConfigData& drone_config);
 
     common::types::MovementResult rotate(common::types::RotationDirection direction,
                                          common::HorizontalAngle angle) override;

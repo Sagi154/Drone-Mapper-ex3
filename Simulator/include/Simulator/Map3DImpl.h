@@ -23,7 +23,7 @@ public:
     /// If boundaries are all-zero they are derived from the array shape.
     Map3DImpl(std::shared_ptr<NpyArray> map_ptr,
               MapRole role,
-              common::types::MapConfig map_config);
+              const common::types::MapConfig& map_config);
 
     /// Convenience overload: role only, config is derived from array shape.
     Map3DImpl(std::shared_ptr<NpyArray> map_ptr, MapRole role);

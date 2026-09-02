@@ -12,17 +12,19 @@ namespace simulator {
 
 namespace {
 
-double snapToCm(double value, double res_cm) {
-    if (res_cm <= 0.0) {
+[[nodiscard]] common::PhysicalLength snapToRes(common::PhysicalLength value,
+                                               common::PhysicalLength res) {
+    if (res <= 0.0 * common::cm) {
         return value;
     }
-    return std::round(value / res_cm) * res_cm;
+    const double n = std::round((value / res).numerical_value_in(mp_units::one));
+    return n * res;
 }
 
 } // namespace
 
-MockGPS::MockGPS(common::Position3D position,
-                 common::Orientation heading,
+MockGPS::MockGPS(const common::Position3D& position,
+                 const common::Orientation& heading,
                  common::PhysicalLength gps_resolution)
     : heading_(heading), resolution_(gps_resolution) {
     setPosition(position);
@@ -36,21 +38,22 @@ common::Orientation MockGPS::heading() const {
     return heading_;
 }
 
-void MockGPS::setPosition(common::Position3D position) {
-    using common::cm;
+void MockGPS::setPosition(const common::Position3D& position) {
     using common::x_extent;
     using common::y_extent;
     using common::z_extent;
 
-    const double res_cm = resolution_.numerical_value_in(cm);
     position_ = common::Position3D{
-        snapToCm(position.x.numerical_value_in(cm), res_cm) * x_extent[cm],
-        snapToCm(position.y.numerical_value_in(cm), res_cm) * y_extent[cm],
-        snapToCm(position.z.numerical_value_in(cm), res_cm) * z_extent[cm],
+        mp_units::quantity_cast<x_extent>(
+            snapToRes(mp_units::quantity_cast<common::isq::length>(position.x), resolution_)),
+        mp_units::quantity_cast<y_extent>(
+            snapToRes(mp_units::quantity_cast<common::isq::length>(position.y), resolution_)),
+        mp_units::quantity_cast<z_extent>(
+            snapToRes(mp_units::quantity_cast<common::isq::length>(position.z), resolution_)),
     };
 }
 
-void MockGPS::setHeading(common::Orientation heading) {
+void MockGPS::setHeading(const common::Orientation& heading) {
     heading_ = heading;
 }
 

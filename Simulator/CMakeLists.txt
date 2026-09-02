@@ -6,6 +6,7 @@ add_executable(test_simulator_mocks
     src/MockLidar.cpp
     src/MockMovement.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
 )
 
 target_include_directories(test_simulator_mocks PRIVATE

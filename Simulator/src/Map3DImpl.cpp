@@ -167,7 +167,7 @@ Map3DImpl::Map3DImpl(std::shared_ptr<NpyArray> map_ptr, MapRole role)
 
 Map3DImpl::Map3DImpl(std::shared_ptr<NpyArray> map_ptr,
                      MapRole role,
-                     common::types::MapConfig map_config)
+                     const common::types::MapConfig& map_config)
     : map_(std::move(map_ptr)),
       role_(role),
       config_(map_ ? finalizeConfig(*map_, map_config) : map_config) {

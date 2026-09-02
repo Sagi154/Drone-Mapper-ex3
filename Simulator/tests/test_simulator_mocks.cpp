@@ -10,6 +10,7 @@
 #include <Simulator/MockMovement.h>
 
 #include <Common/IMap3D.h>
+#include <user_common_207190406_209543255/BeamMath.h>
 
 #include <gtest/gtest.h>
 
@@ -263,6 +264,27 @@ TEST(MockLidar, ConfigGetterMatchesConstructorArg) {
     EXPECT_DOUBLE_EQ(got.z_min.numerical_value_in(cm), 5.0);
     EXPECT_DOUBLE_EQ(got.z_max.numerical_value_in(cm), 300.0);
     EXPECT_EQ(got.fov_circles, 3u);
+}
+
+TEST(MockLidar, MissUsesSharedSentinel) {
+    // Empty-map scan of a miss beam must return kLidarMissDistance, not a raw
+    // max*cm literal that could drift from the shared sentinel.
+    GridMap map{10, 10, 10, 10.0};
+    simulator::MockGPS gps{
+        Position3D{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+        {},
+        10.0 * cm};
+    LidarConfigData cfg{.z_min = 10.0 * cm, .z_max = 80.0 * cm, .d = 2.5 * cm, .fov_circles = 1};
+    simulator::MockLidar lidar{cfg, map, gps};
+
+    const auto scan = lidar.scan(common::Orientation{});
+    bool any_miss = false;
+    for (const auto& hit : scan) {
+        if (user_common_207190406_209543255::beam_math::isMissDistance(hit.distance)) {
+            any_miss = true;
+        }
+    }
+    EXPECT_TRUE(any_miss);
 }
 
 TEST(MockLidar, ExtremeScanOrientationCompletes) {
