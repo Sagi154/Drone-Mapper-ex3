@@ -36,6 +36,8 @@ public:
 
     PluginLoader(const PluginLoader&)            = delete;
     PluginLoader& operator=(const PluginLoader&) = delete;
+    PluginLoader(PluginLoader&&) noexcept        = default;
+    PluginLoader& operator=(PluginLoader&&)      = delete;
 
     [[nodiscard]] PluginLoadOutcome loadAlgorithmSo(const std::filesystem::path& so_path);
     [[nodiscard]] PluginLoadOutcome loadAlgorithmsFromDirectory(

@@ -1,40 +1,15 @@
 // RunMatrixOrchestrator.h — expand a composition into a run matrix and execute
 // each cell via ISimulationRunFactory / ISimulationRun.
-// Not wired into main() yet (needs Yoav's concrete factory).
 
 #pragma once
 
-#include <Simulator/ISimulationRunFactory.h>
-#include <Simulator/SimulationTypes.h>
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/WorkDistributor.h>
 
-#include <cstddef>
 #include <filesystem>
-#include <string>
 #include <vector>
 
 namespace simulator {
-
-struct MatrixCell {
-    std::size_t group_index = 0;
-    std::size_t mission_index = 0;
-    std::size_t drone_index = 0;
-    std::size_t lidar_index = 0;
-    const types::SimulationConfigData* simulation = nullptr;
-    const common::types::MissionConfigData* mission = nullptr;
-    const common::types::DroneConfigData* drone = nullptr;
-    const common::types::LidarConfigData* lidar = nullptr;
-};
-
-struct PluginMatrixBinding {
-    std::string plugin_filename;
-    ISimulationRunFactory* factory = nullptr; // non-owning; must outlive run()
-};
-
-struct PluginMatrixResult {
-    std::string plugin_filename;
-    std::vector<types::SimulationResult> results; // size == composition cell count
-};
 
 class RunMatrixOrchestrator {
 public:

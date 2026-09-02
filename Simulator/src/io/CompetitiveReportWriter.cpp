@@ -1,4 +1,4 @@
-#include <Simulator/io/CompetitiveReportWriter.h>
+#include <Simulator/io/SimulatorReports.h>
 
 #include "ReportAggregationUtil.hpp"
 

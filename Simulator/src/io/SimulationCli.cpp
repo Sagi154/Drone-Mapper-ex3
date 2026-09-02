@@ -1,8 +1,9 @@
-#include <Simulator/io/SimulationCli.h>
+#include <Simulator/io/SimulatorPaths.h>
 
 #include <cctype>
 #include <fstream>
 #include <limits>
+#include <ostream>
 #include <sstream>
 #include <unordered_map>
 
@@ -90,34 +91,19 @@ void appendUnique(std::vector<std::string>& errors, std::string message) {
     errors.push_back(std::move(message));
 }
 
-} // namespace
-
-std::string simulationCliUsage(std::string_view program_name) {
-    std::ostringstream oss;
-    oss << "Usage:\n"
-        << "  " << program_name << " -comparative simulation=<composition_yaml> "
-        << "mission_control_folder=<folder> algorithm=<algorithm_so> "
-        << "[num_threads=<num>] [-verbose]\n"
-        << "  " << program_name << " -competition simulation=<composition_yaml> "
-        << "mission_control=<mission_control_so> algorithms_folder=<folder> "
-        << "[num_threads=<num>] [-verbose]\n";
-    return oss.str();
-}
-
-SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostream* diag) {
-    SimulationCliParseResult result;
-    const std::string program =
-        (argc > 0 && argv != nullptr && argv[0] != nullptr) ? argv[0] : "simulator";
-
+struct TokenParse {
     std::optional<SimulatorMode> mode;
     std::unordered_map<std::string, std::string> values;
     std::vector<std::string> unsupported;
     bool verbose = false;
     bool mode_conflict = false;
+};
 
+[[nodiscard]] TokenParse collectTokens(int argc, char** argv, std::vector<std::string>& errors) {
+    TokenParse tokens;
     for (int i = 1; i < argc; ++i) {
         if (argv == nullptr || argv[i] == nullptr) {
-            appendUnique(result.errors, "null argument at position " + std::to_string(i));
+            appendUnique(errors, "null argument at position " + std::to_string(i));
             continue;
         }
         const std::string_view token{argv[i]};
@@ -125,21 +111,21 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
         if (token == kModeComparative || token == kModeCompetition) {
             const SimulatorMode parsed =
                 (token == kModeComparative) ? SimulatorMode::Comparative : SimulatorMode::Competition;
-            if (mode.has_value() && *mode != parsed) {
-                mode_conflict = true;
+            if (tokens.mode.has_value() && *tokens.mode != parsed) {
+                tokens.mode_conflict = true;
             }
-            mode = parsed;
+            tokens.mode = parsed;
             continue;
         }
 
         if (token == kFlagVerbose) {
-            verbose = true;
+            tokens.verbose = true;
             continue;
         }
 
         const auto eq = token.find('=');
         if (eq == std::string_view::npos) {
-            unsupported.emplace_back(token);
+            tokens.unsupported.emplace_back(token);
             continue;
         }
 
@@ -147,21 +133,25 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
         const std::string value{token.substr(eq + 1)};
 
         if (!isKnownKey(key)) {
-            unsupported.push_back(key);
+            tokens.unsupported.push_back(key);
             continue;
         }
-        if (values.contains(key)) {
-            appendUnique(result.errors, "duplicate argument '" + key + "'");
+        if (tokens.values.contains(key)) {
+            appendUnique(errors, "duplicate argument '" + key + "'");
             continue;
         }
-        values.emplace(key, value);
+        tokens.values.emplace(key, value);
     }
+    return tokens;
+}
 
-    if (mode_conflict) {
+void addShapeErrors(const TokenParse& tokens, SimulationCliParseResult& result) {
+    std::vector<std::string> unsupported = tokens.unsupported;
+
+    if (tokens.mode_conflict) {
         appendUnique(result.errors,
                      "conflicting mode flags: provide exactly one of -comparative or -competition");
-    } else if (!mode.has_value()) {
-        // Dash tokens that are not -verbose / known modes are unknown mode flags.
+    } else if (!tokens.mode.has_value()) {
         bool saw_unknown_mode_flag = false;
         std::vector<std::string> remaining_unsupported;
         remaining_unsupported.reserve(unsupported.size());
@@ -180,10 +170,9 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
         }
     }
 
-    // Keys that are known but illegal for the selected mode count as unsupported.
-    if (mode.has_value()) {
-        for (const auto& [key, _] : values) {
-            if (!isKeyAllowedForMode(*mode, key)) {
+    if (tokens.mode.has_value()) {
+        for (const auto& [key, _] : tokens.values) {
+            if (!isKeyAllowedForMode(*tokens.mode, key)) {
                 unsupported.push_back(key);
             }
         }
@@ -198,9 +187,9 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
         appendUnique(result.errors, oss.str());
     }
 
-    if (mode.has_value()) {
+    if (tokens.mode.has_value()) {
         std::vector<std::string_view> required;
-        if (*mode == SimulatorMode::Comparative) {
+        if (*tokens.mode == SimulatorMode::Comparative) {
             required = {kKeySimulation, kKeyMissionControlFolder, kKeyAlgorithm};
         } else {
             required = {kKeySimulation, kKeyMissionControl, kKeyAlgorithmsFolder};
@@ -208,8 +197,8 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
 
         std::vector<std::string> missing;
         for (const auto key : required) {
-            const auto it = values.find(std::string{key});
-            if (it == values.end() || it->second.empty()) {
+            const auto it = tokens.values.find(std::string{key});
+            if (it == tokens.values.end() || it->second.empty()) {
                 missing.emplace_back(key);
             }
         }
@@ -223,7 +212,7 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
         }
     }
 
-    if (const auto it = values.find(std::string{kKeyNumThreads}); it != values.end()) {
+    if (const auto it = tokens.values.find(std::string{kKeyNumThreads}); it != tokens.values.end()) {
         unsigned threads = 0;
         if (!parseUnsigned(it->second, threads) || threads == 0) {
             appendUnique(result.errors,
@@ -232,41 +221,15 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
             result.args.num_threads = threads;
         }
     }
+}
 
-    // Structural / argument-shape errors: do not touch the filesystem yet.
-    if (!result.errors.empty() || !mode.has_value()) {
-        result.args.verbose = verbose;
-        if (mode.has_value()) {
-            result.args.mode = *mode;
-        }
-        if (diag != nullptr) {
-            *diag << simulationCliUsage(program);
-            for (const auto& err : result.errors) {
-                *diag << "error: " << err << '\n';
-            }
-        }
-        return result;
-    }
-
-    result.args.mode    = *mode;
-    result.args.verbose = verbose;
-    result.args.simulation = values.at(std::string{kKeySimulation});
-
-    if (*mode == SimulatorMode::Comparative) {
-        result.args.mission_control_folder = values.at(std::string{kKeyMissionControlFolder});
-        result.args.algorithm              = values.at(std::string{kKeyAlgorithm});
-    } else {
-        result.args.mission_control   = values.at(std::string{kKeyMissionControl});
-        result.args.algorithms_folder = values.at(std::string{kKeyAlgorithmsFolder});
-    }
-
-    // Filesystem validation — only after argument shape is clean.
+void applyFilesystemChecks(SimulationCliParseResult& result) {
     if (!fileIsOpenable(result.args.simulation)) {
         appendUnique(result.errors, "simulation file is missing or unopenable: " +
                                          result.args.simulation.string());
     }
 
-    if (*mode == SimulatorMode::Comparative) {
+    if (result.args.mode == SimulatorMode::Comparative) {
         if (!fileIsOpenable(result.args.algorithm)) {
             appendUnique(result.errors, "algorithm file is missing or unopenable: " +
                                              result.args.algorithm.string());
@@ -297,13 +260,63 @@ SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostr
                                              result.args.algorithms_folder.string());
         }
     }
+}
 
+void writeDiag(std::ostream* diag, std::string_view program,
+               const std::vector<std::string>& errors) {
+    if (diag == nullptr) {
+        return;
+    }
+    *diag << simulationCliUsage(program);
+    for (const auto& err : errors) {
+        *diag << "error: " << err << '\n';
+    }
+}
+
+} // namespace
+
+std::string simulationCliUsage(std::string_view program_name) {
+    std::ostringstream oss;
+    oss << "Usage:\n"
+        << "  " << program_name << " -comparative simulation=<composition_yaml> "
+        << "mission_control_folder=<folder> algorithm=<algorithm_so> "
+        << "[num_threads=<num>] [-verbose]\n"
+        << "  " << program_name << " -competition simulation=<composition_yaml> "
+        << "mission_control=<mission_control_so> algorithms_folder=<folder> "
+        << "[num_threads=<num>] [-verbose]\n";
+    return oss.str();
+}
+
+SimulationCliParseResult parseSimulationCliArgs(int argc, char** argv, std::ostream* diag) {
+    SimulationCliParseResult result;
+    const std::string program =
+        (argc > 0 && argv != nullptr && argv[0] != nullptr) ? argv[0] : "simulator";
+
+    const TokenParse tokens = collectTokens(argc, argv, result.errors);
+    addShapeErrors(tokens, result);
+
+    result.args.verbose = tokens.verbose;
+    if (tokens.mode.has_value()) {
+        result.args.mode = *tokens.mode;
+    }
+    if (!result.errors.empty() || !tokens.mode.has_value()) {
+        writeDiag(diag, program, result.errors);
+        return result;
+    }
+
+    result.args.simulation = tokens.values.at(std::string{kKeySimulation});
+    if (*tokens.mode == SimulatorMode::Comparative) {
+        result.args.mission_control_folder = tokens.values.at(std::string{kKeyMissionControlFolder});
+        result.args.algorithm              = tokens.values.at(std::string{kKeyAlgorithm});
+    } else {
+        result.args.mission_control   = tokens.values.at(std::string{kKeyMissionControl});
+        result.args.algorithms_folder = tokens.values.at(std::string{kKeyAlgorithmsFolder});
+    }
+
+    applyFilesystemChecks(result);
     result.ok = result.errors.empty();
-    if (!result.ok && diag != nullptr) {
-        *diag << simulationCliUsage(program);
-        for (const auto& err : result.errors) {
-            *diag << "error: " << err << '\n';
-        }
+    if (!result.ok) {
+        writeDiag(diag, program, result.errors);
     }
     return result;
 }

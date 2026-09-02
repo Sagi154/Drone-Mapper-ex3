@@ -89,7 +89,7 @@ Each run creates a fresh output directory (never reused):
 - Comparative mode: `<mission_control_folder>/comparative_results_<UTC time>[_N]`
 - Competition mode: `<algorithms_folder>/competition_<UTC time>[_N]`
 
-`<UTC time>` is `currentUtcTimestamp()` (`UserCommon_207190406_209543255/TimeFormat.h`); `_N`
+`<UTC time>` is `currentUtcTimestamp()` (`user_common_207190406_209543255/IRunErrorLog.h`); `_N`
 is appended starting at `_2` if a directory with that name already exists (same-second collision).
 
 Inside that directory:

@@ -2,7 +2,7 @@
 // Per-run error-log naming: SimulationRunImpl mirrors ErrorRefs into
 // <plugin>_run_NNNN_error.log derived from the output map path.
 
-#include <Simulator/OutputPathUtil.h>
+#include <Simulator/io/SimulatorPaths.h>
 #include <Simulator/SimulationRunImpl.h>
 #include <Simulator/SimulationTypes.h>
 
@@ -119,7 +119,7 @@ struct RunBundle {
         std::filesystem::temp_directory_path() / "sim_run_error_log_tests";
     std::filesystem::create_directories(dir);
     const auto map_path = dir / "plugin.so_run_0007_output_map.npy";
-    const auto log_path = simulator::errorLogPathFromOutputMap(map_path);
+    const auto log_path = simulator::io::errorLogPathFromOutputMap(map_path);
     std::error_code ec;
     std::filesystem::remove(log_path, ec);
 

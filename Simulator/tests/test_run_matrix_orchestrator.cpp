@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -108,7 +109,7 @@ TEST(RunMatrixOrchestrator, EverySlotWrittenOnceForOnePlugin) {
     FakeRunFactory factory;
 
     const std::vector<simulator::PluginMatrixBinding> plugins = {
-        {"plugin_a.so", &factory},
+        {"plugin_a.so", std::ref(factory)},
     };
 
     const auto table = simulator::RunMatrixOrchestrator::run(
@@ -134,8 +135,8 @@ TEST(RunMatrixOrchestrator, TwoPluginsGetIndependentResultRows) {
     FakeRunFactory factory_b;
 
     const std::vector<simulator::PluginMatrixBinding> plugins = {
-        {"a.so", &factory_a},
-        {"b.so", &factory_b},
+        {"a.so", std::ref(factory_a)},
+        {"b.so", std::ref(factory_b)},
     };
 
     const auto table = simulator::RunMatrixOrchestrator::run(
@@ -160,8 +161,8 @@ TEST(RunMatrixOrchestrator, ThrowingRunWritesFailureSentinelWithoutAbortingMatri
 
     // Two plugins: first throws on every cell, second succeeds.
     const std::vector<simulator::PluginMatrixBinding> plugins = {
-        {"bad.so", &throwing},
-        {"good.so", &ok_factory},
+        {"bad.so", std::ref(throwing)},
+        {"good.so", std::ref(ok_factory)},
     };
 
     const auto table = simulator::RunMatrixOrchestrator::run(

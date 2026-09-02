@@ -95,14 +95,14 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
             const std::filesystem::path run_out =
                 outputMapPath(output_root, binding.plugin_filename, cell_index);
 
-            if (binding.factory == nullptr || cell.simulation == nullptr ||
-                cell.mission == nullptr || cell.drone == nullptr || cell.lidar == nullptr) {
+            if (cell.simulation == nullptr || cell.mission == nullptr || cell.drone == nullptr ||
+                cell.lidar == nullptr) {
                 table[plugin_index].results[cell_index] = makeFailureResult(cell, run_out);
                 return;
             }
 
-            auto run = binding.factory->create(*cell.simulation, *cell.mission, *cell.drone,
-                                               *cell.lidar, run_out);
+            auto run = binding.factory.get().create(*cell.simulation, *cell.mission, *cell.drone,
+                                                    *cell.lidar, run_out);
             if (!run) {
                 table[plugin_index].results[cell_index] = makeFailureResult(cell, run_out);
                 return;

@@ -8,7 +8,7 @@
 #include <Simulator/SimulationRunImpl.h>
 
 #include <Simulator/MapsComparison.h>
-#include <Simulator/OutputPathUtil.h>
+#include <Simulator/io/SimulatorPaths.h>
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
@@ -83,7 +83,7 @@ types::SimulationResult SimulationRunImpl::run() {
     std::unique_ptr<user_common_207190406_209543255::RunErrorLog> error_log;
     if (!output_map_file_.empty()) {
         error_log = std::make_unique<user_common_207190406_209543255::RunErrorLog>(
-            errorLogPathFromOutputMap(output_map_file_));
+            simulator::io::errorLogPathFromOutputMap(output_map_file_));
     }
 
     if (!startup_errors_.empty()) {

@@ -4,8 +4,8 @@
 // 5 simulation groups totalling 6 (sim, mission) pairs, 2 drone_configs,
 // 2 lidar_configs = 24 run cells per docs/map3d-contract.md.
 
+#include <Simulator/io/SimulatorPaths.h>
 #include <Simulator/io/YamlConfigParsers.h>
-#include <Simulator/io/PathResolver.h>
 #include <Simulator/SimulationTypes.h>
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
