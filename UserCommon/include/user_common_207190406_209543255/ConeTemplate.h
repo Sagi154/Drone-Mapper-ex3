@@ -7,7 +7,9 @@
 #include <Common/Units.h>
 #include <Common/types/LidarTypes.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace user_common_207190406_209543255::cone_template {

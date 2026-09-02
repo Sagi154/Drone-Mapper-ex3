@@ -115,8 +115,8 @@ std::size_t countUnresolvedVoxels(
     const common::types::LidarConfigData& cfg,
     std::unordered_set<std::int64_t>& seen) {
     const PhysicalLength z_max = cfg.z_max;
-    const PhysicalLength step = kConeWalkResolutionFactor * map.getMapConfig().resolution;
-    const common::types::MapConfig config = map.getMapConfig();
+    const common::types::MapConfig& config = map.getMapConfig();
+    const PhysicalLength step = kConeWalkResolutionFactor * config.resolution;
     const Orientation center_abs =
         bm::normalizeOrientation(bm::absoluteBeamOrientation(drone_heading, relative_scan));
 
@@ -139,7 +139,8 @@ bool coneCoversUnresolved(const common::IMap3D& map,
                           const Orientation& relative_scan,
                           const common::types::LidarConfigData& cfg) {
     const PhysicalLength z_max = cfg.z_max;
-    const PhysicalLength step = kConeWalkResolutionFactor * map.getMapConfig().resolution;
+    const common::types::MapConfig& config = map.getMapConfig();
+    const PhysicalLength step = kConeWalkResolutionFactor * config.resolution;
     const Orientation center_abs =
         bm::normalizeOrientation(bm::absoluteBeamOrientation(drone_heading, relative_scan));
 
