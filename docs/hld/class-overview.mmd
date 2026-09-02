@@ -2,17 +2,68 @@ classDiagram
     direction TB
 
     class main {
-      +parse CLI
-      +load plugins
-      +RunMatrixOrchestrator.run
-      +write reports
-      +dlclose
+      +writeModeReport()
+      +unloadAll()
+    }
+
+    class SimulationCli {
+      <<module>>
+      +parseSimulationCliArgs() SimulationCliArgs
+    }
+
+    class SimulatorPaths {
+      <<module>>
+      +createOutputDir()
+      +errorLogPathFromOutputMap()
+    }
+
+    class YamlConfigParsers {
+      <<module>>
+      +parseCompositionFile()
+      +parseSimulationConfig()
+      +parseMissionConfig()
+      +parseDroneConfig()
+      +parseLidarConfig()
+    }
+
+    class SimulatorReports {
+      <<module>>
+      +writeComparativeReport()
+      +writeCompetitiveReport()
+      +writeSimulationOutputYaml()
+    }
+
+    class runPluginMatrix {
+      <<module>>
+      +runPluginMatrix(bindings, composition, output_root, num_threads)
+      +expandRunMatrix()
+    }
+
+    class distributeWork {
+      <<module>>
+      +distributeWork()
+    }
+
+    class compareMaps {
+      <<module>>
+      +compareMaps(hidden, output, spawn)
+    }
+
+    class applyScanToMap {
+      <<module>>
+      +applyScanToMap()
     }
 
     class PluginLoader {
-      +loadAlgorithmSo(path) LoadedAlgorithmPlugin
-      +loadMissionControlSo(path) LoadedMissionControlPlugin
+      +loadAlgorithmSo() LoadedAlgorithmPlugin
+      +loadMissionControlSo() LoadedMissionControlPlugin
+      +algorithmCount()
+      +algorithmAt()
       +unloadAll()
+    }
+
+    class DlHandle {
+      <<RAII>>
     }
 
     class PluginRegistrar {
@@ -22,14 +73,30 @@ classDiagram
       +takePendingMissionControlFactory()
     }
 
-    class RunMatrixOrchestrator {
-      +expand(composition) cells
-      +run(bindings, cells, threads) results
+    class MappingAlgorithmRegistration
+    class MissionControlRegistration
+    class MappingAlgorithmFactory
+    class MissionControlFactory
+    class MappingAlgorithmDependencies
+    class MissionControlDependencies
+    class MatrixCell
+    class LoadedAlgorithmPlugin
+    class LoadedMissionControlPlugin
+
+    class RunErrorLog {
+      +log(ErrorRef)
     }
 
-    class WorkDistributor {
-      +distribute(tasks, num_threads)
+    class SimulationCoordUtil {
+      <<module>>
+      +worldInitialDronePosition()
+      +forEachSphereSample()
     }
+
+    class WavefrontPlanner
+    class MappingAlgorithmFrontier
+    class ConeTemplateCache
+    class VoxelStamp
 
     class SimulationRunFactoryImpl {
       +create(...) ISimulationRun
@@ -43,7 +110,6 @@ classDiagram
     class MockGPS
     class MockLidar
     class MockMovement
-    class MapsComparison
 
     class MissionControlImpl_207190406_209543255 {
       +runMission() MissionRunResult
@@ -69,21 +135,39 @@ classDiagram
     class ISimulationRun
     class ISimulationRunFactory
 
+    main --> SimulationCli
+    main --> SimulatorPaths
+    main --> YamlConfigParsers
     main --> PluginLoader
-    main --> PluginRegistrar
-    main --> RunMatrixOrchestrator
-    RunMatrixOrchestrator --> WorkDistributor
-    RunMatrixOrchestrator --> SimulationRunFactoryImpl
+    main --> runPluginMatrix
+    main --> SimulatorReports
+    runPluginMatrix --> distributeWork
+    runPluginMatrix --> SimulationRunFactoryImpl
+    runPluginMatrix --> MatrixCell : expandRunMatrix
+    distributeWork --> SimulationRunFactoryImpl
     SimulationRunFactoryImpl ..|> ISimulationRunFactory
     SimulationRunFactoryImpl --> SimulationRunImpl
+    SimulationRunFactoryImpl --> MappingAlgorithmDependencies
+    SimulationRunFactoryImpl --> MissionControlDependencies
     SimulationRunImpl ..|> ISimulationRun
     SimulationRunImpl --> Map3DImpl
     SimulationRunImpl --> MockGPS
     SimulationRunImpl --> MockLidar
     SimulationRunImpl --> MockMovement
-    SimulationRunImpl --> MapsComparison
+    SimulationRunImpl --> compareMaps
+    SimulationRunImpl --> RunErrorLog
     SimulationRunImpl --> IMissionControl
     SimulationRunImpl --> IMappingAlgorithm
+    PluginLoader --> DlHandle
+    PluginLoader --> LoadedAlgorithmPlugin
+    PluginLoader --> LoadedMissionControlPlugin
+    PluginLoader ..> PluginRegistrar : registration ctors
+    MappingAlgorithmRegistration --> PluginRegistrar : setPendingAlgorithmFactory
+    MissionControlRegistration --> PluginRegistrar : setPendingMissionControlFactory
+    LoadedAlgorithmPlugin --> MappingAlgorithmFactory
+    LoadedMissionControlPlugin --> MissionControlFactory
+    MappingAlgorithmFactory --> MappingAlgorithmDependencies
+    MissionControlFactory --> MissionControlDependencies
     MissionControlImpl_207190406_209543255 ..|> IMissionControl
     MissionControlImpl_207190406_209543255 --> DroneControlImpl
     DroneControlImpl ..|> IDroneControl
@@ -91,12 +175,18 @@ classDiagram
     DroneControlImpl --> ILidar
     DroneControlImpl --> IGPS
     DroneControlImpl --> IDroneMovement
-    DroneControlImpl --> IMutableMap3D
+    DroneControlImpl --> applyScanToMap
+    applyScanToMap --> IMutableMap3D
     MappingAlgorithmImpl_207190406_209543255 ..|> IMappingAlgorithm
     MappingAlgorithmImpl_207190406_209543255 --> IMap3D
+    MappingAlgorithmImpl_207190406_209543255 --> WavefrontPlanner
+    MappingAlgorithmImpl_207190406_209543255 --> MappingAlgorithmFrontier
+    MappingAlgorithmImpl_207190406_209543255 --> ConeTemplateCache
+    MappingAlgorithmImpl_207190406_209543255 --> VoxelStamp
     Map3DImpl ..|> IMutableMap3D
     IMutableMap3D --|> IMap3D
     MockLidar ..|> ILidar
     MockGPS ..|> IGPS
     MockMovement ..|> IDroneMovement
-    PluginLoader ..> PluginRegistrar : registration ctors
+    SimulationCoordUtil ..> Map3DImpl : world spawn
+    SimulatorPaths ..> RunErrorLog : errorLogPathFromOutputMap

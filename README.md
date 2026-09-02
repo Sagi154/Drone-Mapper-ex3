@@ -102,6 +102,6 @@ Inside that directory:
   <plugin>_run_NNNN_error.log                # per-run error log
 ```
 
-`NNNN` is the flat cell index from `RunMatrixOrchestrator::expand` (0-based, zero-padded to 4
+`NNNN` is the flat cell index from `expandRunMatrix` (0-based, zero-padded to 4
 digits), unique across the whole run matrix and stable for a given composition + plugin order.
 `<plugin>` is always the loaded `.so` **filename**, never a path.
