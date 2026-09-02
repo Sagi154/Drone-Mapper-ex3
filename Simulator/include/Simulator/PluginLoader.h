@@ -29,6 +29,10 @@ struct PluginLoadOutcome {
     std::vector<std::string> errors; // basenames that failed this call
 };
 
+inline void appendLoadErrors(std::vector<std::string>& dest, const PluginLoadOutcome& outcome) {
+    dest.insert(dest.end(), outcome.errors.begin(), outcome.errors.end());
+}
+
 class PluginLoader {
 public:
     PluginLoader() = default;

@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #ifndef PLUGIN_FIXTURES_DIR
 #error "PLUGIN_FIXTURES_DIR must be defined by CMake"
@@ -135,4 +136,16 @@ TEST_F(PluginLoaderTest, WrongKindSoDoesNotLeaveDanglingPending) {
     ASSERT_EQ(loader.missionControls().size(), 1U);
     EXPECT_EQ(loader.missionControls().front().filename, "valid_mission_control_plugin.so");
     ASSERT_TRUE(static_cast<bool>(loader.missionControls().front().factory));
+}
+
+TEST_F(PluginLoaderTest, AppendLoadErrorsCopiesBasenames) {
+    std::vector<std::string> failed_plugins{"already_failed.so"};
+    simulator::PluginLoadOutcome outcome;
+    outcome.errors = {"bad_algo.so"};
+
+    simulator::appendLoadErrors(failed_plugins, outcome);
+
+    ASSERT_EQ(failed_plugins.size(), 2U);
+    EXPECT_EQ(failed_plugins.front(), "already_failed.so");
+    EXPECT_EQ(failed_plugins.back(), "bad_algo.so");
 }
