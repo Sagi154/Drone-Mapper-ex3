@@ -1,5 +1,7 @@
 #include <MissionControl/MissionControlImpl.h>
 
+#include <MissionControl/DroneControlImpl.h>
+
 #include <fstream>
 #include <utility>
 #include <vector>
@@ -61,6 +63,8 @@ MissionControlImpl_207190406_209543255::MissionControlImpl_207190406_209543255(
           dependencies.output_map,
           dependencies.mapping_algorithm)) {}
 
+MissionControlImpl_207190406_209543255::~MissionControlImpl_207190406_209543255() = default;
+
 common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMission() {
     std::size_t steps = 0;
     common::types::MissionRunStatus status = common::types::MissionRunStatus::MaxSteps;
@@ -72,10 +76,7 @@ common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMissi
 
         if (step_result.status == common::types::DroneStepStatus::Error) {
             status = common::types::MissionRunStatus::Error;
-            errors.push_back(common::types::ErrorRef{
-                "DRONE_STEP_FAILED",
-                step_result.message.empty() ? "Drone step failed." : step_result.message,
-            });
+            errors.push_back(common::types::ErrorRef{"DRONE_STEP_FAILED", "Drone step failed."});
             auto result = finalizeMission(status, steps, std::move(errors));
             if (verbose_ && !output_map_file_.empty()) {
                 writeVerboseLog(output_map_file_, result.status, result.steps);
