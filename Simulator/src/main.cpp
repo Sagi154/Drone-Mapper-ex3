@@ -34,6 +34,8 @@ struct PluginBootstrap {
         const auto algo_outcome = boot.loader.loadAlgorithmSo(args.algorithm);
         if (!algo_outcome.errors.empty()) {
             std::cerr << "error: failed to load algorithm " << args.algorithm << '\n';
+            boot.failed_plugins.insert(boot.failed_plugins.end(), algo_outcome.errors.begin(),
+                                       algo_outcome.errors.end());
             return boot;
         }
         const auto mc_outcome =
@@ -55,6 +57,8 @@ struct PluginBootstrap {
     const auto mc_outcome = boot.loader.loadMissionControlSo(args.mission_control);
     if (!mc_outcome.errors.empty()) {
         std::cerr << "error: failed to load mission control " << args.mission_control << '\n';
+        boot.failed_plugins.insert(boot.failed_plugins.end(), mc_outcome.errors.begin(),
+                                   mc_outcome.errors.end());
         return boot;
     }
     const auto algo_outcome = boot.loader.loadAlgorithmsFromDirectory(args.algorithms_folder);
