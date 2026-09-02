@@ -1,11 +1,11 @@
 #pragma once
 
-#include <TinyNPY.h>
-
 #include <Common/IMutableMap3D.h>
 
 #include <filesystem>
 #include <memory>
+
+class NpyArray;
 
 namespace simulator {
 
@@ -19,15 +19,6 @@ enum class MapRole { Hidden, Output };
 
 class Map3DImpl final : public common::IMutableMap3D {
 public:
-    /// Construct with an explicit MapConfig (boundaries, offset, resolution).
-    /// If boundaries are all-zero they are derived from the array shape.
-    Map3DImpl(std::shared_ptr<NpyArray> map_ptr,
-              MapRole role,
-              const common::types::MapConfig& map_config);
-
-    /// Convenience overload: role only, config is derived from array shape.
-    Map3DImpl(std::shared_ptr<NpyArray> map_ptr, MapRole role);
-
     [[nodiscard]] common::types::VoxelOccupancy atVoxel(const common::Position3D& pos) const override;
     [[nodiscard]] common::types::MapConfig getMapConfig() const override;
     [[nodiscard]] bool isInBounds(const common::Position3D& pos) const override;
@@ -36,9 +27,14 @@ public:
     void save(const std::filesystem::path& path) const override;
 
 private:
-    std::shared_ptr<NpyArray> map_;
-    MapRole role_;
-    common::types::MapConfig config_;
+    struct Storage;
+    std::shared_ptr<Storage> storage_;
+
+    explicit Map3DImpl(std::shared_ptr<Storage> storage);
+
+    friend Map3DImpl makeMap3D(std::shared_ptr<NpyArray> map, MapRole role,
+                               const common::types::MapConfig& config);
+    friend Map3DImpl makeMap3D(std::shared_ptr<NpyArray> map, MapRole role);
 };
 
 } // namespace simulator

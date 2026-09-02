@@ -51,10 +51,10 @@ SimulationRunImpl::SimulationRunImpl(
     std::unique_ptr<common::ILidar>            lidar,
     std::unique_ptr<common::IMappingAlgorithm> mapping_algorithm,
     std::unique_ptr<common::IMissionControl>   mission_control,
-    types::SimulationConfigData                simulation_config,
-    common::types::MissionConfigData           mission_config,
+    const types::SimulationConfigData&         simulation_config,
+    const common::types::MissionConfigData&    mission_config,
     std::filesystem::path                      output_map_file,
-    std::vector<common::types::ErrorRef>       startup_errors)
+    const std::vector<common::types::ErrorRef>& startup_errors)
     : hidden_map_(std::move(hidden_map)),
       output_map_(std::move(output_map)),
       gps_(std::move(gps)),
@@ -62,10 +62,10 @@ SimulationRunImpl::SimulationRunImpl(
       lidar_(std::move(lidar)),
       mapping_algorithm_(std::move(mapping_algorithm)),
       mission_control_(std::move(mission_control)),
-      simulation_config_(std::move(simulation_config)),
-      mission_config_(std::move(mission_config)),
+      simulation_config_(simulation_config),
+      mission_config_(mission_config),
       output_map_file_(std::move(output_map_file)),
-      startup_errors_(std::move(startup_errors)) {
+      startup_errors_(startup_errors) {
     if (!hidden_map_ || !output_map_ || !gps_ || !movement_ ||
         !lidar_ || !mapping_algorithm_ || !mission_control_) {
         throw std::invalid_argument("SimulationRunImpl: all dependencies must be non-null.");
@@ -145,7 +145,7 @@ types::SimulationResult SimulationRunImpl::run() {
         const common::Position3D spawn =
             user_common_207190406_209543255::worldInitialDronePosition(
                 simulation_config_.initial_drone_position, simulation_config_.map_offset.z);
-        result.mission_score = MapsComparison::compare(*hidden_map_, *output_map_, spawn);
+        result.mission_score = compareMaps(*hidden_map_, *output_map_, spawn);
     }
     return result;
 }

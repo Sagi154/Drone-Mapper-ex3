@@ -2,9 +2,10 @@
 
 #include <Common/IDroneMovement.h>
 #include <Common/IMap3D.h>
-#include <Simulator/MockGPS.h>
 
 namespace simulator {
+
+class MockGPS;
 
 /// Simulated drone movement driver.
 /// Validates per-command limits and performs sphere-based collision detection

@@ -1,4 +1,5 @@
 #include <Simulator/Map3DImpl.h>
+#include "Map3DNpy.h"
 #include <Simulator/io/YamlConfigParsers.h>
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
 #include <user_common_207190406_209543255/RunErrorLog.h>
@@ -174,7 +175,8 @@ TEST(SimulationCoordUtil, IsDroneSpawnPassable_HouseScenarioInstructorSpawn) {
     const LPCSTR load_err = map_array->LoadNPY(simulation.map_filename.string());
     ASSERT_EQ(load_err, nullptr) << load_err;
 
-    const Map3DImpl hidden_map{map_array, simulator::MapRole::Hidden, hiddenMapConfig(simulation)};
+    const Map3DImpl hidden_map = simulator::makeMap3D(
+        map_array, simulator::MapRole::Hidden, hiddenMapConfig(simulation));
 
     const Position3D world_spawn =
         user_common_207190406_209543255::worldInitialDronePosition(

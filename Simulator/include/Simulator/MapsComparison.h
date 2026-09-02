@@ -18,13 +18,10 @@
 
 namespace simulator {
 
-class MapsComparison {
-public:
-    /// Score one output map against a hidden reference map.
-    [[nodiscard]] static double compare(
-        const common::IMap3D& origin,
-        const common::IMap3D& target,
-        std::optional<common::Position3D> spawn = std::nullopt);
-};
+/// Score one output map against a hidden reference map.
+[[nodiscard]] double compareMaps(
+    const common::IMap3D& origin,
+    const common::IMap3D& target,
+    std::optional<common::Position3D> spawn = std::nullopt);
 
 } // namespace simulator

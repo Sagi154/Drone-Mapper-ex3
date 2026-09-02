@@ -1,10 +1,12 @@
 #include <Simulator/RunMatrixOrchestrator.h>
 
 #include <Simulator/ISimulationRun.h>
+#include <Simulator/WorkDistributor.h>
 
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <tuple>
 #include <utility>
 
 namespace simulator {
@@ -35,7 +37,17 @@ namespace {
 
 } // namespace
 
-std::vector<MatrixCell> RunMatrixOrchestrator::expand(
+std::size_t countRunMatrixCells(const types::SimulationCompositionData& composition) {
+    std::size_t n = 0;
+    const std::size_t drones = composition.drone_configs.size();
+    const std::size_t lidars = composition.lidar_configs.size();
+    for (const auto& group : composition.simulation_mission_groups) {
+        n += std::get<1>(group).size() * drones * lidars;
+    }
+    return n;
+}
+
+std::vector<MatrixCell> expandRunMatrix(
     const types::SimulationCompositionData& composition) {
     std::vector<MatrixCell> cells;
     for (std::size_t g = 0; g < composition.simulation_mission_groups.size(); ++g) {
@@ -60,12 +72,12 @@ std::vector<MatrixCell> RunMatrixOrchestrator::expand(
     return cells;
 }
 
-std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
+std::vector<PluginMatrixResult> runPluginMatrix(
     const std::vector<PluginMatrixBinding>& plugins,
     const types::SimulationCompositionData& composition,
     const std::filesystem::path& output_root,
     unsigned num_threads) {
-    const std::vector<MatrixCell> cells = expand(composition);
+    const std::vector<MatrixCell> cells = expandRunMatrix(composition);
     const std::size_t cell_count        = cells.size();
     const std::size_t plugin_count      = plugins.size();
 
@@ -84,7 +96,7 @@ std::vector<PluginMatrixResult> RunMatrixOrchestrator::run(
     // Disjoint flat indices — one writer per slot; no lock needed.
     std::vector<char> threw(total, 0);
 
-    (void)WorkDistributor::distribute(
+    (void)distributeWork(
         total, num_threads,
         [&](std::size_t flat_index) {
             const std::size_t plugin_index = flat_index / cell_count;

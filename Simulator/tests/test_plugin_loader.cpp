@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -39,12 +40,12 @@ TEST_F(PluginLoaderTest, ValidFixtureLoadsAndFactoryIsRetrievable) {
 
     const auto outcome = loader.loadAlgorithmSo(so);
     EXPECT_TRUE(outcome.errors.empty());
-    ASSERT_EQ(loader.algorithms().size(), 1U);
-    EXPECT_EQ(loader.algorithms().front().filename, "valid_algorithm_plugin.so");
-    ASSERT_TRUE(static_cast<bool>(loader.algorithms().front().factory));
+    ASSERT_EQ(loader.algorithmCount(), 1U);
+    EXPECT_EQ(loader.algorithmAt(0).filename, "valid_algorithm_plugin.so");
+    ASSERT_TRUE(static_cast<bool>(loader.algorithmAt(0).factory));
 
     loader.unloadAll();
-    EXPECT_TRUE(loader.algorithms().empty());
+    EXPECT_EQ(loader.algorithmCount(), 0U);
 }
 
 TEST_F(PluginLoaderTest, UnregisteredSoGoesToErrorsList) {
@@ -55,7 +56,7 @@ TEST_F(PluginLoaderTest, UnregisteredSoGoesToErrorsList) {
     const auto outcome = loader.loadAlgorithmSo(so);
     ASSERT_EQ(outcome.errors.size(), 1U);
     EXPECT_EQ(outcome.errors.front(), "unregistered_plugin.so");
-    EXPECT_TRUE(loader.algorithms().empty());
+    EXPECT_EQ(loader.algorithmCount(), 0U);
 }
 
 TEST_F(PluginLoaderTest, ReloadSamePathIsBlocked) {
@@ -64,12 +65,12 @@ TEST_F(PluginLoaderTest, ReloadSamePathIsBlocked) {
     ASSERT_TRUE(fs::exists(so)) << so;
 
     ASSERT_TRUE(loader.loadAlgorithmSo(so).errors.empty());
-    ASSERT_EQ(loader.algorithms().size(), 1U);
+    ASSERT_EQ(loader.algorithmCount(), 1U);
 
     const auto second = loader.loadAlgorithmSo(so);
     ASSERT_EQ(second.errors.size(), 1U);
     EXPECT_EQ(second.errors.front(), "valid_algorithm_plugin.so");
-    EXPECT_EQ(loader.algorithms().size(), 1U); // still exactly one successful load
+    EXPECT_EQ(loader.algorithmCount(), 1U); // still exactly one successful load
 }
 
 TEST_F(PluginLoaderTest, DirectoryLoadCollectsValidAndFailed) {
@@ -80,7 +81,7 @@ TEST_F(PluginLoaderTest, DirectoryLoadCollectsValidAndFailed) {
     const auto outcome = loader.loadAlgorithmsFromDirectory(dir);
     // At least the unregistered fixture fails; valid one succeeds.
     EXPECT_FALSE(outcome.errors.empty());
-    EXPECT_FALSE(loader.algorithms().empty());
+    EXPECT_GT(loader.algorithmCount(), 0U);
 
     bool saw_unregistered = false;
     for (const auto& err : outcome.errors) {
@@ -91,8 +92,8 @@ TEST_F(PluginLoaderTest, DirectoryLoadCollectsValidAndFailed) {
     EXPECT_TRUE(saw_unregistered);
 
     bool saw_valid = false;
-    for (const auto& plugin : loader.algorithms()) {
-        if (plugin.filename == "valid_algorithm_plugin.so") {
+    for (std::size_t i = 0; i < loader.algorithmCount(); ++i) {
+        if (loader.algorithmAt(i).filename == "valid_algorithm_plugin.so") {
             saw_valid = true;
         }
     }
@@ -107,12 +108,12 @@ TEST_F(PluginLoaderTest, ReloadBlockedAfterFailedRegistration) {
     const auto first = loader.loadAlgorithmSo(so);
     ASSERT_EQ(first.errors.size(), 1U);
     EXPECT_EQ(first.errors.front(), "unregistered_plugin.so");
-    EXPECT_TRUE(loader.algorithms().empty());
+    EXPECT_EQ(loader.algorithmCount(), 0U);
 
     const auto second = loader.loadAlgorithmSo(so);
     ASSERT_EQ(second.errors.size(), 1U);
     EXPECT_EQ(second.errors.front(), "unregistered_plugin.so");
-    EXPECT_TRUE(loader.algorithms().empty());
+    EXPECT_EQ(loader.algorithmCount(), 0U);
 }
 
 TEST_F(PluginLoaderTest, WrongKindSoDoesNotLeaveDanglingPending) {
@@ -124,8 +125,8 @@ TEST_F(PluginLoaderTest, WrongKindSoDoesNotLeaveDanglingPending) {
     const auto wrong_kind = loader.loadAlgorithmSo(mc_so);
     ASSERT_EQ(wrong_kind.errors.size(), 1U);
     EXPECT_EQ(wrong_kind.errors.front(), "valid_mission_control_plugin.so");
-    EXPECT_TRUE(loader.algorithms().empty());
-    EXPECT_TRUE(loader.missionControls().empty());
+    EXPECT_EQ(loader.algorithmCount(), 0U);
+    EXPECT_EQ(loader.missionControlCount(), 0U);
 
     // unloadAll must not trip over a dangling pending factory from the closed image.
     loader.unloadAll();
@@ -133,9 +134,9 @@ TEST_F(PluginLoaderTest, WrongKindSoDoesNotLeaveDanglingPending) {
     // A subsequent correct MC load still succeeds.
     const auto ok = loader.loadMissionControlSo(mc_so);
     EXPECT_TRUE(ok.errors.empty());
-    ASSERT_EQ(loader.missionControls().size(), 1U);
-    EXPECT_EQ(loader.missionControls().front().filename, "valid_mission_control_plugin.so");
-    ASSERT_TRUE(static_cast<bool>(loader.missionControls().front().factory));
+    ASSERT_EQ(loader.missionControlCount(), 1U);
+    EXPECT_EQ(loader.missionControlAt(0).filename, "valid_mission_control_plugin.so");
+    ASSERT_TRUE(static_cast<bool>(loader.missionControlAt(0).factory));
 }
 
 TEST_F(PluginLoaderTest, AppendLoadErrorsCopiesBasenames) {

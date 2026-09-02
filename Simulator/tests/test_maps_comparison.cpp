@@ -138,7 +138,7 @@ TEST(MapsComparison, IdenticalMapsScore100) {
     reference.set(cellCenter(1, 1, 1), VoxelOccupancy::Occupied);
     target.set(cellCenter(1, 1, 1), VoxelOccupancy::Occupied);
 
-    EXPECT_DOUBLE_EQ(simulator::MapsComparison::compare(reference, target), 100.0);
+    EXPECT_DOUBLE_EQ(simulator::compareMaps(reference, target), 100.0);
 }
 
 TEST(MapsComparison, EmptyUnionScore100) {
@@ -146,7 +146,7 @@ TEST(MapsComparison, EmptyUnionScore100) {
     FakeMap3D reference(config);
     FakeMap3D target(config);
 
-    EXPECT_DOUBLE_EQ(simulator::MapsComparison::compare(reference, target), 100.0);
+    EXPECT_DOUBLE_EQ(simulator::compareMaps(reference, target), 100.0);
 }
 
 TEST(MapsComparison, SingleMismatchReducesScore) {
@@ -157,7 +157,7 @@ TEST(MapsComparison, SingleMismatchReducesScore) {
     fillKnownGrid(target, VoxelOccupancy::Occupied);
     target.set(cellCenter(0, 0, 0), VoxelOccupancy::Empty);
 
-    const double score = simulator::MapsComparison::compare(reference, target);
+    const double score = simulator::compareMaps(reference, target);
     EXPECT_LT(score, 100.0);
     EXPECT_GT(score, 95.0);
 }
@@ -169,7 +169,7 @@ TEST(MapsComparison, DistinctMapsScoreNearZero) {
     fillKnownGrid(reference, VoxelOccupancy::Occupied);
     fillKnownGrid(target, VoxelOccupancy::Empty);
 
-    EXPECT_NEAR(simulator::MapsComparison::compare(reference, target), 0.0, 1e-6);
+    EXPECT_NEAR(simulator::compareMaps(reference, target), 0.0, 1e-6);
 }
 
 TEST(MapsComparison, ReferenceUnmappedCellsAreSkipped) {
@@ -179,7 +179,7 @@ TEST(MapsComparison, ReferenceUnmappedCellsAreSkipped) {
     reference.set(cellCenter(1, 1, 1), VoxelOccupancy::Occupied);
     target.set(cellCenter(1, 1, 1), VoxelOccupancy::Occupied);
 
-    EXPECT_DOUBLE_EQ(simulator::MapsComparison::compare(reference, target), 100.0);
+    EXPECT_DOUBLE_EQ(simulator::compareMaps(reference, target), 100.0);
 }
 
 TEST(MapsComparison, OutOfBoundsCellsAreSkipped) {
@@ -192,7 +192,7 @@ TEST(MapsComparison, OutOfBoundsCellsAreSkipped) {
     const Position3D outside{100.0 * x_extent[cm], 100.0 * y_extent[cm], 100.0 * z_extent[cm]};
     ASSERT_EQ(reference.atVoxel(outside), VoxelOccupancy::OutOfBounds);
 
-    EXPECT_DOUBLE_EQ(simulator::MapsComparison::compare(reference, target), 100.0);
+    EXPECT_DOUBLE_EQ(simulator::compareMaps(reference, target), 100.0);
 }
 
 TEST(MapsComparison, SealedRoomPenalisesWithoutSpawn) {
@@ -205,7 +205,7 @@ TEST(MapsComparison, SealedRoomPenalisesWithoutSpawn) {
         target.set(slabPt(1, z), VoxelOccupancy::Occupied);
     }
 
-    EXPECT_LT(simulator::MapsComparison::compare(reference, target), 100.0);
+    EXPECT_LT(simulator::compareMaps(reference, target), 100.0);
 }
 
 TEST(MapsComparison, SealedRoomExcludedWhenSpawnProvided) {
@@ -218,7 +218,7 @@ TEST(MapsComparison, SealedRoomExcludedWhenSpawnProvided) {
         target.set(slabPt(1, z), VoxelOccupancy::Occupied);
     }
 
-    EXPECT_DOUBLE_EQ(simulator::MapsComparison::compare(reference, target, slabPt(0, 0)), 100.0);
+    EXPECT_DOUBLE_EQ(simulator::compareMaps(reference, target, slabPt(0, 0)), 100.0);
 }
 
 TEST(MapsComparison, ReachableUnmappedCellsStillPenalise) {
@@ -230,7 +230,7 @@ TEST(MapsComparison, ReachableUnmappedCellsStillPenalise) {
         target.set(slabPt(1, z), VoxelOccupancy::Occupied);
     }
 
-    EXPECT_LT(simulator::MapsComparison::compare(reference, target, slabPt(0, 0)), 100.0);
+    EXPECT_LT(simulator::compareMaps(reference, target, slabPt(0, 0)), 100.0);
 }
 
 TEST(MapsComparison, SpawnAwareScoreNeverWorseForSealedRoom) {
@@ -243,8 +243,8 @@ TEST(MapsComparison, SpawnAwareScoreNeverWorseForSealedRoom) {
         target.set(slabPt(1, z), VoxelOccupancy::Occupied);
     }
 
-    const double raw = simulator::MapsComparison::compare(reference, target);
+    const double raw = simulator::compareMaps(reference, target);
     const double with_spawn =
-        simulator::MapsComparison::compare(reference, target, slabPt(0, 0));
+        simulator::compareMaps(reference, target, slabPt(0, 0));
     EXPECT_GE(with_spawn, raw);
 }

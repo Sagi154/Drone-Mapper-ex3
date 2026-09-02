@@ -7,6 +7,7 @@
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <iostream>
@@ -43,8 +44,9 @@ struct PluginBootstrap {
             std::cerr << "warning: mission control failed to load: " << name << '\n';
             boot.failed_plugins.push_back(name);
         }
-        const auto& algorithm_factory = boot.loader.algorithms().front().factory;
-        for (const auto& mc : boot.loader.missionControls()) {
+        const auto& algorithm_factory = boot.loader.algorithmAt(0).factory;
+        for (std::size_t i = 0; i < boot.loader.missionControlCount(); ++i) {
+            const auto& mc = boot.loader.missionControlAt(i);
             boot.factories.push_back(
                 std::make_unique<SimulationRunFactoryImpl>(algorithm_factory, mc.factory,
                                                            args.verbose));
@@ -64,8 +66,9 @@ struct PluginBootstrap {
         std::cerr << "warning: algorithm failed to load: " << name << '\n';
         boot.failed_plugins.push_back(name);
     }
-    const auto& mission_control_factory = boot.loader.missionControls().front().factory;
-    for (const auto& algo : boot.loader.algorithms()) {
+    const auto& mission_control_factory = boot.loader.missionControlAt(0).factory;
+    for (std::size_t i = 0; i < boot.loader.algorithmCount(); ++i) {
+        const auto& algo = boot.loader.algorithmAt(i);
         boot.factories.push_back(std::make_unique<SimulationRunFactoryImpl>(
             algo.factory, mission_control_factory, args.verbose));
         boot.bindings.push_back({algo.filename, std::ref(*boot.factories.back())});
@@ -104,7 +107,7 @@ void writePerPluginSimulationYaml(
     const std::string& generated_at_utc,
     const std::vector<simulator::PluginMatrixResult>& results) {
     const std::vector<simulator::MatrixCell> cells =
-        simulator::RunMatrixOrchestrator::expand(composition);
+        simulator::expandRunMatrix(composition);
 
     for (const auto& plugin_result : results) {
         simulator::types::SimulationManagerReport report;
@@ -189,7 +192,7 @@ int main(int argc, char** argv) {
     if (plugins.bindings.empty()) {
         std::cerr << "error: no plugins loaded successfully — nothing to run\n";
     } else {
-        results = simulator::RunMatrixOrchestrator::run(
+        results = simulator::runPluginMatrix(
             plugins.bindings, composition, output_root, args.num_threads.value_or(1));
         printRunCounts(results);
         writePerPluginSimulationYaml(output_root, composition, generated_at_utc, results);

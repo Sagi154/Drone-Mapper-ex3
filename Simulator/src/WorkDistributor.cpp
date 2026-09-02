@@ -22,11 +22,10 @@ void runOneCell(std::size_t index,
 
 } // namespace
 
-std::size_t WorkDistributor::distribute(
-    std::size_t cell_count,
-    unsigned num_threads,
-    const std::function<void(std::size_t index)>& cell_work,
-    const std::function<void(std::size_t index)>& on_throw) {
+std::size_t distributeWork(
+    std::size_t cell_count, unsigned num_threads,
+    const std::function<void(std::size_t)>& cell_work,
+    const std::function<void(std::size_t)>& on_throw) {
     if (cell_count == 0) {
         return 0;
     }

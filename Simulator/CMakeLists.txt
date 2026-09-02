@@ -27,6 +27,7 @@ add_executable(test_map3d_impl
 
 target_include_directories(test_map3d_impl PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(test_map3d_impl PRIVATE
@@ -79,6 +80,7 @@ add_executable(test_usercommon_simulation_coord_util
 )
 target_include_directories(test_usercommon_simulation_coord_util PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/UserCommon/include
     ${CMAKE_SOURCE_DIR}/common/include
     ${CMAKE_SOURCE_DIR}/Simulator/common_simulator/include

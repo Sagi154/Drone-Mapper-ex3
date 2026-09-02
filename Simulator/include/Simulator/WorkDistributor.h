@@ -9,17 +9,13 @@
 
 namespace simulator {
 
-class WorkDistributor {
-public:
-    /// Run `cell_work(i)` for every i in [0, cell_count).
-    /// On exception from a cell, calls `on_throw(i)` and continues.
-    /// @param num_threads effective CLI value (absent → pass 1).
-    /// @return number of worker threads spawned (0 when main-only).
-    [[nodiscard]] static std::size_t distribute(
-        std::size_t cell_count,
-        unsigned num_threads,
-        const std::function<void(std::size_t index)>& cell_work,
-        const std::function<void(std::size_t index)>& on_throw);
-};
+/// Run `cell_work(i)` for every i in [0, cell_count).
+/// On exception from a cell, calls `on_throw(i)` and continues.
+/// @param num_threads effective CLI value (absent → pass 1).
+/// @return number of worker threads spawned (0 when main-only).
+[[nodiscard]] std::size_t distributeWork(
+    std::size_t cell_count, unsigned num_threads,
+    const std::function<void(std::size_t)>& cell_work,
+    const std::function<void(std::size_t)>& on_throw);
 
 } // namespace simulator

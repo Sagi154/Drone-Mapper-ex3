@@ -18,11 +18,11 @@ public:
     PluginRegistrar(const PluginRegistrar&)            = delete;
     PluginRegistrar& operator=(const PluginRegistrar&) = delete;
 
-    void setPendingAlgorithmFactory(common::MappingAlgorithmFactory factory);
+    void setPendingAlgorithmFactory(const common::MappingAlgorithmFactory& factory);
     void clearPendingAlgorithmFactory();
     [[nodiscard]] std::optional<common::MappingAlgorithmFactory> takePendingAlgorithmFactory();
 
-    void setPendingMissionControlFactory(common::MissionControlFactory factory);
+    void setPendingMissionControlFactory(const common::MissionControlFactory& factory);
     void clearPendingMissionControlFactory();
     [[nodiscard]] std::optional<common::MissionControlFactory> takePendingMissionControlFactory();
 

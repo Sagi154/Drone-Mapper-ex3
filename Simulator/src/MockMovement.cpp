@@ -15,6 +15,7 @@
 // Heading convention: horizontal angle 0° = +X, 90° = +Y.
 
 #include <Simulator/MockMovement.h>
+#include <Simulator/MockGPS.h>
 
 #include <user_common_207190406_209543255/BeamMath.h>
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>

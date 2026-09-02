@@ -3,6 +3,7 @@
 // and the regression cases from docs/map3d-contract.md.
 
 #include <Simulator/Map3DImpl.h>
+#include "Map3DNpy.h"
 
 #include <TinyNPY.h>
 
@@ -18,6 +19,7 @@ using namespace common;
 using namespace common::types;
 using simulator::Map3DImpl;
 using simulator::MapRole;
+using simulator::makeMap3D;
 
 namespace {
 
@@ -59,7 +61,7 @@ namespace {
 // ---------------------------------------------------------------------------
 
 TEST(Map3DImpl, RejectsNullMapPointer) {
-    EXPECT_THROW(Map3DImpl(std::shared_ptr<NpyArray>{}, MapRole::Hidden), std::invalid_argument);
+    EXPECT_THROW(makeMap3D(std::shared_ptr<NpyArray>{}, MapRole::Hidden), std::invalid_argument);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +74,7 @@ TEST(Map3DImpl, Uint8HiddenMapValuesGt1AreOccupied) {
     for (const std::uint8_t v :
          {std::uint8_t{2}, std::uint8_t{3}, std::uint8_t{4}, std::uint8_t{18}, std::uint8_t{45}}) {
         const auto map = makeUint8Map({1, 1, 1}, v);
-        const Map3DImpl impl{map, MapRole::Hidden, makeConfig()};
+        const Map3DImpl impl = makeMap3D(map, MapRole::Hidden, makeConfig());
         EXPECT_EQ(impl.atVoxel(voxel), VoxelOccupancy::Occupied)
             << "stored uint8 value=" << static_cast<int>(v);
     }
@@ -80,7 +82,7 @@ TEST(Map3DImpl, Uint8HiddenMapValuesGt1AreOccupied) {
 
 TEST(Map3DImpl, Uint8HiddenMapValueZeroIsEmpty) {
     const auto map = makeUint8Map({1, 1, 1}, 0);
-    const Map3DImpl impl{map, MapRole::Hidden, makeConfig()};
+    const Map3DImpl impl = makeMap3D(map, MapRole::Hidden, makeConfig());
     EXPECT_EQ(impl.atVoxel({}), VoxelOccupancy::Empty);
 }
 
@@ -93,7 +95,7 @@ TEST(Map3DImpl, Uint8HiddenMapValueZeroIsEmpty) {
 TEST(Map3DImpl, Int8HiddenMapValueGt1IsOccupied) {
     for (const std::int8_t v : {std::int8_t{2}, std::int8_t{3}, std::int8_t{10}}) {
         const auto map = makeInt8Map({1, 1, 1}, v);
-        const Map3DImpl impl{map, MapRole::Hidden, makeConfig()};
+        const Map3DImpl impl = makeMap3D(map, MapRole::Hidden, makeConfig());
         EXPECT_EQ(impl.atVoxel({}), VoxelOccupancy::Occupied)
             << "stored int8 value=" << static_cast<int>(v);
     }
@@ -107,7 +109,7 @@ TEST(Map3DImpl, Int8HiddenMapValueGt1IsOccupied) {
 TEST(Map3DImpl, Int8OutputMapUnmappedStaysUnmapped) {
     const auto map = makeInt8Map({1, 1, 1},
                                  static_cast<std::int8_t>(VoxelOccupancy::Unmapped));
-    const Map3DImpl impl{map, MapRole::Output, makeConfig()};
+    const Map3DImpl impl = makeMap3D(map, MapRole::Output, makeConfig());
     EXPECT_EQ(impl.atVoxel({}), VoxelOccupancy::Unmapped);
 }
 
@@ -116,7 +118,7 @@ TEST(Map3DImpl, Int8OutputMapNegativeEnumsRoundTrip) {
          {VoxelOccupancy::PotentiallyOccupied, VoxelOccupancy::Unmapped,
           VoxelOccupancy::Empty, VoxelOccupancy::Occupied}) {
         const auto map = makeInt8Map({1, 1, 1}, static_cast<std::int8_t>(v));
-        const Map3DImpl impl{map, MapRole::Output, makeConfig()};
+        const Map3DImpl impl = makeMap3D(map, MapRole::Output, makeConfig());
         EXPECT_EQ(impl.atVoxel({}), v);
     }
 }
@@ -128,7 +130,7 @@ TEST(Map3DImpl, Int8OutputMapNegativeEnumsRoundTrip) {
 TEST(Map3DImpl, InBoundsVoxelIsDetectedCorrectly) {
     // 5x5x5 at 10 cm/cell — valid positions are 0..40 on each axis
     const auto map = makeInt8Map({5, 5, 5}, 0);
-    Map3DImpl impl{map, MapRole::Hidden, makeConfig(10.0, 40.0)};
+    Map3DImpl impl = makeMap3D(map, MapRole::Hidden, makeConfig(10.0, 40.0));
 
     EXPECT_TRUE(impl.isInBounds(Position3D{0.0 * x_extent[cm], 0.0 * y_extent[cm], 0.0 * z_extent[cm]}));
     EXPECT_TRUE(impl.isInBounds(Position3D{20.0 * x_extent[cm], 20.0 * y_extent[cm], 20.0 * z_extent[cm]}));
@@ -137,7 +139,7 @@ TEST(Map3DImpl, InBoundsVoxelIsDetectedCorrectly) {
 
 TEST(Map3DImpl, AtVoxelOutsideBoundsReturnsOutOfBounds) {
     const auto map = makeInt8Map({3, 3, 3}, 1);
-    const Map3DImpl impl{map, MapRole::Hidden, makeConfig(10.0, 20.0)};
+    const Map3DImpl impl = makeMap3D(map, MapRole::Hidden, makeConfig(10.0, 20.0));
 
     EXPECT_EQ(impl.atVoxel(Position3D{50.0 * x_extent[cm], 0.0 * y_extent[cm], 0.0 * z_extent[cm]}),
               VoxelOccupancy::OutOfBounds);
@@ -150,7 +152,7 @@ TEST(Map3DImpl, AtVoxelOutsideBoundsReturnsOutOfBounds) {
 TEST(Map3DImpl, SetUpdatesMutatesVoxel) {
     const auto map = makeInt8Map({3, 3, 3},
                                  static_cast<std::int8_t>(VoxelOccupancy::Unmapped));
-    Map3DImpl impl{map, MapRole::Output, makeConfig()};
+    Map3DImpl impl = makeMap3D(map, MapRole::Output, makeConfig());
 
     const Position3D target{10.0 * x_extent[cm], 10.0 * y_extent[cm], 10.0 * z_extent[cm]};
     impl.set(target, VoxelOccupancy::Occupied);
@@ -160,7 +162,7 @@ TEST(Map3DImpl, SetUpdatesMutatesVoxel) {
 TEST(Map3DImpl, SetOutOfBoundsIsNoOp) {
     const auto map = makeInt8Map({3, 3, 3},
                                  static_cast<std::int8_t>(VoxelOccupancy::Unmapped));
-    Map3DImpl impl{map, MapRole::Output, makeConfig()};
+    Map3DImpl impl = makeMap3D(map, MapRole::Output, makeConfig());
 
     const Position3D outside{100.0 * x_extent[cm], 0.0 * y_extent[cm], 0.0 * z_extent[cm]};
     impl.set(outside, VoxelOccupancy::Occupied);
@@ -170,7 +172,7 @@ TEST(Map3DImpl, SetOutOfBoundsIsNoOp) {
 TEST(Map3DImpl, SaveLoadRoundTripPreservesOccupied) {
     const auto map = makeInt8Map({3, 3, 3},
                                  static_cast<std::int8_t>(VoxelOccupancy::Unmapped));
-    Map3DImpl impl{map, MapRole::Output, makeConfig()};
+    Map3DImpl impl = makeMap3D(map, MapRole::Output, makeConfig());
 
     const Position3D target{10.0 * x_extent[cm], 10.0 * y_extent[cm], 10.0 * z_extent[cm]};
     impl.set(target, VoxelOccupancy::Occupied);
@@ -182,7 +184,7 @@ TEST(Map3DImpl, SaveLoadRoundTripPreservesOccupied) {
     const LPCSTR err = reloaded->LoadNPY(temp.string());
     ASSERT_EQ(err, nullptr);
 
-    const Map3DImpl reloaded_impl{reloaded, MapRole::Output, makeConfig()};
+    const Map3DImpl reloaded_impl = makeMap3D(reloaded, MapRole::Output, makeConfig());
     EXPECT_EQ(reloaded_impl.atVoxel(target), VoxelOccupancy::Occupied);
 
     std::error_code ec;
@@ -199,7 +201,7 @@ TEST(Map3DImpl, DerivesBoundsFromShapeWhenUnset) {
     MapConfig cfg{};
     cfg.resolution = 10.0 * cm;  // boundaries left at zero
 
-    const Map3DImpl impl{map, MapRole::Hidden, cfg};
+    const Map3DImpl impl = makeMap3D(map, MapRole::Hidden, cfg);
     const MapConfig derived = impl.getMapConfig();
 
     EXPECT_DOUBLE_EQ(derived.boundaries.max_x.numerical_value_in(cm), 40.0);

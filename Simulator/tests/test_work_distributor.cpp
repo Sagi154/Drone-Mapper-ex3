@@ -25,7 +25,7 @@ struct MatrixRun {
     run.results.assign(cell_count, kUnset);
 
     std::atomic<int> invocations{0};
-    run.workers_spawned = simulator::WorkDistributor::distribute(
+    run.workers_spawned = simulator::distributeWork(
         cell_count, num_threads,
         [&](std::size_t index) {
             invocations.fetch_add(1, std::memory_order_relaxed);
@@ -97,7 +97,7 @@ TEST(WorkDistributor, ThrowingCellDoesNotStopSiblings) {
 }
 
 TEST(WorkDistributor, EmptyMatrixSpawnsNothing) {
-    const auto workers = simulator::WorkDistributor::distribute(
+    const auto workers = simulator::distributeWork(
         0, 8, [](std::size_t) {}, [](std::size_t) {});
     EXPECT_EQ(workers, 0U);
 }

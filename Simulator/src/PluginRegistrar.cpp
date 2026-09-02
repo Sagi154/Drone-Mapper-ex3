@@ -9,8 +9,8 @@ PluginRegistrar& PluginRegistrar::instance() {
     return registrar;
 }
 
-void PluginRegistrar::setPendingAlgorithmFactory(common::MappingAlgorithmFactory factory) {
-    pending_algorithm_ = std::move(factory);
+void PluginRegistrar::setPendingAlgorithmFactory(const common::MappingAlgorithmFactory& factory) {
+    pending_algorithm_ = factory;
 }
 
 void PluginRegistrar::clearPendingAlgorithmFactory() {
@@ -23,8 +23,9 @@ std::optional<common::MappingAlgorithmFactory> PluginRegistrar::takePendingAlgor
     return taken;
 }
 
-void PluginRegistrar::setPendingMissionControlFactory(common::MissionControlFactory factory) {
-    pending_mission_control_ = std::move(factory);
+void PluginRegistrar::setPendingMissionControlFactory(
+    const common::MissionControlFactory& factory) {
+    pending_mission_control_ = factory;
 }
 
 void PluginRegistrar::clearPendingMissionControlFactory() {

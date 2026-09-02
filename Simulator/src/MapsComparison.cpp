@@ -168,8 +168,8 @@ void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
 
 } // namespace
 
-double MapsComparison::compare(const common::IMap3D& origin, const common::IMap3D& target,
-                               std::optional<Position3D> spawn) {
+double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
+                   std::optional<Position3D> spawn) {
     const GridExtent g = gridExtent(target);
 
     std::optional<std::unordered_set<GridKey, GridKeyHash>> reachable_set;
