@@ -12,13 +12,20 @@
 
 namespace algorithm_207190406_209543255::detail {
 
+using InformationRate = double; // voxels gained per step; dimensionless by design
+
+namespace plan_detail {
+// planner internals consumed by MappingAlgorithmImpl
+} // namespace plan_detail
+
 struct ExplorationPlan {
     std::vector<common::Position3D> waypoints{};
     std::size_t target_cluster_cells = 0;
-    double expected_rate = 0.0;
+    InformationRate expected_rate = 0.0;
+    bool valid = false;
+    // planner internals consumed by MappingAlgorithmImpl
     std::vector<GridKey> target_keys{};
     FrontierCells frontier_cells{};
-    bool valid = false;
 };
 
 struct WavefrontInputs {

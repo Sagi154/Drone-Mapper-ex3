@@ -4,6 +4,9 @@
 
 #include "MappingAlgorithmFrontier.h"
 
+#include <mp-units/math.h>
+#include <mp-units/systems/si/math.h>
+
 #include <cmath>
 #include <numbers>
 
@@ -15,16 +18,15 @@ using common::Orientation;
 using common::Position3D;
 using common::cm;
 using common::deg;
+using common::x_extent;
+using common::y_extent;
+using common::z_extent;
 
-constexpr double kSameAltitudeEpsilonCm = 1e-6;
-constexpr double kSameAxisEpsilonCm = 1e-6;
-
-[[nodiscard]] double xCm(const Position3D& p) { return p.x.force_numerical_value_in(cm); }
-[[nodiscard]] double yCm(const Position3D& p) { return p.y.force_numerical_value_in(cm); }
-[[nodiscard]] double zCm(const Position3D& p) { return p.z.force_numerical_value_in(cm); }
+constexpr common::ZLength kSameAltitudeEpsilon = 1e-6 * z_extent[cm];
+constexpr common::PhysicalLength kSameAxisEpsilon = 1e-6 * cm;
 
 [[nodiscard]] bool sameAltitude(const Position3D& a, const Position3D& b) {
-    return std::abs(zCm(a) - zCm(b)) <= kSameAltitudeEpsilonCm;
+    return mp_units::abs(a.z - b.z) <= kSameAltitudeEpsilon;
 }
 
 [[nodiscard]] std::size_t ceilDiv(double amount, double per_step) {
@@ -62,7 +64,7 @@ std::vector<Position3D> stringPullConstantAltitude(const common::IMap3D& map,
         std::size_t best = anchor + 1;
         for (std::size_t probe = anchor + 2; probe < path.size(); ++probe) {
             if (!sameAltitude(path[anchor], path[probe])) {
-                break;  // an altitude change ends the mergeable run
+                break;
             }
             if (!hasClearLineOfSight(map, path[anchor], path[probe], drone_radius)) {
                 break;
@@ -80,31 +82,34 @@ std::size_t stepCostForPath(const std::vector<Position3D>& waypoints,
                             const Position3D& start_position,
                             const Orientation& start_heading,
                             const MovementLimits& limits) {
-    const double advance_cm = limits.max_advance.force_numerical_value_in(cm);
-    const double elevate_cm = limits.max_elevate.force_numerical_value_in(cm);
-    const double rotate_deg = limits.max_rotate.force_numerical_value_in(deg);
+    const double advance_cm = limits.max_advance.numerical_value_in(cm);
+    const double elevate_cm = limits.max_elevate.numerical_value_in(cm);
+    const double rotate_deg = limits.max_rotate.numerical_value_in(deg);
 
     std::size_t steps = 0;
     Position3D from = start_position;
-    double heading_deg = start_heading.horizontal.force_numerical_value_in(deg);
+    double heading_deg = start_heading.horizontal.numerical_value_in(deg);
 
     for (const Position3D& to : waypoints) {
-        const double dz = zCm(to) - zCm(from);
-        if (std::abs(dz) > kSameAxisEpsilonCm) {
-            steps += ceilDiv(std::abs(dz), elevate_cm);
+        const Position3D d = to - from;
+        const auto dz = mp_units::quantity_cast<common::isq::length>(d.z);
+        if (mp_units::abs(dz) > kSameAxisEpsilon) {
+            steps += ceilDiv(mp_units::abs(dz).numerical_value_in(cm), elevate_cm);
         }
 
-        const double dx = xCm(to) - xCm(from);
-        const double dy = yCm(to) - yCm(from);
-        const double planar = std::sqrt(dx * dx + dy * dy);
-        if (planar > kSameAxisEpsilonCm) {
-            const double target_deg = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
+        const auto dx = mp_units::quantity_cast<common::isq::length>(d.x);
+        const auto dy = mp_units::quantity_cast<common::isq::length>(d.y);
+        const auto planar = mp_units::sqrt(dx * dx + dy * dy);
+        if (planar > kSameAxisEpsilon) {
+            const double target_deg =
+                std::atan2(dy.numerical_value_in(cm), dx.numerical_value_in(cm)) *
+                (180.0 / std::numbers::pi);
             const double turn = std::abs(wrapDeg(target_deg - heading_deg));
             if (turn > 1e-9) {
                 steps += ceilDiv(turn, rotate_deg);
                 heading_deg = target_deg;
             }
-            steps += ceilDiv(planar, advance_cm);
+            steps += ceilDiv(planar.numerical_value_in(cm), advance_cm);
         }
 
         from = to;

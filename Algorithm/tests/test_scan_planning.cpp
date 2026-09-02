@@ -56,7 +56,22 @@ namespace ct = common::types;
     return Position3D{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]};
 }
 
+[[nodiscard]] ct::MapConfig makeConfigWithSpans(double x, double y, double z) {
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = x * x_extent[cm];
+    config.boundaries.max_y = y * y_extent[cm];
+    config.boundaries.max_height = z * z_extent[cm];
+    return config;
+}
+
 } // namespace
+
+TEST(ScanPlanning, MissionVolumeSpansMatchBoundaryDeltas) {
+    auto config = makeConfigWithSpans(/*x*/200, /*y*/200, /*z*/200);
+    const auto spans = algorithm_207190406_209543255::detail::missionVolumeSpans(config);
+    EXPECT_EQ(spans.x, 200.0 * common::cm);
+    EXPECT_TRUE(algorithm_207190406_209543255::detail::isOpenVolumeMission(config));
+}
 
 TEST(ScanPlanning, MaskRejectsUnmappedBehindOccupied) {
     [[maybe_unused]] const ct::MapConfig config = makeConfig();

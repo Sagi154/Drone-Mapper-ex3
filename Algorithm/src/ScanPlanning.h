@@ -5,6 +5,7 @@
 #include <user_common_207190406_209543255/ConeTemplate.h>
 
 #include <Common/IMap3D.h>
+#include <Common/Units.h>
 #include <Common/types/DroneTypes.h>
 #include <Common/types/LidarTypes.h>
 
@@ -14,6 +15,14 @@
 namespace algorithm_207190406_209543255::detail {
 
 [[nodiscard]] bool isGainMasked(const GridKey& key, const FrontierCells& frontier);
+
+struct MissionVolumeSpans {
+    common::PhysicalLength x{};
+    common::PhysicalLength y{};
+    common::PhysicalLength z{};
+};
+
+[[nodiscard]] MissionVolumeSpans missionVolumeSpans(const common::types::MapConfig& config);
 
 /// Outdoor cubes (small_out / large_out): height and both XY spans >= 200 cm.
 [[nodiscard]] bool isOpenVolumeMission(const common::types::MapConfig& config);
