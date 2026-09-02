@@ -148,7 +148,8 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData&      simulat
                                                    MapRole::Output, out_cfg);
 
     // Compute world spawn position (local + map_axes_offset)
-    const Position3D world_spawn = UC::worldInitialDronePosition(simulation_config);
+    const Position3D world_spawn = UC::worldInitialDronePosition(
+        simulation_config.initial_drone_position, simulation_config.map_offset.z);
 
     if (startup_errors.empty()) {
         if (!UC::isDroneSpawnPassable(*hidden_map, drone_config.radius, world_spawn)) {

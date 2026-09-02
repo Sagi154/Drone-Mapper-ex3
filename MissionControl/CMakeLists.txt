@@ -4,6 +4,8 @@ add_library(MissionControl_207190406_209543255 SHARED
     src/DroneControlImpl.cpp
     src/MissionControlImpl.cpp
     src/MissionControlPluginRegistration.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
 )
 set_target_properties(MissionControl_207190406_209543255 PROPERTIES PREFIX "")
 
@@ -22,6 +24,8 @@ add_executable(test_drone_control
     tests/test_drone_control.cpp
     src/ScanResultToVoxels.cpp
     src/DroneControlImpl.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
 )
 target_include_directories(test_drone_control PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -39,6 +43,8 @@ add_executable(test_mission_control
     src/ScanResultToVoxels.cpp
     src/DroneControlImpl.cpp
     src/MissionControlImpl.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
 )
 target_include_directories(test_mission_control PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include

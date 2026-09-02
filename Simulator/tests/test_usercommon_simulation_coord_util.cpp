@@ -88,6 +88,20 @@ struct NullLog final : user_common_207190406_209543255::IRunErrorLog {
     return cfg;
 }
 
+[[nodiscard]] MapConfig makeConfig(double resolution_cm, double max_bound_cm) {
+    MapConfig cfg{};
+    cfg.resolution = resolution_cm * cm;
+    cfg.boundaries = {
+        0.0 * x_extent[cm],
+        max_bound_cm * x_extent[cm],
+        0.0 * y_extent[cm],
+        max_bound_cm * y_extent[cm],
+        0.0 * z_extent[cm],
+        max_bound_cm * z_extent[cm],
+    };
+    return cfg;
+}
+
 } // namespace
 
 TEST(SimulationCoordUtil, WorldInitialDronePosition_HouseScenarioOffset) {
@@ -99,7 +113,8 @@ TEST(SimulationCoordUtil, WorldInitialDronePosition_HouseScenarioOffset) {
         Position3D{0.0 * x_extent[cm], 0.0 * y_extent[cm], 150.0 * z_extent[cm]};
 
     const Position3D world =
-        user_common_207190406_209543255::worldInitialDronePosition(simulation);
+        user_common_207190406_209543255::worldInitialDronePosition(
+            simulation.initial_drone_position, simulation.map_offset.z);
     EXPECT_DOUBLE_EQ(world.x.numerical_value_in(cm), 150.0);
     EXPECT_DOUBLE_EQ(world.y.numerical_value_in(cm), 200.0);
     EXPECT_DOUBLE_EQ(world.z.numerical_value_in(cm), 300.0);
@@ -113,7 +128,8 @@ TEST(SimulationCoordUtil, WorldInitialDronePosition_UnchangedWhenOffsetZero) {
         Position3D{0.0 * x_extent[cm], 0.0 * y_extent[cm], 0.0 * z_extent[cm]};
 
     const Position3D world =
-        user_common_207190406_209543255::worldInitialDronePosition(simulation);
+        user_common_207190406_209543255::worldInitialDronePosition(
+            simulation.initial_drone_position, simulation.map_offset.z);
     EXPECT_EQ(world.x, simulation.initial_drone_position.x);
     EXPECT_EQ(world.y, simulation.initial_drone_position.y);
     EXPECT_EQ(world.z, simulation.initial_drone_position.z);
@@ -161,7 +177,8 @@ TEST(SimulationCoordUtil, IsDroneSpawnPassable_HouseScenarioInstructorSpawn) {
     const Map3DImpl hidden_map{map_array, simulator::MapRole::Hidden, hiddenMapConfig(simulation)};
 
     const Position3D world_spawn =
-        user_common_207190406_209543255::worldInitialDronePosition(simulation);
+        user_common_207190406_209543255::worldInitialDronePosition(
+            simulation.initial_drone_position, simulation.map_offset.z);
     EXPECT_DOUBLE_EQ(world_spawn.x.numerical_value_in(cm), 150.0);
     EXPECT_DOUBLE_EQ(world_spawn.y.numerical_value_in(cm), 200.0);
     EXPECT_DOUBLE_EQ(world_spawn.z.numerical_value_in(cm), 300.0);
@@ -170,4 +187,32 @@ TEST(SimulationCoordUtil, IsDroneSpawnPassable_HouseScenarioInstructorSpawn) {
     const PhysicalLength drone_small_radius = 4.0 * cm;
     EXPECT_TRUE(user_common_207190406_209543255::isDroneSpawnPassable(
         hidden_map, drone_small_radius, world_spawn));
+}
+
+TEST(SimulationCoordUtil, WorldSpawnAddsOnlyZOffset) {
+    using common::z_extent;
+    const common::Position3D local{
+        10.0 * x_extent[cm], 20.0 * y_extent[cm], 5.0 * z_extent[cm]};
+    const common::Position3D world =
+        user_common_207190406_209543255::worldInitialDronePosition(
+            local, 40.0 * z_extent[cm]);
+    EXPECT_EQ(world.x, local.x);
+    EXPECT_EQ(world.y, local.y);
+    EXPECT_EQ(world.z, 45.0 * z_extent[cm]);
+}
+
+TEST(SimulationCoordUtil, SphereWalkSkipsOutsideRadiusThenHitsOccupied) {
+    FakeMap3D map(makeConfig(/*resolution_cm=*/10.0, /*max_bound_cm=*/100.0),
+                  common::types::VoxelOccupancy::Empty);
+    int samples = 0;
+    user_common_207190406_209543255::forEachSphereSample(
+        map,
+        common::Position3D{50.0 * common::x_extent[common::cm],
+                           50.0 * common::y_extent[common::cm],
+                           50.0 * common::z_extent[common::cm]},
+        15.0 * common::cm, [&](const common::Position3D&) {
+            ++samples;
+            return true;
+        });
+    EXPECT_GT(samples, 1);
 }

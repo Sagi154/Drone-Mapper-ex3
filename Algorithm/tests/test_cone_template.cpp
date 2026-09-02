@@ -168,7 +168,7 @@ TEST(ConeTemplate, NearFieldSamplesCoverExactlyInsideZMin) {
     const auto& templates = cache.get(lidar, config.resolution);
     ASSERT_FALSE(templates.empty());
 
-    const double step = templates.front().step_cm;
+    const double step = templates.front().step.numerical_value_in(common::cm);
     ASSERT_GT(step, 0.0);
     std::size_t expected = 0;
     for (double dist = step; dist < 20.0 - 1e-9; dist += step) {

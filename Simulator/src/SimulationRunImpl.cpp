@@ -143,7 +143,8 @@ types::SimulationResult SimulationRunImpl::run() {
         result.mission_score = -1.0;
     } else {
         const common::Position3D spawn =
-            user_common_207190406_209543255::worldInitialDronePosition(simulation_config_);
+            user_common_207190406_209543255::worldInitialDronePosition(
+                simulation_config_.initial_drone_position, simulation_config_.map_offset.z);
         result.mission_score = MapsComparison::compare(*hidden_map_, *output_map_, spawn);
     }
     return result;

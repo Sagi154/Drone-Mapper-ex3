@@ -2,6 +2,7 @@
 
 #include "FakeMap3D.h"
 
+#include <user_common_207190406_209543255/BeamMath.h>
 #include <user_common_207190406_209543255/LidarCone.h>
 
 #include <gtest/gtest.h>
@@ -194,4 +195,22 @@ TEST(LidarCone, NearFieldInsideZMinIsCounted) {
 
     std::unordered_set<std::int64_t> seen;
     EXPECT_EQ(lc::countUnresolvedVoxels(map, origin, Orientation{}, Orientation{}, cfg, seen), 1u);
+}
+
+TEST(BeamMath, PointAlongBeamPlusXKeepsQuantityTypes) {
+    using common::cm;
+    using common::deg;
+    using common::x_extent;
+    const auto p = user_common_207190406_209543255::beam_math::pointAlongBeam(
+        common::Position3D{}, common::Orientation{0.0 * deg, 0.0 * deg}, 10.0 * cm);
+    EXPECT_NEAR(p.x.numerical_value_in(common::cm), 10.0, 1e-9);
+    EXPECT_NEAR(p.y.numerical_value_in(common::cm), 0.0, 1e-9);
+    EXPECT_NEAR(p.z.numerical_value_in(common::cm), 0.0, 1e-9);
+}
+
+TEST(BeamMath, MissDistanceUsesNamedSentinel) {
+    using user_common_207190406_209543255::beam_math::isMissDistance;
+    using user_common_207190406_209543255::kLidarMissDistance;
+    EXPECT_TRUE(isMissDistance(kLidarMissDistance));
+    EXPECT_FALSE(isMissDistance(0.0 * common::cm));
 }
