@@ -54,10 +54,14 @@ Position3D pointAlongBeam(const Position3D& origin, const Orientation& beam_orie
     const auto dx = cos_altitude * si::cos(beam.horizontal);
     const auto dy = cos_altitude * si::sin(beam.horizontal);
     const auto dz = si::sin(beam.altitude);
+    const double dir_x = dx.force_numerical_value_in(mp::one);
+    const double dir_y = dy.force_numerical_value_in(mp::one);
+    const double dir_z = dz.force_numerical_value_in(mp::one);
+    const double distance_cm = distance.force_numerical_value_in(cm);
     return Position3D{
-        origin.x + mp::quantity_cast<x_extent>(dx * distance),
-        origin.y + mp::quantity_cast<y_extent>(dy * distance),
-        origin.z + mp::quantity_cast<z_extent>(dz * distance),
+        origin.x + dir_x * distance_cm * x_extent[cm],
+        origin.y + dir_y * distance_cm * y_extent[cm],
+        origin.z + dir_z * distance_cm * z_extent[cm],
     };
 }
 

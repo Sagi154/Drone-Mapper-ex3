@@ -24,25 +24,30 @@ void forEachSphereSample(const common::IMap3D& map, const common::Position3D& ce
     if (cfg.resolution <= 0.0 * common::cm || radius < 0.0 * common::cm) {
         return;
     }
-    const int steps = static_cast<int>(
-        std::ceil((radius / cfg.resolution).numerical_value_in(mp_units::one)));
     using common::cm;
     using common::x_extent;
     using common::y_extent;
     using common::z_extent;
+    const double res_cm = cfg.resolution.numerical_value_in(cm);
+    const double r_cm = radius.numerical_value_in(cm);
+    const double cx = center.x.numerical_value_in(cm);
+    const double cy = center.y.numerical_value_in(cm);
+    const double cz = center.z.numerical_value_in(cm);
+    const int steps = static_cast<int>(std::ceil(r_cm / res_cm));
+    const double r2 = r_cm * r_cm;
     for (int dx = -steps; dx <= steps; ++dx) {
         for (int dy = -steps; dy <= steps; ++dy) {
             for (int dz = -steps; dz <= steps; ++dz) {
-                const auto ox = static_cast<double>(dx) * cfg.resolution;
-                const auto oy = static_cast<double>(dy) * cfg.resolution;
-                const auto oz = static_cast<double>(dz) * cfg.resolution;
-                if (ox * ox + oy * oy + oz * oz > radius * radius) {
+                const double ox = dx * res_cm;
+                const double oy = dy * res_cm;
+                const double oz = dz * res_cm;
+                if (ox * ox + oy * oy + oz * oz > r2) {
                     continue;
                 }
                 const common::Position3D sample{
-                    center.x + mp_units::quantity_cast<x_extent>(ox),
-                    center.y + mp_units::quantity_cast<y_extent>(oy),
-                    center.z + mp_units::quantity_cast<z_extent>(oz),
+                    (cx + ox) * x_extent[cm],
+                    (cy + oy) * y_extent[cm],
+                    (cz + oz) * z_extent[cm],
                 };
                 if (!fn(sample)) {
                     return;
