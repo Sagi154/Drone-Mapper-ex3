@@ -42,10 +42,6 @@ struct ConeTemplate {
 
 } // namespace detail
 
-// Backward-compatibility aliases so existing callers don't need to be updated.
-using BeamRun = detail::BeamRun;
-using ConeTemplate = detail::ConeTemplate;
-
 // ── VoxelStamp: per-beam deduplication helper ─────────────────────────────────
 
 class VoxelStamp {

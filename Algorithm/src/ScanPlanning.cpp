@@ -49,7 +49,7 @@ constexpr Offset kFaceOffsets[6] = {
 struct ScoredDirection {
     std::size_t gain = 0;
     Orientation direction{};
-    const ctpl::ConeTemplate* cone = nullptr;
+    const ctpl::detail::ConeTemplate* cone = nullptr;
 };
 
 [[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
@@ -109,11 +109,11 @@ struct ScoredDirection {
     return lidar.z_max <= kShortRangeLidarMax;
 }
 
-[[nodiscard]] const ctpl::ConeTemplate* closestTemplate(
-    const std::vector<ctpl::ConeTemplate>& templates, const Orientation& probe) {
-    const ctpl::ConeTemplate* best = nullptr;
+[[nodiscard]] const ctpl::detail::ConeTemplate* closestTemplate(
+    const std::vector<ctpl::detail::ConeTemplate>& templates, const Orientation& probe) {
+    const ctpl::detail::ConeTemplate* best = nullptr;
     double best_dist = 0.0;
-    for (const ctpl::ConeTemplate& cone : templates) {
+    for (const ctpl::detail::ConeTemplate& cone : templates) {
         const double dist = angularDistance(probe, cone.direction);
         if (best == nullptr || dist < best_dist) {
             best = &cone;
@@ -123,7 +123,7 @@ struct ScoredDirection {
     return best;
 }
 
-[[nodiscard]] std::size_t countConeGain(const ctpl::ConeTemplate& cone,
+[[nodiscard]] std::size_t countConeGain(const ctpl::detail::ConeTemplate& cone,
                                         const common::IMap3D& map,
                                         const Position3D& origin,
                                         const types::LidarConfigData& lidar,
@@ -143,7 +143,7 @@ struct ScoredDirection {
 }
 
 [[nodiscard]] std::optional<ScoredDirection> scoreTemplate(
-    const ctpl::ConeTemplate& cone,
+    const ctpl::detail::ConeTemplate& cone,
     const common::IMap3D& map,
     const Position3D& origin,
     const types::LidarConfigData& lidar,
@@ -210,12 +210,12 @@ std::vector<Orientation> buildSweepDirections(
     const Position3D& origin,
     const types::LidarConfigData& lidar,
     const FrontierCells& frontier,
-    const std::vector<ctpl::ConeTemplate>& templates,
+    const std::vector<ctpl::detail::ConeTemplate>& templates,
     ctpl::VoxelStamp& stamp) {
     std::vector<ScoredDirection> scored;
     scored.reserve(templates.size());
     const types::MapConfig bounds = map.getMapConfig();
-    for (const ctpl::ConeTemplate& cone : templates) {
+    for (const ctpl::detail::ConeTemplate& cone : templates) {
         if (const auto entry = scoreTemplate(cone, map, origin, lidar, frontier, bounds, stamp)) {
             scored.push_back(*entry);
         }
@@ -256,7 +256,7 @@ std::optional<Orientation> bestTravelScan(
     const Position3D& next_waypoint,
     const types::LidarConfigData& lidar,
     const FrontierCells& frontier,
-    const std::vector<ctpl::ConeTemplate>& templates,
+    const std::vector<ctpl::detail::ConeTemplate>& templates,
     ctpl::VoxelStamp& stamp) {
     if (templates.empty()) {
         return std::nullopt;
@@ -281,7 +281,7 @@ std::optional<Orientation> bestTravelScan(
 
     const types::MapConfig config = map.getMapConfig();
     for (const Orientation& probe : probes) {
-        const ctpl::ConeTemplate* cone = closestTemplate(templates, probe);
+        const ctpl::detail::ConeTemplate* cone = closestTemplate(templates, probe);
         if (cone == nullptr) {
             continue;
         }

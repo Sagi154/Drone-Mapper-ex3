@@ -57,7 +57,7 @@ namespace ct = common::types;
 }
 
 [[nodiscard]] std::unordered_set<std::int64_t> templateKeys(
-    const ctpl::ConeTemplate& cone, const Map& map, const Position3D& origin) {
+    const ctpl::detail::ConeTemplate& cone, const Map& map, const Position3D& origin) {
     ctpl::VoxelStamp stamp;
     stamp.begin(map.getMapConfig(), origin, 80.0 * cm);
     std::unordered_set<std::int64_t> keys;

@@ -181,8 +181,8 @@ constexpr std::size_t kMaxSweepReserve = 8;
         candidate.waypoints = std::move(waypoints);
         candidate.target_cluster_cells = clusterScore(*cluster, rank_volume);
         candidate.expected_rate = rate;
-        candidate.target_keys = cluster->keys;
-        candidate.frontier_cells = reach.frontier_cells;
+        candidate.internals.target_keys = cluster->keys;
+        candidate.internals.frontier_cells = reach.frontier_cells;
         candidates.push_back(std::move(candidate));
     }
     return candidates;
@@ -251,7 +251,7 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
             forced.waypoints = stringPullConstantAltitude(in.map, drop.path, in.drone.radius);
             forced.target_cluster_cells = 1;
             forced.expected_rate = 1.0;
-            forced.frontier_cells = reach.frontier_cells;
+            forced.internals.frontier_cells = reach.frontier_cells;
             return forced;
         }
     }

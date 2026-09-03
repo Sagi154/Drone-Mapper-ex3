@@ -38,7 +38,7 @@ struct MissionVolumeSpans {
     const common::Position3D& origin,
     const common::types::LidarConfigData& lidar,
     const FrontierCells& frontier,
-    const std::vector<user_common_207190406_209543255::cone_template::ConeTemplate>&
+    const std::vector<user_common_207190406_209543255::cone_template::detail::ConeTemplate>&
         templates,
     user_common_207190406_209543255::cone_template::VoxelStamp& stamp);
 
@@ -49,7 +49,7 @@ struct MissionVolumeSpans {
     const common::Position3D& next_waypoint,
     const common::types::LidarConfigData& lidar,
     const FrontierCells& frontier,
-    const std::vector<user_common_207190406_209543255::cone_template::ConeTemplate>&
+    const std::vector<user_common_207190406_209543255::cone_template::detail::ConeTemplate>&
         templates,
     user_common_207190406_209543255::cone_template::VoxelStamp& stamp);
 

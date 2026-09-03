@@ -64,7 +64,6 @@ struct MappingAlgorithmImpl_207190406_209543255::Impl {
     bool has_progress_baseline = false;
     std::vector<detail::ExplorationPlan> pending_plans{};
     bool finished = false;
-    bool planning_initialized = false;
 };
 
 MappingAlgorithmImpl_207190406_209543255::~MappingAlgorithmImpl_207190406_209543255() = default;
@@ -72,13 +71,6 @@ MappingAlgorithmImpl_207190406_209543255::~MappingAlgorithmImpl_207190406_209543
 MappingAlgorithmImpl_207190406_209543255::MappingAlgorithmImpl_207190406_209543255(
     common::MappingAlgorithmDependencies dependencies)
     : common::IMappingAlgorithm(dependencies), impl_(std::make_unique<Impl>()) {}
-
-void MappingAlgorithmImpl_207190406_209543255::ensurePlanningReady() {
-    if (impl_->planning_initialized) {
-        return;
-    }
-    impl_->planning_initialized = true;
-}
 
 bool MappingAlgorithmImpl_207190406_209543255::samePosition(const Position3D& a,
                                                            const Position3D& b) const {
@@ -187,8 +179,8 @@ bool MappingAlgorithmImpl_207190406_209543255::popPendingPlan(const types::Drone
     while (!impl_->pending_plans.empty()) {
         detail::ExplorationPlan candidate = std::move(impl_->pending_plans.front());
         impl_->pending_plans.erase(impl_->pending_plans.begin());
-        if (!candidate.target_keys.empty() &&
-            !detail::clusterStillFrontier(output_map_, candidate.target_keys)) {
+        if (!candidate.internals.target_keys.empty() &&
+            !detail::clusterStillFrontier(output_map_, candidate.internals.target_keys)) {
             continue;
         }
         adoptPlan(std::move(candidate), state);
@@ -205,7 +197,7 @@ void MappingAlgorithmImpl_207190406_209543255::adoptPlan(detail::ExplorationPlan
     impl_->arrival_scan_index = 0;
     impl_->steps_since_replan = 0;
     impl_->has_plan = impl_->plan.valid;
-    impl_->last_frontier = impl_->plan.frontier_cells;
+    impl_->last_frontier = impl_->plan.internals.frontier_cells;
     if (impl_->has_plan && impl_->plan.waypoints.empty()) {
         buildArrivalSweep(state, output_map_.getMapConfig());
         if (impl_->arrival_scans.empty()) {
@@ -228,10 +220,10 @@ void MappingAlgorithmImpl_207190406_209543255::buildArrivalSweep(
 }
 
 bool MappingAlgorithmImpl_207190406_209543255::targetClusterAlive() const {
-    if (impl_->plan.target_keys.empty()) {
+    if (impl_->plan.internals.target_keys.empty()) {
         return true;
     }
-    return detail::clusterStillFrontier(output_map_, impl_->plan.target_keys);
+    return detail::clusterStillFrontier(output_map_, impl_->plan.internals.target_keys);
 }
 
 types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
@@ -260,11 +252,14 @@ types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
     return next;
 }
 
-types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::finishIfUnmapped() const {
+types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::finishIfUnmapped(
+    std::optional<std::size_t> known_unmapped) const {
     types::MappingStepCommand cmd{};
-    cmd.status = detail::hasAnyNotMappedInBounds(output_map_)
-                     ? types::AlgorithmStatus::FinishedWithUnmappableVoxels
-                     : types::AlgorithmStatus::Finished;
+    const bool any_unmapped = known_unmapped.has_value()
+                                  ? *known_unmapped > 0
+                                  : detail::hasAnyNotMappedInBounds(output_map_);
+    cmd.status = any_unmapped ? types::AlgorithmStatus::FinishedWithUnmappableVoxels
+                              : types::AlgorithmStatus::Finished;
     return cmd;
 }
 
@@ -383,7 +378,6 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     }
 
     const types::MapConfig map_config = output_map_.getMapConfig();
-    ensurePlanningReady();
     pruneExpiredBlockedCells(state.step_index);
 
     if (impl_->has_plan && impl_->waypoint_index < impl_->plan.waypoints.size() &&
@@ -425,7 +419,7 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     ++impl_->steps_since_replan;
 
     if (updateProgressWindow()) {
-        return finishIfUnmapped();
+        return finishIfUnmapped(impl_->unmapped_at_progress_mark);
     }
 
     return emitMovementOrScan(state, map_config);
