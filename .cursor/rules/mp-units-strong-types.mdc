@@ -49,6 +49,15 @@ Voxel indices are the legitimate exception: they are dimensionless `std::size_t`
 map implementation from `(pos - offset) / resolution`. Keep that conversion in one place
 (`docs/map3d-contract.md`), not scattered across the algorithm.
 
+**Score / libm parity (Ex3):** quantity-path `si::cos` / `si::sin` and some `quantity_cast` multiplies
+do **not** match main’s unwrap → `std::cos`/`std::sin`(deg·π/180) → rewrap float order. That drift
+changes outdoor trajectories and `sim_compose.yaml` scores. Hot paths that must stay bit-identical to
+main may unwrap to `double` **inside the `.cpp`**, compute with libm, then rewrap to
+`PhysicalLength` / `Position3D` / angles before returning across an API. Public APIs and stored fields
+must still be strong types (e16). Do not invent new `double distance_cm` parameters or `double x,y,z`
+structs. Document intentional sites in `docs/advcpp-rubric-review.md` and
+`docs/benchmarks/2026-09-03-main-score-parity.md`.
+
 ## Aliases
 
 `Units.h` already provides `mp`, `isq`, `si`, `cm`, and `deg` inside `namespace common`. Use those.

@@ -2,6 +2,7 @@
 
 **Written to this file:** 2026-09-03.  
 **Re-verify:** 2026-09-03 (four explore groups A–D against the live tree after Tasks 1–7 on `fix-advcpp-rubric-findings`, plus leftover-site cleanup in Task 8).  
+**Score-parity follow-up:** 2026-09-03 (libm unwrap in movement/beam/sphere/scoring/planner hot paths so all 24 `sim_compose.yaml` scores match `main` `9374aea`; see `docs/benchmarks/2026-09-03-main-score-parity.md`).  
 **How to read this:** `e01`–`e23` are grader judgment from `context/Error Code Key.xlsx` / `docs/review-error-codes.md`. A site here is “worth a second look,” not an automated FAIL. `b*` codes are runtime deductions and are **not** in this table.
 
 Severity: **m** = minor, **n** = normal, **s** = severe (spreadsheet columns).
@@ -31,6 +32,16 @@ Rows below are **new** nits this pass named. They are not the 2026-09-02 combine
 
 `HLD.pdf` is at the repo root (**205,402** bytes).
 
+### Score / libm parity (accepted e03 risk)
+
+Full quantity-path trig (`si::cos` / `si::sin` + `quantity_cast` multiplies) changed outdoor float order vs `main` and broke score parity on long missions. We restored **unwrap → libm → rewrap** inside hot `.cpp` files while keeping strong-typed APIs and stored fields (e16). That is an intentional e03 soft risk documented in `.cursor/rules/mp-units-strong-types.mdc` (“Score / libm parity”). Do **not** “fix” those sites back to quantity-path math without re-running the 24-cell matrix.
+
+**Intentional unwrap sites (keep):** `MockMovement` advance/elevate/rotate limits+trig, `MockGPS` snap, `BeamMath::pointAlongBeam` dir×distance, `forEachSphereSample` cm loop, `MapsComparison` quantize/compare scalars, Algorithm planner `atan2`/distance unwraps in `MappingAlgorithmImpl` / `PathShaping` / `ScanPlanning` / `WavefrontPlanner` / Frontier helpers.
+
+**Still open e03 (not required for score parity):** LidarCone / ConeTemplate / `normalizeOrientation` / MockLidar local normalize / factory resolution factor — quantity cleanup remains desirable there.
+
+Clean fair timing 2026-09-03: branch vs `main` **24/24 scores identical**; walls ~176s vs ~171s (noise). Details: `docs/benchmarks/2026-09-03-main-score-parity.md`.
+
 ---
 
 ## Combined findings table
@@ -39,18 +50,19 @@ Rows below are **new** nits this pass named. They are not the 2026-09-02 combine
 |------|-------------|-----|---------|---------------|
 | e01 | *(our headers)* | — | No obvious violations. | — |
 | e02 | *(our headers)* | — | No obvious violations. I/O is three headers (`SimulatorPaths`, `SimulatorReports`, `YamlConfigParsers`). | — |
-| e03 | `Algorithm/src/MappingAlgorithmImpl.cpp:116` | s | `movementToward` unwraps `dx`/`dy` for `std::atan2`, then wraps heading/`max_rotate` in `double`. | `si::atan2` on lengths; keep `HorizontalAngle` through wrap/clamp. |
-| e03 | `Algorithm/src/PathShaping.cpp:85` | s | `stepCostForPath` unwraps advance/elevate/rotate and heading, then `atan2` + `wrapDeg` on `double`. | Quantity `ceil` of `abs(dz)/max_elevate` (and planar/turn); `si::atan2`. |
-| e03 | `Algorithm/src/ScanPlanning.cpp:272` | s | `bestTravelScan` unwraps planar delta for `std::atan2` → heading. | `si::atan2(dy, dx)` into `HorizontalAngle`. |
-| e03 | `UserCommon/include/user_common_207190406_209543255/LidarCone.h:83` | s | `forEachConeBeam` unwraps lengths/angles, then cone basis/trig in `double`. | Same construction with `si::sin` / `si::cos` / `si::atan2`. |
-| e03 | `UserCommon/src/LidarCone.cpp:13` | s | `coneHalfAngleRad` unwraps `z_min`/`d` for `std::atan2`. | `si::atan2` on quantities. |
-| e03 | `UserCommon/src/LidarCone.cpp:77` | s | `fibonacciSphereOrientations` builds azimuth/elevation in `double`. | Quantity angles; reuse `beam_math::normalizeOrientation`. |
-| e03 | `UserCommon/src/BeamMath.cpp:45` | s | `normalizeOrientation` unwraps both angles into `wrapDeg(double)`. | Wrap as `HorizontalAngle` / `AltitudeAngle`. |
-| e03 | `Simulator/src/MockLidar.cpp:42` | s | Local `normalize_orientation` duplicates that unwrap. | Call `beam_math::normalizeOrientation`. |
-| e03 | `UserCommon/src/ConeTemplate.cpp:132` | s | `build` unwraps `pointAlongBeam(..., 1.0 * cm)` into `BeamRun` doubles. | Store `PhysicalLength` components. |
-| e03 | `Simulator/src/MapsComparison.cpp:88` | s | `quantizePosition` unwraps pos/bounds/resolution to `double` (BFS itself is integer-index now). | Same quantity-division pattern as `gridExtent`. |
-| e03 | `Simulator/src/SimulationRunFactoryImpl.cpp:62` | s | Output resolution is `(map_resolution.force_numerical_value_in(cm) / factor) * cm`. | `sim.map_resolution / factor`. |
-| e03 | `Algorithm/src/ScanPlanning.cpp:74` | s | `angularDistance` unwraps `cm*cm` for `std::clamp`. | Clamp/compare the quantity (or a dimensionless ratio). |
+| e03 | `Algorithm/src/MappingAlgorithmImpl.cpp` | s | `movementToward` unwraps for `std::atan2` (score/libm parity). | **Accepted** — see Score / libm parity. |
+| e03 | `Algorithm/src/PathShaping.cpp` | s | `stepCostForPath` unwraps advance/elevate/rotate + `atan2` (parity). | **Accepted** — see Score / libm parity. |
+| e03 | `Algorithm/src/ScanPlanning.cpp` | s | Travel/angular helpers unwrap planar/`clamp` math (parity). | **Accepted** — see Score / libm parity. |
+| e03 | `Simulator/src/MockMovement.cpp` | s | Advance uses libm `cos`/`sin`(deg·π/180); limits via unwrapped cm/deg. | **Accepted** — see Score / libm parity. |
+| e03 | `Simulator/src/MockGPS.cpp` | s | Snap rounds in cm `double` then rewraps axes. | **Accepted** — see Score / libm parity. |
+| e03 | `UserCommon/src/BeamMath.cpp` | s | `pointAlongBeam` multiplies dir×distance in cm doubles; `normalizeOrientation` still unwraps into `wrapDeg(double)`. | Beam step: **Accepted** (parity). Wrap: prefer typed angles if cheap. |
+| e03 | `UserCommon/.../SimulationCoordUtil.h` | s | Sphere sample loop unwraps cm for index/`r2` then rewraps `Position3D`. | **Accepted** — see Score / libm parity. |
+| e03 | `Simulator/src/MapsComparison.cpp` | s | Quantize/compare use cm doubles (parity with main scorer). | **Accepted** — see Score / libm parity. |
+| e03 | `UserCommon/include/.../LidarCone.h` | s | `forEachConeBeam` unwraps lengths/angles, then cone basis/trig in `double`. | Same construction with `si::sin` / `si::cos` / `si::atan2`. |
+| e03 | `UserCommon/src/LidarCone.cpp` | s | `coneHalfAngleRad` / fibonacci sphere use unwrapped trig. | `si::atan2` / quantity angles; reuse `beam_math::normalizeOrientation`. |
+| e03 | `Simulator/src/MockLidar.cpp` | s | Local `normalize_orientation` duplicates unwrap. | Call `beam_math::normalizeOrientation`. |
+| e03 | `UserCommon/src/ConeTemplate.cpp` | s | `build` unwraps `pointAlongBeam(..., 1.0 * cm)` into `BeamRun` doubles. | Store `PhysicalLength` components. |
+| e03 | `Simulator/src/SimulationRunFactoryImpl.cpp` | s | Output resolution is `(map_resolution.force_numerical_value_in(cm) / factor) * cm`. | `sim.map_resolution / factor`. |
 | e04 | `UserCommon/src/ConeTemplate.cpp:89` | n | Cache hit test is `==` on unwrapped `double` keys. | Compare `PhysicalLength` members. |
 | e04 | `Algorithm/src/ScanPlanning.cpp:44` | n | Neighbor table is a C array `kFaceOffsets[6]`. | `constexpr std::array`. |
 | e04 | `Algorithm/src/MappingAlgorithmFrontier.cpp:49` | n | Same C-array 6-neighbor table. | `std::array`. |
