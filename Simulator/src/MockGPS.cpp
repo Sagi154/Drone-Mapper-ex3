@@ -12,13 +12,11 @@ namespace simulator {
 
 namespace {
 
-[[nodiscard]] common::PhysicalLength snapToRes(common::PhysicalLength value,
-                                               common::PhysicalLength res) {
-    if (res <= 0.0 * common::cm) {
+double snapToCm(double value, double res_cm) {
+    if (res_cm <= 0.0) {
         return value;
     }
-    const double n = std::round((value / res).numerical_value_in(mp_units::one));
-    return n * res;
+    return std::round(value / res_cm) * res_cm;
 }
 
 } // namespace
@@ -39,17 +37,16 @@ common::Orientation MockGPS::heading() const {
 }
 
 void MockGPS::setPosition(const common::Position3D& position) {
+    using common::cm;
     using common::x_extent;
     using common::y_extent;
     using common::z_extent;
 
+    const double res_cm = resolution_.numerical_value_in(cm);
     position_ = common::Position3D{
-        mp_units::quantity_cast<x_extent>(
-            snapToRes(mp_units::quantity_cast<common::isq::length>(position.x), resolution_)),
-        mp_units::quantity_cast<y_extent>(
-            snapToRes(mp_units::quantity_cast<common::isq::length>(position.y), resolution_)),
-        mp_units::quantity_cast<z_extent>(
-            snapToRes(mp_units::quantity_cast<common::isq::length>(position.z), resolution_)),
+        snapToCm(position.x.numerical_value_in(cm), res_cm) * x_extent[cm],
+        snapToCm(position.y.numerical_value_in(cm), res_cm) * y_extent[cm],
+        snapToCm(position.z.numerical_value_in(cm), res_cm) * z_extent[cm],
     };
 }
 

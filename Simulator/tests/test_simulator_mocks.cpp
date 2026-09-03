@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <numbers>
 #include <stdexcept>
 #include <vector>
 
@@ -124,6 +125,23 @@ TEST(MockGPS, ZeroResolutionDoesNotSnap) {
 // ---------------------------------------------------------------------------
 // MockMovement tests
 // ---------------------------------------------------------------------------
+
+TEST(MockMovement, AdvanceAtAngleUsesLibmDegreeTrig) {
+    // Keep heading trig on libm cos/sin(deg * pi/180), not mp-units si::cos.
+    // Quantity-path trig diverges after many outdoor advances and changes scores.
+    GridMap map{20, 20, 20, 10.0};
+    simulator::MockGPS gps{
+        Position3D{50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]},
+        Orientation{45.0 * deg, 0.0 * deg},
+        0.0 * cm};
+    simulator::MockMovement mv{gps, map, makeDroneConfig(5.0, 200.0)};
+
+    const auto result = mv.advance(10.0 * cm);
+    EXPECT_TRUE(result.success);
+    const double rad = 45.0 * (std::numbers::pi / 180.0);
+    EXPECT_DOUBLE_EQ(gps.position().x.numerical_value_in(cm), 50.0 + 10.0 * std::cos(rad));
+    EXPECT_DOUBLE_EQ(gps.position().y.numerical_value_in(cm), 50.0 + 10.0 * std::sin(rad));
+}
 
 TEST(MockMovement, AdvanceLegalMoveSucceeds) {
     // 10x10x10 grid, 10 cm/cell, no walls — advance 50 cm forward (+X)

@@ -40,82 +40,54 @@ struct GridKeyHash {
     }
 };
 
-struct GridExtent {
-    int nx = 0;
-    int ny = 0;
-    int nz = 0;
-    MapConfig config{};
-};
-
 [[nodiscard]] bool isKnownOccupancy(VoxelOccupancy value) {
     return value == VoxelOccupancy::Empty || value == VoxelOccupancy::Occupied ||
            value == VoxelOccupancy::PotentiallyOccupied;
 }
 
-[[nodiscard]] GridExtent gridExtent(const common::IMap3D& map) {
-    GridExtent g;
-    g.config = map.getMapConfig();
-    if (g.config.resolution <= 0.0 * cm) {
-        return g;
-    }
-    const auto size_x = g.config.boundaries.max_x - g.config.boundaries.min_x;
-    const auto size_y = g.config.boundaries.max_y - g.config.boundaries.min_y;
-    const auto size_z = g.config.boundaries.max_height - g.config.boundaries.min_height;
-    g.nx = static_cast<int>(
-        std::lround((size_x / g.config.resolution).numerical_value_in(mp_units::one)));
-    g.ny = static_cast<int>(
-        std::lround((size_y / g.config.resolution).numerical_value_in(mp_units::one)));
-    g.nz = static_cast<int>(
-        std::lround((size_z / g.config.resolution).numerical_value_in(mp_units::one)));
-    return g;
-}
-
-[[nodiscard]] Position3D voxelCenter(const GridExtent& g, int ix, int iy, int iz) {
-    const auto& b = g.config.boundaries;
-    const auto res = g.config.resolution;
-    const auto ox = static_cast<double>(ix) * res;
-    const auto oy = static_cast<double>(iy) * res;
-    const auto oz = static_cast<double>(iz) * res;
-    return Position3D{
-        b.min_x + mp_units::quantity_cast<x_extent>(ox),
-        b.min_y + mp_units::quantity_cast<y_extent>(oy),
-        b.min_height + mp_units::quantity_cast<z_extent>(oz),
-    };
-}
-
-[[nodiscard]] GridKey quantizePosition(const Position3D& pos, const GridExtent& g) {
-    const auto& b = g.config.boundaries;
-    const double step = g.config.resolution.numerical_value_in(cm);
+[[nodiscard]] GridKey quantizePosition(const Position3D& pos, const MapConfig& config) {
+    const double step = config.resolution.numerical_value_in(cm);
+    const double ox = config.offset.x.numerical_value_in(cm);
+    const double oy = config.offset.y.numerical_value_in(cm);
+    const double oz = config.offset.z.numerical_value_in(cm);
+    const double px = pos.x.numerical_value_in(cm);
+    const double py = pos.y.numerical_value_in(cm);
+    const double pz = pos.z.numerical_value_in(cm);
     return GridKey{
-        static_cast<int>(
-            std::lround((pos.x.numerical_value_in(cm) - b.min_x.numerical_value_in(cm)) / step)),
-        static_cast<int>(
-            std::lround((pos.y.numerical_value_in(cm) - b.min_y.numerical_value_in(cm)) / step)),
-        static_cast<int>(
-            std::lround((pos.z.numerical_value_in(cm) - b.min_height.numerical_value_in(cm)) / step)),
+        static_cast<int>(std::lround((px - ox) / step)),
+        static_cast<int>(std::lround((py - oy) / step)),
+        static_cast<int>(std::lround((pz - oz) / step)),
     };
 }
 
 template <typename Visitor>
-void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
-    if (g.config.resolution <= 0.0 * cm) {
+void forEachGridCenter(const MapConfig& config, const Visitor& visitor) {
+    const double step = config.resolution.numerical_value_in(cm);
+    if (step <= 0.0) {
         return;
     }
-    for (int ix = 0; ix <= g.nx; ++ix) {
-        for (int iy = 0; iy <= g.ny; ++iy) {
-            for (int iz = 0; iz <= g.nz; ++iz) {
-                visitor(ix, iy, iz);
+
+    const auto& bounds = config.boundaries;
+    const double min_x = bounds.min_x.numerical_value_in(cm);
+    const double max_x = bounds.max_x.numerical_value_in(cm);
+    const double min_y = bounds.min_y.numerical_value_in(cm);
+    const double max_y = bounds.max_y.numerical_value_in(cm);
+    const double min_z = bounds.min_height.numerical_value_in(cm);
+    const double max_z = bounds.max_height.numerical_value_in(cm);
+
+    for (double x = min_x; x <= max_x + 1e-9; x += step) {
+        for (double y = min_y; y <= max_y + 1e-9; y += step) {
+            for (double z = min_z; z <= max_z + 1e-9; z += step) {
+                visitor(Position3D{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]});
             }
         }
     }
 }
 
-// BFS through Empty cells in `reference`, seeded at `spawn`, bounded by
-// `g` (the produced/output map's region). Occupied cells adjacent
-// to a visited Empty cell are added as "visible walls" (counted, not traversed).
 [[nodiscard]] std::unordered_set<GridKey, GridKeyHash> computeReachable(
-    const common::IMap3D& reference, const Position3D& spawn, const GridExtent& g) {
-    if (g.config.resolution <= 0.0 * cm) {
+    const common::IMap3D& reference, const Position3D& spawn, const MapConfig& scoring_config) {
+    const double step = scoring_config.resolution.numerical_value_in(cm);
+    if (step <= 0.0) {
         return {};
     }
 
@@ -126,7 +98,7 @@ void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
     std::unordered_set<GridKey, GridKeyHash> reachable;
     reachable.reserve(512);
 
-    const GridKey start = quantizePosition(spawn, g);
+    const GridKey start = quantizePosition(spawn, scoring_config);
     reachable.insert(start);
 
     static const int kDx[6] = {1, -1, 0, 0, 0, 0};
@@ -135,6 +107,10 @@ void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
 
     std::queue<GridKey> queue;
     queue.push(start);
+
+    const double ox = scoring_config.offset.x.numerical_value_in(cm);
+    const double oy = scoring_config.offset.y.numerical_value_in(cm);
+    const double oz = scoring_config.offset.z.numerical_value_in(cm);
 
     while (!queue.empty()) {
         const GridKey cur = queue.front();
@@ -146,7 +122,11 @@ void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
                 continue;
             }
 
-            const Position3D nb_pos = voxelCenter(g, nb.x, nb.y, nb.z);
+            const Position3D nb_pos{
+                (ox + static_cast<double>(nb.x) * step) * x_extent[cm],
+                (oy + static_cast<double>(nb.y) * step) * y_extent[cm],
+                (oz + static_cast<double>(nb.z) * step) * z_extent[cm],
+            };
 
             if (!reference.isInBounds(nb_pos)) {
                 continue;
@@ -158,7 +138,7 @@ void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
                 queue.push(nb);
             } else if (occ == VoxelOccupancy::Occupied ||
                        occ == VoxelOccupancy::PotentiallyOccupied) {
-                reachable.insert(nb); // visible wall — counted, not traversed
+                reachable.insert(nb);
             }
         }
     }
@@ -170,11 +150,11 @@ void forEachVoxelIndex(const GridExtent& g, const Visitor& visitor) {
 
 double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
                    std::optional<Position3D> spawn) {
-    const GridExtent g = gridExtent(target);
+    const MapConfig target_config = target.getMapConfig();
 
     std::optional<std::unordered_set<GridKey, GridKeyHash>> reachable_set;
     if (spawn.has_value()) {
-        auto rs = computeReachable(origin, *spawn, g);
+        auto rs = computeReachable(origin, *spawn, target_config);
         if (!rs.empty()) {
             reachable_set = std::move(rs);
         }
@@ -186,9 +166,7 @@ double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
     std::size_t correct = 0;
     std::size_t total = 0;
 
-    // Pass 1: reference cells within the target map's region.
-    forEachVoxelIndex(g, [&](int ix, int iy, int iz) {
-        const Position3D pos = voxelCenter(g, ix, iy, iz);
+    forEachGridCenter(target_config, [&](const Position3D& pos) {
         if (!target.isInBounds(pos)) {
             return;
         }
@@ -198,7 +176,7 @@ double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
             return;
         }
 
-        const GridKey key{ix, iy, iz};
+        const GridKey key = quantizePosition(pos, target_config);
         if (reachable_set.has_value() && !reachable_set->contains(key)) {
             return;
         }
@@ -216,10 +194,7 @@ double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
         }
     });
 
-    // Pass 2: target cells with known occupancy not already covered above
-    // (extra mapped area outside the reference's known region).
-    forEachVoxelIndex(g, [&](int ix, int iy, int iz) {
-        const Position3D pos = voxelCenter(g, ix, iy, iz);
+    forEachGridCenter(target_config, [&](const Position3D& pos) {
         if (!target.isInBounds(pos)) {
             return;
         }
@@ -229,8 +204,7 @@ double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
             return;
         }
 
-        const GridKey key{ix, iy, iz};
-        if (ref_keys.contains(key)) {
+        if (ref_keys.contains(quantizePosition(pos, target_config))) {
             return;
         }
 
