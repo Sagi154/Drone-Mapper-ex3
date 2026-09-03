@@ -6,13 +6,9 @@
 #include "ScanPlanning.h"
 #include "WavefrontPlanner.h"
 
-#include <user_common_207190406_209543255/BeamMath.h>
 #include <user_common_207190406_209543255/ConeTemplate.h>
 
 #include <Common/MappingAlgorithmRegistration.h>
-
-#include <mp-units/math.h>
-#include <mp-units/systems/si/math.h>
 
 #include <algorithm>
 #include <cmath>
@@ -23,7 +19,6 @@
 namespace algorithm_207190406_209543255 {
 
 namespace types = common::types;
-namespace bm = user_common_207190406_209543255::beam_math;
 using common::Orientation;
 using common::Position3D;
 using common::cm;
@@ -36,7 +31,7 @@ namespace {
 
 constexpr double kHalfStepTolerance = 0.5;
 constexpr std::size_t kMaxArrivalScans = 4;
-constexpr common::PhysicalLength kPositionEpsilon = 1e-6 * cm;
+constexpr double kPositionEpsilon = 1e-6;
 
 } // namespace
 
@@ -74,49 +69,51 @@ MappingAlgorithmImpl_207190406_209543255::MappingAlgorithmImpl_207190406_2095432
 
 bool MappingAlgorithmImpl_207190406_209543255::samePosition(const Position3D& a,
                                                            const Position3D& b) const {
-    const Position3D d = a - b;
-    return mp_units::abs(d.x) <= mp_units::quantity_cast<x_extent>(kPositionEpsilon) &&
-           mp_units::abs(d.y) <= mp_units::quantity_cast<y_extent>(kPositionEpsilon) &&
-           mp_units::abs(d.z) <= mp_units::quantity_cast<z_extent>(kPositionEpsilon);
+    const double dx = std::abs(a.x.force_numerical_value_in(cm) - b.x.force_numerical_value_in(cm));
+    const double dy = std::abs(a.y.force_numerical_value_in(cm) - b.y.force_numerical_value_in(cm));
+    const double dz = std::abs(a.z.force_numerical_value_in(cm) - b.z.force_numerical_value_in(cm));
+    return dx <= kPositionEpsilon && dy <= kPositionEpsilon && dz <= kPositionEpsilon;
 }
 
 bool MappingAlgorithmImpl_207190406_209543255::reachedWaypoint(
     const types::DroneState& state,
     const Position3D& target,
     const types::MapConfig& map_config) const {
-    const auto half = map_config.resolution * kHalfStepTolerance;
-    const Position3D d = state.position - target;
-    return mp_units::abs(d.x) <= mp_units::quantity_cast<x_extent>(half) &&
-           mp_units::abs(d.y) <= mp_units::quantity_cast<y_extent>(half) &&
-           mp_units::abs(d.z) <= mp_units::quantity_cast<z_extent>(half);
+    const double step = map_config.resolution.force_numerical_value_in(cm);
+    const double dx = std::abs(state.position.x.force_numerical_value_in(cm) -
+                               target.x.force_numerical_value_in(cm));
+    const double dy = std::abs(state.position.y.force_numerical_value_in(cm) -
+                               target.y.force_numerical_value_in(cm));
+    const double dz = std::abs(state.position.z.force_numerical_value_in(cm) -
+                               target.z.force_numerical_value_in(cm));
+    return dx <= step * kHalfStepTolerance && dy <= step * kHalfStepTolerance &&
+           dz <= step * kHalfStepTolerance;
 }
 
 std::optional<types::MovementCommand> MappingAlgorithmImpl_207190406_209543255::movementToward(
     const types::DroneState& state, const Position3D& target) const {
-    const auto dh = target.z - state.position.z;
-    if (mp_units::abs(dh) > mp_units::quantity_cast<z_extent>(kPositionEpsilon)) {
-        const auto limit = mp_units::quantity_cast<z_extent>(drone_config_.max_elevate);
+    const double dh =
+        target.z.force_numerical_value_in(cm) - state.position.z.force_numerical_value_in(cm);
+    if (std::abs(dh) > 1e-6) {
+        const double limit = drone_config_.max_elevate.force_numerical_value_in(cm);
         types::MovementCommand cmd{};
         cmd.type = types::MovementCommandType::Elevate;
-        cmd.distance = mp_units::quantity_cast<common::isq::length>(std::clamp(dh, -limit, limit));
+        cmd.distance = std::clamp(dh, -limit, limit) * cm;
         return cmd;
     }
 
-    const auto dx = target.x - state.position.x;
-    const auto dy = target.y - state.position.y;
-    if (mp_units::abs(dx) <= mp_units::quantity_cast<x_extent>(kPositionEpsilon) &&
-        mp_units::abs(dy) <= mp_units::quantity_cast<y_extent>(kPositionEpsilon)) {
+    const double dx =
+        target.x.force_numerical_value_in(cm) - state.position.x.force_numerical_value_in(cm);
+    const double dy =
+        target.y.force_numerical_value_in(cm) - state.position.y.force_numerical_value_in(cm);
+    if (std::abs(dx) < 1e-6 && std::abs(dy) < 1e-6) {
         types::MovementCommand cmd{};
         cmd.type = types::MovementCommandType::Hover;
         return cmd;
     }
 
-    const auto dx_len = mp_units::quantity_cast<common::isq::length>(dx);
-    const auto dy_len = mp_units::quantity_cast<common::isq::length>(dy);
-    const double target_heading =
-        std::atan2(dy_len.numerical_value_in(cm), dx_len.numerical_value_in(cm)) *
-        (180.0 / std::numbers::pi);
-    const double current_heading = state.heading.horizontal.numerical_value_in(deg);
+    const double target_heading = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
+    const double current_heading = state.heading.horizontal.force_numerical_value_in(deg);
     double delta = std::fmod(target_heading - current_heading, 360.0);
     if (delta > 180.0) {
         delta -= 360.0;
@@ -125,7 +122,7 @@ std::optional<types::MovementCommand> MappingAlgorithmImpl_207190406_209543255::
         delta += 360.0;
     }
 
-    const double rot_limit = drone_config_.max_rotate.numerical_value_in(deg);
+    const double rot_limit = drone_config_.max_rotate.force_numerical_value_in(deg);
     if (std::abs(delta) > 1e-6) {
         types::MovementCommand cmd{};
         cmd.type = types::MovementCommandType::Rotate;
@@ -135,10 +132,11 @@ std::optional<types::MovementCommand> MappingAlgorithmImpl_207190406_209543255::
         return cmd;
     }
 
-    const auto dist = mp_units::sqrt(dx_len * dx_len + dy_len * dy_len);
+    const double dist_cm = std::sqrt(dx * dx + dy * dy);
+    const double adv_limit = drone_config_.max_advance.force_numerical_value_in(cm);
     types::MovementCommand cmd{};
     cmd.type = types::MovementCommandType::Advance;
-    cmd.distance = std::min(dist, drone_config_.max_advance);
+    cmd.distance = std::min(dist_cm, adv_limit) * cm;
     return cmd;
 }
 
@@ -233,20 +231,32 @@ types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
     case types::MovementCommandType::Hover:
         break;
     case types::MovementCommandType::Rotate: {
-        const common::HorizontalAngle delta =
-            (movement.rotation == types::RotationDirection::Left) ? movement.angle
-                                                                 : -movement.angle;
-        next.heading.horizontal = state.heading.horizontal + delta;
+        const double delta = movement.angle.force_numerical_value_in(deg) *
+                             ((movement.rotation == types::RotationDirection::Left) ? 1.0 : -1.0);
+        next.heading.horizontal =
+            (state.heading.horizontal.force_numerical_value_in(deg) + delta) * deg;
         break;
     }
-    case types::MovementCommandType::Advance:
-        next.position = bm::pointAlongBeam(
-            state.position, Orientation{state.heading.horizontal, 0.0 * deg},
-            movement.distance);
+    case types::MovementCommandType::Advance: {
+        const double dist = movement.distance.force_numerical_value_in(cm);
+        const double heading_rad =
+            state.heading.horizontal.force_numerical_value_in(deg) * (std::numbers::pi / 180.0);
+        next.position = Position3D{
+            (state.position.x.force_numerical_value_in(cm) + dist * std::cos(heading_rad)) *
+                common::x_extent[cm],
+            (state.position.y.force_numerical_value_in(cm) + dist * std::sin(heading_rad)) *
+                common::y_extent[cm],
+            state.position.z,
+        };
         break;
+    }
     case types::MovementCommandType::Elevate:
-        next.position.z =
-            state.position.z + mp_units::quantity_cast<z_extent>(movement.distance);
+        next.position = Position3D{
+            state.position.x, state.position.y,
+            (state.position.z.force_numerical_value_in(cm) +
+             movement.distance.force_numerical_value_in(cm)) *
+                common::z_extent[cm],
+        };
         break;
     }
     return next;

@@ -3,9 +3,6 @@
 
 #include "MappingAlgorithmFrontier.h"
 
-#include <mp-units/math.h>
-#include <mp-units/systems/si/math.h>
-
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -51,12 +48,19 @@ constexpr Offset kOffsets[6] = {
     {0, -1, 0}, {0, 0, 1},  {0, 0, -1},
 };
 
+[[nodiscard]] double gridStepCm(const types::MapConfig& config) {
+    return config.resolution.force_numerical_value_in(cm);
+}
+
 [[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
-    const auto step = config.resolution;
+    const double step = gridStepCm(config);
+    const double ox = config.offset.x.force_numerical_value_in(cm);
+    const double oy = config.offset.y.force_numerical_value_in(cm);
+    const double oz = config.offset.z.force_numerical_value_in(cm);
     return Position3D{
-        config.offset.x + mp_units::quantity_cast<x_extent>(static_cast<double>(key.qx) * step),
-        config.offset.y + mp_units::quantity_cast<y_extent>(static_cast<double>(key.qy) * step),
-        config.offset.z + mp_units::quantity_cast<z_extent>(static_cast<double>(key.qz) * step),
+        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
+        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
+        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
     };
 }
 
@@ -82,36 +86,35 @@ constexpr Offset kOffsets[6] = {
 // step/2 intersects the closed sphere of radius at the origin. Centre-distance
 // (forEachSphereSample) skips face neighbours when radius < step; box nearest-point
 // restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
-[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz, PhysicalLength step,
-                                           PhysicalLength radius) {
+[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz, double step_cm,
+                                           double radius_cm) {
     if (dx == 0 && dy == 0 && dz == 0) {
         return true;
     }
-    const auto half = step * 0.5;
-    const auto ox = static_cast<double>(dx) * step;
-    const auto oy = static_cast<double>(dy) * step;
-    const auto oz = static_cast<double>(dz) * step;
-    const auto nearest1d = [half](PhysicalLength o) -> PhysicalLength {
-        if (0.0 * cm < o - half) {
+    const double half = step_cm * 0.5;
+    const double ox = static_cast<double>(dx) * step_cm;
+    const double oy = static_cast<double>(dy) * step_cm;
+    const double oz = static_cast<double>(dz) * step_cm;
+    const auto nearest1d = [half](double o) {
+        if (0.0 < o - half) {
             return o - half;
         }
-        if (0.0 * cm > o + half) {
+        if (0.0 > o + half) {
             return o + half;
         }
-        return PhysicalLength{};
+        return 0.0;
     };
-    const auto nx = nearest1d(ox);
-    const auto ny = nearest1d(oy);
-    const auto nz = nearest1d(oz);
-    return (nx * nx + ny * ny + nz * nz) <= (radius * radius);
+    const double nx = nearest1d(ox);
+    const double ny = nearest1d(oy);
+    const double nz = nearest1d(oz);
+    return (nx * nx + ny * ny + nz * nz) <= (radius_cm * radius_cm);
 }
 
 [[nodiscard]] bool isSpherePassable(const IMap3D& map,
                                     const Position3D& centre,
-                                    PhysicalLength radius,
-                                    PhysicalLength step,
+                                    double radius_cm,
+                                    double step_cm,
                                     const BlockedCells& blocked) {
-    // Treat Unmapped as passable: only confirmed Occupied or OutOfBounds blocks navigation.
     const types::VoxelOccupancy centre_occ = occupancyAt(map, centre);
     if (centre_occ == types::VoxelOccupancy::Occupied ||
         centre_occ == types::VoxelOccupancy::OutOfBounds) {
@@ -124,8 +127,12 @@ constexpr Offset kOffsets[6] = {
         return false;
     }
 
-    const int rx = static_cast<int>(std::ceil((radius / step).numerical_value_in(mp_units::one)));
-    const int rh = rx;
+    const double cx = centre.x.force_numerical_value_in(cm);
+    const double cy = centre.y.force_numerical_value_in(cm);
+    const double cz = centre.z.force_numerical_value_in(cm);
+
+    const int rx = static_cast<int>(std::ceil(radius_cm / step_cm));
+    const int rh = static_cast<int>(std::ceil(radius_cm / step_cm));
 
     for (int dx = -rx; dx <= rx; ++dx) {
         for (int dy = -rx; dy <= rx; ++dy) {
@@ -133,14 +140,17 @@ constexpr Offset kOffsets[6] = {
                 if (dx == 0 && dy == 0 && dz == 0) {
                     continue;
                 }
-                if (!sphereIntersectsCellBox(dx, dy, dz, step, radius)) {
+                if (!sphereIntersectsCellBox(dx, dy, dz, step_cm, radius_cm)) {
                     continue;
                 }
 
+                const double ox = dx * step_cm;
+                const double oy = dy * step_cm;
+                const double oz = dz * step_cm;
                 const Position3D probe{
-                    centre.x + mp_units::quantity_cast<x_extent>(static_cast<double>(dx) * step),
-                    centre.y + mp_units::quantity_cast<y_extent>(static_cast<double>(dy) * step),
-                    centre.z + mp_units::quantity_cast<z_extent>(static_cast<double>(dz) * step),
+                    (cx + ox) * x_extent[cm],
+                    (cy + oy) * y_extent[cm],
+                    (cz + oz) * z_extent[cm],
                 };
                 const types::VoxelOccupancy probe_occ = occupancyAt(map, probe);
                 if (probe_occ == types::VoxelOccupancy::Occupied) {
@@ -154,21 +164,28 @@ constexpr Offset kOffsets[6] = {
 
 [[nodiscard]] bool sphereContainsNotMapped(const IMap3D& map,
                                            const Position3D& centre,
-                                           PhysicalLength radius,
-                                           PhysicalLength step) {
-    const int rx = static_cast<int>(std::ceil((radius / step).numerical_value_in(mp_units::one)));
-    const int rh = rx;
+                                           double radius_cm,
+                                           double step_cm) {
+    const double cx = centre.x.force_numerical_value_in(cm);
+    const double cy = centre.y.force_numerical_value_in(cm);
+    const double cz = centre.z.force_numerical_value_in(cm);
+
+    const int rx = static_cast<int>(std::ceil(radius_cm / step_cm));
+    const int rh = static_cast<int>(std::ceil(radius_cm / step_cm));
 
     for (int dx = -rx; dx <= rx; ++dx) {
         for (int dy = -rx; dy <= rx; ++dy) {
             for (int dz = -rh; dz <= rh; ++dz) {
-                if (!sphereIntersectsCellBox(dx, dy, dz, step, radius)) {
+                if (!sphereIntersectsCellBox(dx, dy, dz, step_cm, radius_cm)) {
                     continue;
                 }
+                const double ox = dx * step_cm;
+                const double oy = dy * step_cm;
+                const double oz = dz * step_cm;
                 const Position3D probe{
-                    centre.x + mp_units::quantity_cast<x_extent>(static_cast<double>(dx) * step),
-                    centre.y + mp_units::quantity_cast<y_extent>(static_cast<double>(dy) * step),
-                    centre.z + mp_units::quantity_cast<z_extent>(static_cast<double>(dz) * step),
+                    (cx + ox) * x_extent[cm],
+                    (cy + oy) * y_extent[cm],
+                    (cz + oz) * z_extent[cm],
                 };
                 if (occupancyAt(map, probe) == types::VoxelOccupancy::Unmapped) {
                     return true;
@@ -207,8 +224,8 @@ struct BoundedSearchResult {
     const IMap3D& map,
     const types::MapConfig& config,
     const GridKey& start_key,
-    PhysicalLength radius,
-    PhysicalLength step,
+    double radius_cm,
+    double step_cm,
     const BlockedCells& blocked_cells,
     std::size_t max_expansions) {
     BoundedSearchResult out;
@@ -218,7 +235,7 @@ struct BoundedSearchResult {
         if (it != passable_memo.end()) {
             return it->second;
         }
-        const bool ok = isSpherePassable(map, pt, radius, step, blocked_cells);
+        const bool ok = isSpherePassable(map, pt, radius_cm, step_cm, blocked_cells);
         passable_memo.emplace(key, ok);
         return ok;
     };
@@ -359,21 +376,21 @@ struct BoundedSearchResult {
 template <typename Fn>
 void forEachInBoundsVoxel(const IMap3D& map, Fn&& fn) {
     const types::MapConfig config = map.getMapConfig();
-    const auto step = config.resolution;
-    if (!(step > 0.0 * cm)) {
+    const double step = gridStepCm(config);
+    if (step <= 0.0) {
         return;
     }
     const types::MappingBounds& bounds = config.boundaries;
-    const auto x_eps = 1e-9 * x_extent[cm];
-    const auto y_eps = 1e-9 * y_extent[cm];
-    const auto z_eps = 1e-9 * z_extent[cm];
-    for (auto x = bounds.min_x; x <= bounds.max_x + x_eps;
-         x += mp_units::quantity_cast<x_extent>(step)) {
-        for (auto y = bounds.min_y; y <= bounds.max_y + y_eps;
-             y += mp_units::quantity_cast<y_extent>(step)) {
-            for (auto z = bounds.min_height; z <= bounds.max_height + z_eps;
-                 z += mp_units::quantity_cast<z_extent>(step)) {
-                if (!fn(Position3D{x, y, z})) {
+    const double min_x = bounds.min_x.force_numerical_value_in(cm);
+    const double max_x = bounds.max_x.force_numerical_value_in(cm);
+    const double min_y = bounds.min_y.force_numerical_value_in(cm);
+    const double max_y = bounds.max_y.force_numerical_value_in(cm);
+    const double min_z = bounds.min_height.force_numerical_value_in(cm);
+    const double max_z = bounds.max_height.force_numerical_value_in(cm);
+    for (double x = min_x; x <= max_x + 1e-9; x += step) {
+        for (double y = min_y; y <= max_y + 1e-9; y += step) {
+            for (double z = min_z; z <= max_z + 1e-9; z += step) {
+                if (!fn(Position3D{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]})) {
                     return;
                 }
             }
@@ -384,28 +401,27 @@ void forEachInBoundsVoxel(const IMap3D& map, Fn&& fn) {
 } // namespace
 
 GridKey quantizePosition(const Position3D& pos, const types::MapConfig& config) {
-    const auto qx = ((pos.x - config.offset.x) /
-                     mp_units::quantity_cast<x_extent>(config.resolution))
-                        .numerical_value_in(mp_units::one);
-    const auto qy = ((pos.y - config.offset.y) /
-                     mp_units::quantity_cast<y_extent>(config.resolution))
-                        .numerical_value_in(mp_units::one);
-    const auto qz = ((pos.z - config.offset.z) /
-                     mp_units::quantity_cast<z_extent>(config.resolution))
-                        .numerical_value_in(mp_units::one);
+    const double step = gridStepCm(config);
+    const double ox = config.offset.x.force_numerical_value_in(cm);
+    const double oy = config.offset.y.force_numerical_value_in(cm);
+    const double oz = config.offset.z.force_numerical_value_in(cm);
+    const double px = pos.x.force_numerical_value_in(cm);
+    const double py = pos.y.force_numerical_value_in(cm);
+    const double pz = pos.z.force_numerical_value_in(cm);
     return GridKey{
-        static_cast<int>(std::lround(qx)),
-        static_cast<int>(std::lround(qy)),
-        static_cast<int>(std::lround(qz)),
+        static_cast<int>(std::lround((px - ox) / step)),
+        static_cast<int>(std::lround((py - oy) / step)),
+        static_cast<int>(std::lround((pz - oz) / step)),
     };
 }
 
 bool hasNotMappedInSphere(const IMap3D& map, const Position3D& centre, PhysicalLength radius) {
-    const auto step = map.getMapConfig().resolution;
-    if (!(step > 0.0 * cm)) {
+    const double step = gridStepCm(map.getMapConfig());
+    if (step <= 0.0) {
         return false;
     }
-    return sphereContainsNotMapped(map, centre, radius, step);
+    const double radius_cm = radius.force_numerical_value_in(cm);
+    return sphereContainsNotMapped(map, centre, radius_cm, step);
 }
 
 std::size_t countUnmappedInBounds(const IMap3D& map) {
@@ -438,17 +454,18 @@ FrontierPathResult MappingAlgorithmFrontier::findPathTo(
     PhysicalLength drone_radius,
     const BlockedCells& blocked_cells) const {
     const types::MapConfig config = map.getMapConfig();
-    const auto step = config.resolution;
+    const double step = gridStepCm(config);
+    const double radius_cm = drone_radius.force_numerical_value_in(cm);
 
     const GridKey start_key = quantizePosition(start, config);
     const GridKey goal_key = quantizePosition(goal, config);
     const Position3D start_pt = keyToPoint(start_key, config);
     const Position3D goal_pt = keyToPoint(goal_key, config);
 
-    if (!isSpherePassable(map, start_pt, drone_radius, step, blocked_cells)) {
+    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
         return {};
     }
-    if (!isSpherePassable(map, goal_pt, drone_radius, step, blocked_cells)) {
+    if (!isSpherePassable(map, goal_pt, radius_cm, step, blocked_cells)) {
         return {};
     }
     if (start_key == goal_key) {
@@ -481,7 +498,7 @@ FrontierPathResult MappingAlgorithmFrontier::findPathTo(
         for (const Offset& off : kOffsets) {
             const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
             const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!isSpherePassable(map, neighbour_pt, drone_radius, step, blocked_cells)) {
+            if (!isSpherePassable(map, neighbour_pt, radius_cm, step, blocked_cells)) {
                 continue;
             }
             const int new_cost = current_cost + traversalCost(map, neighbour_pt);
@@ -501,11 +518,12 @@ FrontierPathResult MappingAlgorithmFrontier::findUnstickPath(const IMap3D& map,
                                                              const Position3D& start,
                                                              PhysicalLength drone_radius) const {
     const types::MapConfig config = map.getMapConfig();
-    const auto step = config.resolution;
+    const double step = gridStepCm(config);
+    const double radius_cm = drone_radius.force_numerical_value_in(cm);
 
     const GridKey start_key = quantizePosition(start, config);
     const Position3D start_pt = keyToPoint(start_key, config);
-    if (isSpherePassable(map, start_pt, drone_radius, step, {})) {
+    if (isSpherePassable(map, start_pt, radius_cm, step, {})) {
         return {};
     }
 
@@ -518,7 +536,7 @@ FrontierPathResult MappingAlgorithmFrontier::findUnstickPath(const IMap3D& map,
         const GridKey neighbour{start_key.qx + off.dx, start_key.qy + off.dy,
                                 start_key.qz + off.dz};
         const Position3D neighbour_pt = keyToPoint(neighbour, config);
-        if (isSpherePassable(map, neighbour_pt, drone_radius, step, {})) {
+        if (isSpherePassable(map, neighbour_pt, radius_cm, step, {})) {
             FrontierPathResult result;
             result.found = true;
             result.path.push_back(neighbour_pt);
@@ -531,19 +549,21 @@ FrontierPathResult MappingAlgorithmFrontier::findUnstickPath(const IMap3D& map,
 
 std::size_t maxExpansionsForMap(const IMap3D& map) {
     const types::MapConfig config = map.getMapConfig();
-    const auto step = config.resolution;
-    if (!(step > 0.0 * cm)) {
+    const double step = gridStepCm(config);
+    if (!(step > 0.0)) {
         return 1;
     }
     const types::MappingBounds& b = config.boundaries;
-    const auto span = [step](auto lo, auto hi) {
-        const auto delta = mp_units::quantity_cast<common::isq::length>(hi - lo);
-        return static_cast<std::size_t>(
-                   std::max(0.0, std::floor((delta / step).numerical_value_in(mp_units::one)))) +
-               1U;
+    const auto span = [step](double lo, double hi) {
+        return static_cast<std::size_t>(std::max(0.0, std::floor((hi - lo) / step))) + 1U;
     };
-    return span(b.min_x, b.max_x) * span(b.min_y, b.max_y) *
-           span(b.min_height, b.max_height);
+    const std::size_t nx =
+        span(b.min_x.force_numerical_value_in(cm), b.max_x.force_numerical_value_in(cm));
+    const std::size_t ny =
+        span(b.min_y.force_numerical_value_in(cm), b.max_y.force_numerical_value_in(cm));
+    const std::size_t nz =
+        span(b.min_height.force_numerical_value_in(cm), b.max_height.force_numerical_value_in(cm));
+    return nx * ny * nz;
 }
 
 bool hasClearLineOfSight(const IMap3D& map,
@@ -551,27 +571,26 @@ bool hasClearLineOfSight(const IMap3D& map,
                          const Position3D& to,
                          PhysicalLength drone_radius) {
     const types::MapConfig config = map.getMapConfig();
-    const auto step = config.resolution;
-    if (!(step > 0.0 * cm)) {
+    const double step = gridStepCm(config);
+    if (!(step > 0.0)) {
         return false;
     }
-    const Position3D delta = to - from;
-    const auto dx = mp_units::quantity_cast<common::isq::length>(delta.x);
-    const auto dy = mp_units::quantity_cast<common::isq::length>(delta.y);
-    const auto dz = mp_units::quantity_cast<common::isq::length>(delta.z);
-    const auto length = mp_units::sqrt(dx * dx + dy * dy + dz * dz);
-    const auto sample = step * 0.5;
-    const int samples =
-        static_cast<int>(std::ceil((length / sample).numerical_value_in(mp_units::one)));
+    const double radius_cm = drone_radius.force_numerical_value_in(cm);
+    const double dx = to.x.force_numerical_value_in(cm) - from.x.force_numerical_value_in(cm);
+    const double dy = to.y.force_numerical_value_in(cm) - from.y.force_numerical_value_in(cm);
+    const double dz = to.z.force_numerical_value_in(cm) - from.z.force_numerical_value_in(cm);
+    const double length = std::sqrt(dx * dx + dy * dy + dz * dz);
+    const double sample = step * 0.5;
+    const int samples = static_cast<int>(std::ceil(length / sample));
 
     for (int i = 0; i <= samples; ++i) {
         const double t = (samples == 0) ? 0.0 : static_cast<double>(i) / samples;
         const Position3D probe{
-            from.x + mp_units::quantity_cast<x_extent>(dx * t),
-            from.y + mp_units::quantity_cast<y_extent>(dy * t),
-            from.z + mp_units::quantity_cast<z_extent>(dz * t),
+            (from.x.force_numerical_value_in(cm) + dx * t) * x_extent[cm],
+            (from.y.force_numerical_value_in(cm) + dy * t) * y_extent[cm],
+            (from.z.force_numerical_value_in(cm) + dz * t) * z_extent[cm],
         };
-        if (!isSpherePassable(map, probe, drone_radius, step, {})) {
+        if (!isSpherePassable(map, probe, radius_cm, step, {})) {
             return false;
         }
     }
@@ -597,18 +616,19 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
     const BlockedCells& blocked_cells,
     std::size_t max_expansions) const {
     const types::MapConfig config = map.getMapConfig();
-    const auto step = config.resolution;
+    const double step = gridStepCm(config);
+    const double radius_cm = drone_radius.force_numerical_value_in(cm);
 
     ReachabilityResult out;
     out.start_key = quantizePosition(start, config);
     const Position3D start_pt = keyToPoint(out.start_key, config);
-    if (!isSpherePassable(map, start_pt, drone_radius, step, blocked_cells)) {
+    if (!isSpherePassable(map, start_pt, radius_cm, step, blocked_cells)) {
         return out;
     }
     out.start_passable = true;
 
     const BoundedSearchResult search = runBoundedSearch(
-        map, config, out.start_key, drone_radius, step, blocked_cells, max_expansions);
+        map, config, out.start_key, radius_cm, step, blocked_cells, max_expansions);
     out.parent_of = std::move(search.parent_of);
     out.frontier_cells = std::move(search.frontier_cells);
     out.truncated = search.truncated;

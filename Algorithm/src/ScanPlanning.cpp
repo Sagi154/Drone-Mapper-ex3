@@ -7,6 +7,7 @@
 #include <user_common_207190406_209543255/LidarConstants.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
@@ -53,30 +54,33 @@ struct ScoredDirection {
 };
 
 [[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
-    const auto step = config.resolution;
+    const double step = config.resolution.force_numerical_value_in(cm);
+    const double ox = config.offset.x.force_numerical_value_in(cm);
+    const double oy = config.offset.y.force_numerical_value_in(cm);
+    const double oz = config.offset.z.force_numerical_value_in(cm);
     return Position3D{
-        config.offset.x + mp_units::quantity_cast<x_extent>(static_cast<double>(key.qx) * step),
-        config.offset.y + mp_units::quantity_cast<y_extent>(static_cast<double>(key.qy) * step),
-        config.offset.z + mp_units::quantity_cast<z_extent>(static_cast<double>(key.qz) * step),
+        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
+        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
+        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
     };
 }
 
+[[nodiscard]] std::array<double, 3> unitVector(const Orientation& dir) {
+    const Position3D tip = bm::pointAlongBeam(Position3D{}, dir, 1.0 * cm);
+    return {tip.x.force_numerical_value_in(cm), tip.y.force_numerical_value_in(cm),
+            tip.z.force_numerical_value_in(cm)};
+}
+
 [[nodiscard]] double angularDistance(const Orientation& a, const Orientation& b) {
-    const Position3D ua = bm::pointAlongBeam(Position3D{}, a, 1.0 * cm);
-    const Position3D ub = bm::pointAlongBeam(Position3D{}, b, 1.0 * cm);
-    const auto ax = mp_units::quantity_cast<common::isq::length>(ua.x);
-    const auto ay = mp_units::quantity_cast<common::isq::length>(ua.y);
-    const auto az = mp_units::quantity_cast<common::isq::length>(ua.z);
-    const auto bx = mp_units::quantity_cast<common::isq::length>(ub.x);
-    const auto by = mp_units::quantity_cast<common::isq::length>(ub.y);
-    const auto bz = mp_units::quantity_cast<common::isq::length>(ub.z);
-    const auto dot = ax * bx + ay * by + az * bz;
-    const double dot_as_double = dot.numerical_value_in(cm * cm);
-    return 1.0 - std::clamp(dot_as_double, -1.0, 1.0);
+    const auto ua = unitVector(a);
+    const auto ub = unitVector(b);
+    const double dot = ua[0] * ub[0] + ua[1] * ub[1] + ua[2] * ub[2];
+    return 1.0 - std::clamp(dot, -1.0, 1.0);
 }
 
 [[nodiscard]] bool pointingDown(const Orientation& dir) {
-    return dir.altitude < kDownwardScanThreshold;
+    return dir.altitude.force_numerical_value_in(deg) <
+           kDownwardScanThreshold.force_numerical_value_in(deg);
 }
 
 [[nodiscard]] bool skipDownwardScan(const types::MapConfig& config,
@@ -89,9 +93,10 @@ struct ScoredDirection {
     if (isHouseVolumeMission(config)) {
         return true;
     }
-    const auto remaining = config.boundaries.max_height - origin.z;
-    const auto z_min = mp_units::quantity_cast<z_extent>(lidar.z_min);
-    return remaining <= z_min + 1e-6 * z_extent[cm];
+    const double z = origin.z.force_numerical_value_in(cm);
+    const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
+    const double z_min = lidar.z_min.force_numerical_value_in(cm);
+    return max_z - z <= z_min + 1e-6;
 }
 
 [[nodiscard]] bool volumeGainAllowed(const types::MapConfig& config,
@@ -106,7 +111,8 @@ struct ScoredDirection {
     if (!isOpenVolumeMission(config)) {
         return false;
     }
-    return lidar.z_max <= kShortRangeLidarMax;
+    return lidar.z_max.force_numerical_value_in(cm) <=
+           kShortRangeLidarMax.force_numerical_value_in(cm);
 }
 
 [[nodiscard]] const ctpl::detail::ConeTemplate* closestTemplate(
@@ -165,32 +171,42 @@ struct ScoredDirection {
 } // namespace
 
 MissionVolumeSpans missionVolumeSpans(const types::MapConfig& config) {
-    return MissionVolumeSpans{
-        mp_units::quantity_cast<common::isq::length>(
-            config.boundaries.max_x - config.boundaries.min_x),
-        mp_units::quantity_cast<common::isq::length>(
-            config.boundaries.max_y - config.boundaries.min_y),
-        mp_units::quantity_cast<common::isq::length>(
-            config.boundaries.max_height - config.boundaries.min_height),
-    };
+    const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
+                     config.boundaries.min_x.force_numerical_value_in(cm);
+    const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
+                     config.boundaries.min_y.force_numerical_value_in(cm);
+    const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
+                     config.boundaries.min_height.force_numerical_value_in(cm);
+    return MissionVolumeSpans{x * cm, y * cm, z * cm};
 }
 
 bool isOpenVolumeMission(const types::MapConfig& config) {
     const auto s = missionVolumeSpans(config);
-    return s.x >= kOpenVolumeMinSpan && s.y >= kOpenVolumeMinSpan && s.z >= kOpenVolumeMinSpan;
+    return s.x.force_numerical_value_in(cm) >= kOpenVolumeMinSpan.force_numerical_value_in(cm) &&
+           s.y.force_numerical_value_in(cm) >= kOpenVolumeMinSpan.force_numerical_value_in(cm) &&
+           s.z.force_numerical_value_in(cm) >= kOpenVolumeMinSpan.force_numerical_value_in(cm);
 }
 
 bool isSmallOutdoorMission(const types::MapConfig& config) {
     const auto s = missionVolumeSpans(config);
-    return s.x >= kOpenVolumeMinSpan && s.x < kSmallOutdoorMaxSpan &&
-           s.y >= kOpenVolumeMinSpan && s.y < kSmallOutdoorMaxSpan &&
-           s.z >= kOpenVolumeMinSpan && s.z < kSmallOutdoorMaxSpan;
+    const double x = s.x.force_numerical_value_in(cm);
+    const double y = s.y.force_numerical_value_in(cm);
+    const double z = s.z.force_numerical_value_in(cm);
+    const double open_min = kOpenVolumeMinSpan.force_numerical_value_in(cm);
+    const double small_max = kSmallOutdoorMaxSpan.force_numerical_value_in(cm);
+    return x >= open_min && x < small_max && y >= open_min && y < small_max && z >= open_min &&
+           z < small_max;
 }
 
 bool isHouseVolumeMission(const types::MapConfig& config) {
     const auto s = missionVolumeSpans(config);
-    return s.x >= kHouseMinXySpan && s.y >= kHouseMinXySpan &&
-           s.z >= kHouseMinZSpan && s.z < kHouseMaxZSpan;
+    const double x = s.x.force_numerical_value_in(cm);
+    const double y = s.y.force_numerical_value_in(cm);
+    const double z = s.z.force_numerical_value_in(cm);
+    return x >= kHouseMinXySpan.force_numerical_value_in(cm) &&
+           y >= kHouseMinXySpan.force_numerical_value_in(cm) &&
+           z >= kHouseMinZSpan.force_numerical_value_in(cm) &&
+           z < kHouseMaxZSpan.force_numerical_value_in(cm);
 }
 
 bool isGainMasked(const GridKey& key, const FrontierCells& frontier) {
@@ -225,10 +241,13 @@ std::vector<Orientation> buildSweepDirections(
                          if (a.gain != b.gain) {
                              return a.gain > b.gain;
                          }
-                         if (a.direction.horizontal != b.direction.horizontal) {
-                             return a.direction.horizontal < b.direction.horizontal;
+                         const double ah = a.direction.horizontal.force_numerical_value_in(deg);
+                         const double bh = b.direction.horizontal.force_numerical_value_in(deg);
+                         if (ah != bh) {
+                             return ah < bh;
                          }
-                         return a.direction.altitude < b.direction.altitude;
+                         return a.direction.altitude.force_numerical_value_in(deg) <
+                                b.direction.altitude.force_numerical_value_in(deg);
                      });
 
     stamp.begin(bounds, origin, lidar.z_max);
@@ -262,16 +281,15 @@ std::optional<Orientation> bestTravelScan(
         return std::nullopt;
     }
 
-    const Position3D delta = next_waypoint - predicted.position;
-    const auto dx = mp_units::quantity_cast<common::isq::length>(delta.x);
-    const auto dy = mp_units::quantity_cast<common::isq::length>(delta.y);
+    const double dx = next_waypoint.x.force_numerical_value_in(cm) -
+                      predicted.position.x.force_numerical_value_in(cm);
+    const double dy = next_waypoint.y.force_numerical_value_in(cm) -
+                      predicted.position.y.force_numerical_value_in(cm);
 
     std::vector<Orientation> probes;
     probes.reserve(3);
-    if (!(dx == 0.0 * cm && dy == 0.0 * cm)) {
-        const double heading_deg =
-            std::atan2(dy.numerical_value_in(cm), dx.numerical_value_in(cm)) *
-            (180.0 / std::numbers::pi);
+    if (!(dx == 0.0 && dy == 0.0)) {
+        const double heading_deg = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
         probes.emplace_back(heading_deg * deg, 0.0 * deg);
     } else {
         probes.emplace_back(predicted.heading.horizontal, 0.0 * deg);

@@ -13,7 +13,6 @@ namespace algorithm_207190406_209543255::detail {
 
 namespace lc = user_common_207190406_209543255::lidar_cone;
 namespace types = common::types;
-using common::PhysicalLength;
 using common::Position3D;
 using common::cm;
 using common::x_extent;
@@ -40,18 +39,20 @@ constexpr std::size_t kMaxSweepReserve = 8;
                                          const Position3D& start,
                                          const ParentMap& parent_of,
                                          const GridKey& start_key) {
-    auto z = start.z;
+    const double step = config.resolution.force_numerical_value_in(cm);
+    const double min_z = config.boundaries.min_height.force_numerical_value_in(cm);
+    double z = start.z.force_numerical_value_in(cm);
     GridKey cursor = start_key;
     while (true) {
         const GridKey down{cursor.qx, cursor.qy, cursor.qz - 1};
         if (!parent_of.contains(down)) {
             return false;
         }
-        z -= mp_units::quantity_cast<z_extent>(config.resolution);
-        if (z < config.boundaries.min_height - 1e-6 * z_extent[cm]) {
+        z -= step;
+        if (z < min_z - 1e-6) {
             return false;
         }
-        const Position3D below{start.x, start.y, z};
+        const Position3D below{start.x, start.y, z * z_extent[cm]};
         if (map.atVoxel(below) == types::VoxelOccupancy::Unmapped) {
             return true;
         }
@@ -61,15 +62,16 @@ constexpr std::size_t kMaxSweepReserve = 8;
 
 [[nodiscard]] bool hasHorizontalUnmapped(const common::IMap3D& map,
                                          const Position3D& start,
-                                         PhysicalLength step) {
-    const Position3D offsets[4] = {
-        Position3D{mp_units::quantity_cast<x_extent>(step), {}, {}},
-        Position3D{mp_units::quantity_cast<x_extent>(-step), {}, {}},
-        Position3D{{}, mp_units::quantity_cast<y_extent>(step), {}},
-        Position3D{{}, mp_units::quantity_cast<y_extent>(-step), {}},
-    };
-    for (const Position3D& off : offsets) {
-        if (map.atVoxel(start + off) == types::VoxelOccupancy::Unmapped) {
+                                         double step_cm) {
+    const double x = start.x.force_numerical_value_in(cm);
+    const double y = start.y.force_numerical_value_in(cm);
+    const double z = start.z.force_numerical_value_in(cm);
+    const double dx[4] = {step_cm, -step_cm, 0.0, 0.0};
+    const double dy[4] = {0.0, 0.0, step_cm, -step_cm};
+    for (int i = 0; i < 4; ++i) {
+        const Position3D nb{(x + dx[i]) * x_extent[cm], (y + dy[i]) * y_extent[cm],
+                            z * z_extent[cm]};
+        if (map.atVoxel(nb) == types::VoxelOccupancy::Unmapped) {
             return true;
         }
     }
@@ -144,15 +146,15 @@ constexpr std::size_t kMaxSweepReserve = 8;
         if (approach == reach.start_key) {
             waypoints.clear();
             const GridKey down{reach.start_key.qx, reach.start_key.qy, reach.start_key.qz - 1};
-            const auto remaining_height =
-                config.boundaries.max_height - in.state.position.z;
-            const auto z_min = mp_units::quantity_cast<z_extent>(in.lidar.z_min);
+            const double z = in.state.position.z.force_numerical_value_in(cm);
+            const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
+            const double z_min = in.lidar.z_min.force_numerical_value_in(cm);
+            const double step = config.resolution.force_numerical_value_in(cm);
             const bool column_unmapped = unmappedInColumnBelow(
                 in.map, config, in.state.position, reach.parent_of, reach.start_key);
-            const bool near_ceiling = remaining_height <= z_min + 1e-6 * z_extent[cm];
+            const bool near_ceiling = max_z - z <= z_min + 1e-6;
             const bool house_layer_done =
-                house_volume &&
-                !hasHorizontalUnmapped(in.map, in.state.position, config.resolution);
+                house_volume && !hasHorizontalUnmapped(in.map, in.state.position, step);
             if ((near_ceiling || house_layer_done) && column_unmapped &&
                 reach.parent_of.contains(down)) {
                 const FrontierPathResult drop =
@@ -237,7 +239,9 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
 
     const bool house_volume = isHouseVolumeMission(config);
     const bool open_volume = isOpenVolumeMission(config);
-    const bool rank_volume = open_volume && in.lidar.z_max > kShortRangeLidarMax;
+    const bool rank_volume =
+        open_volume &&
+        in.lidar.z_max.force_numerical_value_in(cm) > kShortRangeLidarMax.force_numerical_value_in(cm);
 
     const GridKey down_key{reach.start_key.qx, reach.start_key.qy, reach.start_key.qz - 1};
     if (house_volume && in.prefer_descend && reach.parent_of.contains(down_key) &&
