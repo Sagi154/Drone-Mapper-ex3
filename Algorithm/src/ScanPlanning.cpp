@@ -4,12 +4,14 @@
 #include "ScanPlanning.h"
 
 #include <user_common_207190406_209543255/BeamMath.h>
+#include <user_common_207190406_209543255/LidarConstants.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
+#include <optional>
 
 namespace algorithm_207190406_209543255::detail {
 
@@ -24,10 +26,13 @@ using common::deg;
 using common::x_extent;
 using common::y_extent;
 using common::z_extent;
-
-bool isOpenVolumeMission(const types::MapConfig& config);
-bool isSmallOutdoorMission(const types::MapConfig& config);
-bool isHouseVolumeMission(const types::MapConfig& config);
+using user_common_207190406_209543255::kDownwardScanThreshold;
+using user_common_207190406_209543255::kHouseMaxZSpan;
+using user_common_207190406_209543255::kHouseMinXySpan;
+using user_common_207190406_209543255::kHouseMinZSpan;
+using user_common_207190406_209543255::kOpenVolumeMinSpan;
+using user_common_207190406_209543255::kShortRangeLidarMax;
+using user_common_207190406_209543255::kSmallOutdoorMaxSpan;
 
 namespace {
 
@@ -45,7 +50,7 @@ constexpr Offset kFaceOffsets[6] = {
 struct ScoredDirection {
     std::size_t gain = 0;
     Orientation direction{};
-    const ctpl::ConeTemplate* cone = nullptr;
+    const ctpl::detail::ConeTemplate* cone = nullptr;
 };
 
 [[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
@@ -74,7 +79,8 @@ struct ScoredDirection {
 }
 
 [[nodiscard]] bool pointingDown(const Orientation& dir) {
-    return dir.altitude.force_numerical_value_in(deg) < -10.0;
+    return dir.altitude.force_numerical_value_in(deg) <
+           kDownwardScanThreshold.force_numerical_value_in(deg);
 }
 
 [[nodiscard]] bool skipDownwardScan(const types::MapConfig& config,
@@ -105,14 +111,15 @@ struct ScoredDirection {
     if (!isOpenVolumeMission(config)) {
         return false;
     }
-    return lidar.z_max.force_numerical_value_in(cm) <= 90.0;
+    return lidar.z_max.force_numerical_value_in(cm) <=
+           kShortRangeLidarMax.force_numerical_value_in(cm);
 }
 
-[[nodiscard]] const ctpl::ConeTemplate* closestTemplate(
-    const std::vector<ctpl::ConeTemplate>& templates, const Orientation& probe) {
-    const ctpl::ConeTemplate* best = nullptr;
+[[nodiscard]] const ctpl::detail::ConeTemplate* closestTemplate(
+    const std::vector<ctpl::detail::ConeTemplate>& templates, const Orientation& probe) {
+    const ctpl::detail::ConeTemplate* best = nullptr;
     double best_dist = 0.0;
-    for (const ctpl::ConeTemplate& cone : templates) {
+    for (const ctpl::detail::ConeTemplate& cone : templates) {
         const double dist = angularDistance(probe, cone.direction);
         if (best == nullptr || dist < best_dist) {
             best = &cone;
@@ -122,14 +129,14 @@ struct ScoredDirection {
     return best;
 }
 
-[[nodiscard]] std::size_t countConeGain(const ctpl::ConeTemplate& cone,
+[[nodiscard]] std::size_t countConeGain(const ctpl::detail::ConeTemplate& cone,
                                         const common::IMap3D& map,
                                         const Position3D& origin,
                                         const types::LidarConfigData& lidar,
                                         const FrontierCells& frontier,
+                                        const types::MapConfig& config,
                                         ctpl::VoxelStamp& stamp,
                                         bool open_volume) {
-    const types::MapConfig config = map.getMapConfig();
     stamp.begin(config, origin, lidar.z_max);
     std::size_t gain = 0;
     (void)ctpl::walkTemplate(cone, map, origin, stamp, [&](const Position3D& p) {
@@ -141,36 +148,65 @@ struct ScoredDirection {
     return gain;
 }
 
+[[nodiscard]] std::optional<ScoredDirection> scoreTemplate(
+    const ctpl::detail::ConeTemplate& cone,
+    const common::IMap3D& map,
+    const Position3D& origin,
+    const types::LidarConfigData& lidar,
+    const FrontierCells& frontier,
+    const types::MapConfig& bounds,
+    ctpl::VoxelStamp& stamp) {
+    if (skipDownwardScan(bounds, origin, lidar, cone.direction)) {
+        return std::nullopt;
+    }
+    const bool volume = volumeGainAllowed(bounds, lidar, cone.direction);
+    const std::size_t gain =
+        countConeGain(cone, map, origin, lidar, frontier, bounds, stamp, volume);
+    if (gain == 0) {
+        return std::nullopt;
+    }
+    return ScoredDirection{gain, cone.direction, &cone};
+}
+
 } // namespace
 
-bool isOpenVolumeMission(const types::MapConfig& config) {
+MissionVolumeSpans missionVolumeSpans(const types::MapConfig& config) {
     const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
                      config.boundaries.min_x.force_numerical_value_in(cm);
     const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
                      config.boundaries.min_y.force_numerical_value_in(cm);
     const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
                      config.boundaries.min_height.force_numerical_value_in(cm);
-    return x >= 199.0 && y >= 199.0 && z >= 199.0;
+    return MissionVolumeSpans{x * cm, y * cm, z * cm};
+}
+
+bool isOpenVolumeMission(const types::MapConfig& config) {
+    const auto s = missionVolumeSpans(config);
+    return s.x.force_numerical_value_in(cm) >= kOpenVolumeMinSpan.force_numerical_value_in(cm) &&
+           s.y.force_numerical_value_in(cm) >= kOpenVolumeMinSpan.force_numerical_value_in(cm) &&
+           s.z.force_numerical_value_in(cm) >= kOpenVolumeMinSpan.force_numerical_value_in(cm);
 }
 
 bool isSmallOutdoorMission(const types::MapConfig& config) {
-    const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
-                     config.boundaries.min_x.force_numerical_value_in(cm);
-    const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
-                     config.boundaries.min_y.force_numerical_value_in(cm);
-    const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
-                     config.boundaries.min_height.force_numerical_value_in(cm);
-    return x >= 199.0 && x < 250.0 && y >= 199.0 && y < 250.0 && z >= 199.0 && z < 250.0;
+    const auto s = missionVolumeSpans(config);
+    const double x = s.x.force_numerical_value_in(cm);
+    const double y = s.y.force_numerical_value_in(cm);
+    const double z = s.z.force_numerical_value_in(cm);
+    const double open_min = kOpenVolumeMinSpan.force_numerical_value_in(cm);
+    const double small_max = kSmallOutdoorMaxSpan.force_numerical_value_in(cm);
+    return x >= open_min && x < small_max && y >= open_min && y < small_max && z >= open_min &&
+           z < small_max;
 }
 
 bool isHouseVolumeMission(const types::MapConfig& config) {
-    const double x = config.boundaries.max_x.force_numerical_value_in(cm) -
-                     config.boundaries.min_x.force_numerical_value_in(cm);
-    const double y = config.boundaries.max_y.force_numerical_value_in(cm) -
-                     config.boundaries.min_y.force_numerical_value_in(cm);
-    const double z = config.boundaries.max_height.force_numerical_value_in(cm) -
-                     config.boundaries.min_height.force_numerical_value_in(cm);
-    return x >= 249.0 && y >= 249.0 && z >= 99.0 && z < 199.0;
+    const auto s = missionVolumeSpans(config);
+    const double x = s.x.force_numerical_value_in(cm);
+    const double y = s.y.force_numerical_value_in(cm);
+    const double z = s.z.force_numerical_value_in(cm);
+    return x >= kHouseMinXySpan.force_numerical_value_in(cm) &&
+           y >= kHouseMinXySpan.force_numerical_value_in(cm) &&
+           z >= kHouseMinZSpan.force_numerical_value_in(cm) &&
+           z < kHouseMaxZSpan.force_numerical_value_in(cm);
 }
 
 bool isGainMasked(const GridKey& key, const FrontierCells& frontier) {
@@ -190,20 +226,14 @@ std::vector<Orientation> buildSweepDirections(
     const Position3D& origin,
     const types::LidarConfigData& lidar,
     const FrontierCells& frontier,
-    const std::vector<ctpl::ConeTemplate>& templates,
+    const std::vector<ctpl::detail::ConeTemplate>& templates,
     ctpl::VoxelStamp& stamp) {
     std::vector<ScoredDirection> scored;
     scored.reserve(templates.size());
     const types::MapConfig bounds = map.getMapConfig();
-    for (const ctpl::ConeTemplate& cone : templates) {
-        if (skipDownwardScan(bounds, origin, lidar, cone.direction)) {
-            continue;
-        }
-        const bool volume = volumeGainAllowed(bounds, lidar, cone.direction);
-        const std::size_t gain =
-            countConeGain(cone, map, origin, lidar, frontier, stamp, volume);
-        if (gain > 0) {
-            scored.push_back(ScoredDirection{gain, cone.direction, &cone});
+    for (const ctpl::detail::ConeTemplate& cone : templates) {
+        if (const auto entry = scoreTemplate(cone, map, origin, lidar, frontier, bounds, stamp)) {
+            scored.push_back(*entry);
         }
     }
     std::stable_sort(scored.begin(), scored.end(),
@@ -220,15 +250,14 @@ std::vector<Orientation> buildSweepDirections(
                                 b.direction.altitude.force_numerical_value_in(deg);
                      });
 
-    const types::MapConfig config = map.getMapConfig();
-    stamp.begin(config, origin, lidar.z_max);
+    stamp.begin(bounds, origin, lidar.z_max);
     std::vector<Orientation> kept;
     kept.reserve(scored.size());
     for (const ScoredDirection& entry : scored) {
         std::size_t added = 0;
         (void)ctpl::walkTemplate(*entry.cone, map, origin, stamp, [&](const Position3D& p) {
-            if (volumeGainAllowed(config, lidar, entry.direction) ||
-                isGainMasked(quantizePosition(p, config), frontier)) {
+            if (volumeGainAllowed(bounds, lidar, entry.direction) ||
+                isGainMasked(quantizePosition(p, bounds), frontier)) {
                 ++added;
             }
             return true;
@@ -246,7 +275,7 @@ std::optional<Orientation> bestTravelScan(
     const Position3D& next_waypoint,
     const types::LidarConfigData& lidar,
     const FrontierCells& frontier,
-    const std::vector<ctpl::ConeTemplate>& templates,
+    const std::vector<ctpl::detail::ConeTemplate>& templates,
     ctpl::VoxelStamp& stamp) {
     if (templates.empty()) {
         return std::nullopt;
@@ -263,7 +292,6 @@ std::optional<Orientation> bestTravelScan(
         const double heading_deg = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
         probes.emplace_back(heading_deg * deg, 0.0 * deg);
     } else {
-        // Advance often lands predicted on the waypoint; still look along heading.
         probes.emplace_back(predicted.heading.horizontal, 0.0 * deg);
     }
     probes.emplace_back(0.0 * deg, 90.0 * deg);
@@ -271,7 +299,7 @@ std::optional<Orientation> bestTravelScan(
 
     const types::MapConfig config = map.getMapConfig();
     for (const Orientation& probe : probes) {
-        const ctpl::ConeTemplate* cone = closestTemplate(templates, probe);
+        const ctpl::detail::ConeTemplate* cone = closestTemplate(templates, probe);
         if (cone == nullptr) {
             continue;
         }

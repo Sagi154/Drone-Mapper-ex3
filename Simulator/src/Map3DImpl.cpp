@@ -8,7 +8,7 @@
 // Both hidden and output maps can be either int8 or uint8; the role, not the
 // dtype, decides the interpretation (see docs/map3d-contract.md).
 
-#include <Simulator/Map3DImpl.h>
+#include "Map3DNpy.h"
 
 #include <algorithm>
 #include <array>
@@ -158,22 +158,28 @@ void writeStoredValue(NpyArray& map, std::size_t linear_idx, VoxelOccupancy valu
 
 } // namespace
 
-// ---------------------------------------------------------------------------
-// Map3DImpl constructors
-// ---------------------------------------------------------------------------
+struct Map3DImpl::Storage {
+    std::shared_ptr<NpyArray> map;
+    MapRole role = MapRole::Hidden;
+    common::types::MapConfig config{};
+};
 
-Map3DImpl::Map3DImpl(std::shared_ptr<NpyArray> map_ptr, MapRole role)
-    : Map3DImpl(std::move(map_ptr), role, common::types::MapConfig{}) {}
+Map3DImpl::Map3DImpl(std::shared_ptr<Storage> storage) : storage_(std::move(storage)) {}
 
-Map3DImpl::Map3DImpl(std::shared_ptr<NpyArray> map_ptr,
-                     MapRole role,
-                     common::types::MapConfig map_config)
-    : map_(std::move(map_ptr)),
-      role_(role),
-      config_(map_ ? finalizeConfig(*map_, map_config) : map_config) {
-    if (!map_) {
+Map3DImpl makeMap3D(std::shared_ptr<NpyArray> map_ptr, MapRole role,
+                    const common::types::MapConfig& map_config) {
+    if (!map_ptr) {
         throw std::invalid_argument("Map3DImpl requires a valid map pointer.");
     }
+    auto storage = std::make_shared<Map3DImpl::Storage>();
+    storage->map    = std::move(map_ptr);
+    storage->role   = role;
+    storage->config = finalizeConfig(*storage->map, map_config);
+    return Map3DImpl(std::move(storage));
+}
+
+Map3DImpl makeMap3D(std::shared_ptr<NpyArray> map_ptr, MapRole role) {
+    return makeMap3D(std::move(map_ptr), role, common::types::MapConfig{});
 }
 
 // ---------------------------------------------------------------------------
@@ -184,26 +190,26 @@ common::types::VoxelOccupancy Map3DImpl::atVoxel(const common::Position3D& pos) 
     if (!isInBounds(pos)) {
         return common::types::VoxelOccupancy::OutOfBounds;
     }
-    const auto index = toVoxelIndex(pos, config_);
-    if (!index || !isIndexWithinShape(*map_, *index)) {
+    const auto index = toVoxelIndex(pos, storage_->config);
+    if (!index || !isIndexWithinShape(*storage_->map, *index)) {
         return common::types::VoxelOccupancy::OutOfBounds;
     }
-    return readStoredValue(*map_, linearIndex(*map_, *index), role_);
+    return readStoredValue(*storage_->map, linearIndex(*storage_->map, *index), storage_->role);
 }
 
 common::types::MapConfig Map3DImpl::getMapConfig() const {
-    return config_;
+    return storage_->config;
 }
 
 bool Map3DImpl::isInBounds(const common::Position3D& pos) const {
-    if (!isWithinMappingBounds(pos, config_.boundaries)) {
+    if (!isWithinMappingBounds(pos, storage_->config.boundaries)) {
         return false;
     }
-    const auto index = toVoxelIndex(pos, config_);
+    const auto index = toVoxelIndex(pos, storage_->config);
     if (!index) {
         return false;
     }
-    return isIndexWithinShape(*map_, *index);
+    return isIndexWithinShape(*storage_->map, *index);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,15 +220,15 @@ void Map3DImpl::set(const common::Position3D& pos, common::types::VoxelOccupancy
     if (!isInBounds(pos)) {
         return;
     }
-    const auto index = *toVoxelIndex(pos, config_);
-    writeStoredValue(*map_, linearIndex(*map_, index), value);
+    const auto index = *toVoxelIndex(pos, storage_->config);
+    writeStoredValue(*storage_->map, linearIndex(*storage_->map, index), value);
 }
 
 void Map3DImpl::save(const std::filesystem::path& path) const {
-    if (map_->IsEmpty()) {
+    if (storage_->map->IsEmpty()) {
         throw std::runtime_error("Cannot save an empty map.");
     }
-    const LPCSTR error = map_->SaveNPY(path.string());
+    const LPCSTR error = storage_->map->SaveNPY(path.string());
     if (error != nullptr) {
         throw std::runtime_error(error);
     }

@@ -71,8 +71,7 @@ constexpr Offset kOffsets[6] = {
     return map.atVoxel(pos);
 }
 
-[[nodiscard]] bool isBlockedCell(const BlockedCells& blocked,
-                                 const GridKey& key) {
+[[nodiscard]] bool isBlockedCell(const BlockedCells& blocked, const GridKey& key) {
     return blocked.find(key) != blocked.end();
 }
 
@@ -83,13 +82,11 @@ constexpr Offset kOffsets[6] = {
     return kEmptyTraversalCost;
 }
 
-// True iff the axis-aligned voxel box centered at (dx,dy,dz)*step_cm with half-extent
-// step_cm/2 intersects the closed sphere of radius radius_cm at the origin. Using cell
-// centres for the distance gate (the old ox²+oy²+oz² > r² test) is a no-op when
-// radius_cm < step_cm: every non-zero offset is ≥ step_cm and is skipped. Nearest-point
-// in the box restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
-[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz,
-                                           double step_cm,
+// True iff the axis-aligned voxel box centered at (dx,dy,dz)*step with half-extent
+// step/2 intersects the closed sphere of radius at the origin. Centre-distance
+// (forEachSphereSample) skips face neighbours when radius < step; box nearest-point
+// restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
+[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz, double step_cm,
                                            double radius_cm) {
     if (dx == 0 && dy == 0 && dz == 0) {
         return true;
@@ -118,9 +115,6 @@ constexpr Offset kOffsets[6] = {
                                     double radius_cm,
                                     double step_cm,
                                     const BlockedCells& blocked) {
-    // Treat Unmapped as passable: only confirmed Occupied or OutOfBounds blocks navigation.
-    // This allows the planner to route through unexplored territory; stall detection handles
-    // the case where an Unmapped cell turns out to be solid at execution time.
     const types::VoxelOccupancy centre_occ = occupancyAt(map, centre);
     if (centre_occ == types::VoxelOccupancy::Occupied ||
         centre_occ == types::VoxelOccupancy::OutOfBounds) {
@@ -159,9 +153,6 @@ constexpr Offset kOffsets[6] = {
                     (cz + oz) * z_extent[cm],
                 };
                 const types::VoxelOccupancy probe_occ = occupancyAt(map, probe);
-                // Occupied is a wall. OutOfBounds is the mission AABB — the drone
-                // centre is already in-bounds, so a sphere that clips the box is
-                // not a collision (house_full spawn sits on max_height).
                 if (probe_occ == types::VoxelOccupancy::Occupied) {
                     return false;
                 }
@@ -221,6 +212,192 @@ constexpr Offset kOffsets[6] = {
     return result;
 }
 
+struct BoundedSearchResult {
+    ParentMap parent_of{};
+    GridIntMap cost_of{};
+    std::vector<GridKey> frontier_list{};
+    FrontierCells frontier_cells{};
+    bool truncated = false;
+};
+
+[[nodiscard]] BoundedSearchResult runBoundedSearch(
+    const IMap3D& map,
+    const types::MapConfig& config,
+    const GridKey& start_key,
+    double radius_cm,
+    double step_cm,
+    const BlockedCells& blocked_cells,
+    std::size_t max_expansions) {
+    BoundedSearchResult out;
+    std::unordered_map<GridKey, bool, GridKeyHash> passable_memo;
+    auto passable = [&](const GridKey& key, const Position3D& pt) {
+        const auto it = passable_memo.find(key);
+        if (it != passable_memo.end()) {
+            return it->second;
+        }
+        const bool ok = isSpherePassable(map, pt, radius_cm, step_cm, blocked_cells);
+        passable_memo.emplace(key, ok);
+        return ok;
+    };
+
+    CostQueue queue;
+    out.parent_of[start_key] = start_key;
+    out.cost_of[start_key] = 0;
+    queue.push({0, start_key});
+
+    std::size_t expansions = 0;
+    while (!queue.empty()) {
+        if (++expansions > max_expansions) {
+            out.truncated = true;
+            break;
+        }
+        const auto [current_cost, current] = queue.top();
+        queue.pop();
+        if (current_cost > out.cost_of.at(current)) {
+            continue;
+        }
+        const Position3D current_pt = keyToPoint(current, config);
+        const types::VoxelOccupancy current_occ = occupancyAt(map, current_pt);
+
+        int unmapped = 0;
+        for (const Offset& off : kOffsets) {
+            const Position3D nb = keyToPoint(
+                GridKey{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz}, config);
+            if (occupancyAt(map, nb) == types::VoxelOccupancy::Unmapped) {
+                ++unmapped;
+            }
+        }
+        const bool self_unmapped = current_occ == types::VoxelOccupancy::Unmapped;
+        if (unmapped > 0 || self_unmapped) {
+            if (out.frontier_cells.insert(current).second) {
+                out.frontier_list.push_back(current);
+            }
+        }
+
+        for (const Offset& off : kOffsets) {
+            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
+            const Position3D neighbour_pt = keyToPoint(neighbour, config);
+            if (!passable(neighbour, neighbour_pt)) {
+                continue;
+            }
+            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
+            if (out.cost_of.contains(neighbour) && new_cost >= out.cost_of.at(neighbour)) {
+                continue;
+            }
+            out.parent_of[neighbour] = current;
+            out.cost_of[neighbour] = new_cost;
+            queue.push({new_cost, neighbour});
+        }
+    }
+    return out;
+}
+
+[[nodiscard]] std::vector<FrontierCluster> clusterFrontierCells(
+    const IMap3D& map,
+    const types::MapConfig& config,
+    const std::vector<GridKey>& frontier_list,
+    const FrontierCells& frontier_cells,
+    const GridIntMap& cost_of) {
+    std::vector<FrontierCluster> clusters;
+    std::unordered_set<GridKey, GridKeyHash> clustered;
+    for (const GridKey& seed : frontier_list) {
+        if (clustered.contains(seed)) {
+            continue;
+        }
+        FrontierCluster cluster;
+        std::queue<GridKey> bfs;
+        bfs.push(seed);
+        clustered.insert(seed);
+        int best_cost = cost_of.at(seed);
+        GridKey best_key = seed;
+        while (!bfs.empty()) {
+            const GridKey cell = bfs.front();
+            bfs.pop();
+            cluster.keys.push_back(cell);
+            const int cell_cost = cost_of.at(cell);
+            if (cell_cost < best_cost) {
+                best_cost = cell_cost;
+                best_key = cell;
+            }
+            for (const Offset& off : kOffsets) {
+                const GridKey neighbour{cell.qx + off.dx, cell.qy + off.dy, cell.qz + off.dz};
+                if (!frontier_cells.contains(neighbour) || clustered.contains(neighbour)) {
+                    continue;
+                }
+                clustered.insert(neighbour);
+                bfs.push(neighbour);
+            }
+        }
+        cluster.volume_count = cluster.keys.size();
+        std::vector<GridKey> surface;
+        surface.reserve(cluster.keys.size());
+        bool have_surface = false;
+        int surface_best_cost = 0;
+        GridKey surface_best = cluster.keys.front();
+        for (const GridKey& key : cluster.keys) {
+            const types::VoxelOccupancy occ = occupancyAt(map, keyToPoint(key, config));
+            if (occ != types::VoxelOccupancy::Empty) {
+                continue;
+            }
+            surface.push_back(key);
+            const int cell_cost = cost_of.at(key);
+            if (!have_surface || cell_cost < surface_best_cost) {
+                have_surface = true;
+                surface_best_cost = cell_cost;
+                surface_best = key;
+            }
+        }
+        if (!have_surface) {
+            surface.push_back(best_key);
+            surface_best = best_key;
+            surface_best_cost = best_cost;
+        }
+        cluster.keys = std::move(surface);
+        cluster.cell_count = cluster.keys.size();
+        cluster.approach_key = surface_best;
+        cluster.approach_position = keyToPoint(surface_best, config);
+        cluster.approach_cost = surface_best_cost;
+        clusters.push_back(std::move(cluster));
+    }
+
+    std::sort(clusters.begin(), clusters.end(),
+              [](const FrontierCluster& a, const FrontierCluster& b) {
+                  if (a.approach_key.qx != b.approach_key.qx) {
+                      return a.approach_key.qx < b.approach_key.qx;
+                  }
+                  if (a.approach_key.qy != b.approach_key.qy) {
+                      return a.approach_key.qy < b.approach_key.qy;
+                  }
+                  return a.approach_key.qz < b.approach_key.qz;
+              });
+    return clusters;
+}
+
+template <typename Fn>
+void forEachInBoundsVoxel(const IMap3D& map, Fn&& fn) {
+    const types::MapConfig config = map.getMapConfig();
+    const double step = gridStepCm(config);
+    if (step <= 0.0) {
+        return;
+    }
+    const types::MappingBounds& bounds = config.boundaries;
+    const double min_x = bounds.min_x.force_numerical_value_in(cm);
+    const double max_x = bounds.max_x.force_numerical_value_in(cm);
+    const double min_y = bounds.min_y.force_numerical_value_in(cm);
+    const double max_y = bounds.max_y.force_numerical_value_in(cm);
+    const double min_z = bounds.min_height.force_numerical_value_in(cm);
+    const double max_z = bounds.max_height.force_numerical_value_in(cm);
+    for (double x = min_x; x <= max_x + 1e-9; x += step) {
+        for (double y = min_y; y <= max_y + 1e-9; y += step) {
+            for (double z = min_z; z <= max_z + 1e-9; z += step) {
+                if (!fn(Position3D{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]})) {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 GridKey quantizePosition(const Position3D& pos, const types::MapConfig& config) {
@@ -231,7 +408,6 @@ GridKey quantizePosition(const Position3D& pos, const types::MapConfig& config) 
     const double px = pos.x.force_numerical_value_in(cm);
     const double py = pos.y.force_numerical_value_in(cm);
     const double pz = pos.z.force_numerical_value_in(cm);
-
     return GridKey{
         static_cast<int>(std::lround((px - ox) / step)),
         static_cast<int>(std::lround((py - oy) / step)),
@@ -249,36 +425,26 @@ bool hasNotMappedInSphere(const IMap3D& map, const Position3D& centre, PhysicalL
 }
 
 std::size_t countUnmappedInBounds(const IMap3D& map) {
-    const types::MapConfig config = map.getMapConfig();
-    const double step = gridStepCm(config);
-    if (step <= 0.0) {
-        return 0;
-    }
-    const types::MappingBounds& bounds = config.boundaries;
-
-    const double min_x = bounds.min_x.force_numerical_value_in(cm);
-    const double max_x = bounds.max_x.force_numerical_value_in(cm);
-    const double min_y = bounds.min_y.force_numerical_value_in(cm);
-    const double max_y = bounds.max_y.force_numerical_value_in(cm);
-    const double min_z = bounds.min_height.force_numerical_value_in(cm);
-    const double max_z = bounds.max_height.force_numerical_value_in(cm);
-
     std::size_t count = 0;
-    for (double x = min_x; x <= max_x + 1e-9; x += step) {
-        for (double y = min_y; y <= max_y + 1e-9; y += step) {
-            for (double z = min_z; z <= max_z + 1e-9; z += step) {
-                const Position3D pos{x * x_extent[cm], y * y_extent[cm], z * z_extent[cm]};
-                if (occupancyAt(map, pos) == types::VoxelOccupancy::Unmapped) {
-                    ++count;
-                }
-            }
+    forEachInBoundsVoxel(map, [&](const Position3D& pos) {
+        if (occupancyAt(map, pos) == types::VoxelOccupancy::Unmapped) {
+            ++count;
         }
-    }
+        return true;
+    });
     return count;
 }
 
 bool hasAnyNotMappedInBounds(const IMap3D& map) {
-    return countUnmappedInBounds(map) > 0;
+    bool found = false;
+    forEachInBoundsVoxel(map, [&](const Position3D& pos) {
+        if (occupancyAt(map, pos) == types::VoxelOccupancy::Unmapped) {
+            found = true;
+            return false;
+        }
+        return true;
+    });
+    return found;
 }
 
 FrontierPathResult MappingAlgorithmFrontier::findPathTo(
@@ -361,7 +527,6 @@ FrontierPathResult MappingAlgorithmFrontier::findUnstickPath(const IMap3D& map,
         return {};
     }
 
-    // Adjacent escape only: Occupied/non-passable neighbours are not walked.
     std::size_t expansions = 0;
     const std::size_t max_expansions = maxExpansionsForMap(map);
     for (const Offset& off : kOffsets) {
@@ -392,12 +557,12 @@ std::size_t maxExpansionsForMap(const IMap3D& map) {
     const auto span = [step](double lo, double hi) {
         return static_cast<std::size_t>(std::max(0.0, std::floor((hi - lo) / step))) + 1U;
     };
-    const std::size_t nx = span(b.min_x.force_numerical_value_in(cm),
-                                b.max_x.force_numerical_value_in(cm));
-    const std::size_t ny = span(b.min_y.force_numerical_value_in(cm),
-                                b.max_y.force_numerical_value_in(cm));
-    const std::size_t nz = span(b.min_height.force_numerical_value_in(cm),
-                                b.max_height.force_numerical_value_in(cm));
+    const std::size_t nx =
+        span(b.min_x.force_numerical_value_in(cm), b.max_x.force_numerical_value_in(cm));
+    const std::size_t ny =
+        span(b.min_y.force_numerical_value_in(cm), b.max_y.force_numerical_value_in(cm));
+    const std::size_t nz =
+        span(b.min_height.force_numerical_value_in(cm), b.max_height.force_numerical_value_in(cm));
     return nx * ny * nz;
 }
 
@@ -462,146 +627,13 @@ ReachabilityResult MappingAlgorithmFrontier::exploreReachable(
     }
     out.start_passable = true;
 
-    std::unordered_map<GridKey, bool, GridKeyHash> passable_memo;
-    auto passable = [&](const GridKey& key, const Position3D& pt) {
-        const auto it = passable_memo.find(key);
-        if (it != passable_memo.end()) {
-            return it->second;
-        }
-        const bool ok = isSpherePassable(map, pt, radius_cm, step, blocked_cells);
-        passable_memo.emplace(key, ok);
-        return ok;
-    };
-
-    GridIntMap cost_of;
-    CostQueue queue;
-    out.parent_of[out.start_key] = out.start_key;
-    cost_of[out.start_key] = 0;
-    queue.push({0, out.start_key});
-
-    std::vector<GridKey> frontier_list;
-    std::size_t expansions = 0;
-
-    while (!queue.empty()) {
-        if (++expansions > max_expansions) {
-            out.truncated = true;
-            break;
-        }
-        const auto [current_cost, current] = queue.top();
-        queue.pop();
-        if (current_cost > cost_of.at(current)) {
-            continue;
-        }
-        const Position3D current_pt = keyToPoint(current, config);
-        const types::VoxelOccupancy current_occ = occupancyAt(map, current_pt);
-
-        int unmapped = 0;
-        for (const Offset& off : kOffsets) {
-            const Position3D nb = keyToPoint(
-                GridKey{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz}, config);
-            if (occupancyAt(map, nb) == types::VoxelOccupancy::Unmapped) {
-                ++unmapped;
-            }
-        }
-        // Isolated Unmapped voxels have no Unmapped face neighbour, but they are the
-        // unknown volume. Including them keeps face-connected clustering as one
-        // cluster per pocket (the Empty shell alone is six disconnected cells).
-        const bool self_unmapped = current_occ == types::VoxelOccupancy::Unmapped;
-        if (unmapped > 0 || self_unmapped) {
-            if (out.frontier_cells.insert(current).second) {
-                frontier_list.push_back(current);
-            }
-        }
-
-        for (const Offset& off : kOffsets) {
-            const GridKey neighbour{current.qx + off.dx, current.qy + off.dy, current.qz + off.dz};
-            const Position3D neighbour_pt = keyToPoint(neighbour, config);
-            if (!passable(neighbour, neighbour_pt)) {
-                continue;
-            }
-            const int new_cost = current_cost + traversalCost(map, neighbour_pt);
-            if (cost_of.contains(neighbour) && new_cost >= cost_of.at(neighbour)) {
-                continue;
-            }
-            out.parent_of[neighbour] = current;
-            cost_of[neighbour] = new_cost;
-            queue.push({new_cost, neighbour});
-        }
-    }
-
-    std::unordered_set<GridKey, GridKeyHash> clustered;
-    for (const GridKey& seed : frontier_list) {
-        if (clustered.contains(seed)) {
-            continue;
-        }
-        FrontierCluster cluster;
-        std::queue<GridKey> bfs;
-        bfs.push(seed);
-        clustered.insert(seed);
-        int best_cost = cost_of.at(seed);
-        GridKey best_key = seed;
-        while (!bfs.empty()) {
-            const GridKey cell = bfs.front();
-            bfs.pop();
-            cluster.keys.push_back(cell);
-            const int cell_cost = cost_of.at(cell);
-            if (cell_cost < best_cost) {
-                best_cost = cell_cost;
-                best_key = cell;
-            }
-            for (const Offset& off : kOffsets) {
-                const GridKey neighbour{cell.qx + off.dx, cell.qy + off.dy, cell.qz + off.dz};
-                if (!out.frontier_cells.contains(neighbour) || clustered.contains(neighbour)) {
-                    continue;
-                }
-                clustered.insert(neighbour);
-                bfs.push(neighbour);
-            }
-        }
-        cluster.volume_count = cluster.keys.size();
-        std::vector<GridKey> surface;
-        surface.reserve(cluster.keys.size());
-        bool have_surface = false;
-        int surface_best_cost = 0;
-        GridKey surface_best = cluster.keys.front();
-        for (const GridKey& key : cluster.keys) {
-            const types::VoxelOccupancy occ = occupancyAt(map, keyToPoint(key, config));
-            if (occ != types::VoxelOccupancy::Empty) {
-                continue;
-            }
-            surface.push_back(key);
-            const int cell_cost = cost_of.at(key);
-            if (!have_surface || cell_cost < surface_best_cost) {
-                have_surface = true;
-                surface_best_cost = cell_cost;
-                surface_best = key;
-            }
-        }
-        if (!have_surface) {
-            // All-Unmapped start: stand on the cheapest cluster member (usually start).
-            surface.push_back(best_key);
-            surface_best = best_key;
-            surface_best_cost = best_cost;
-        }
-        cluster.keys = std::move(surface);
-        cluster.cell_count = cluster.keys.size();
-        cluster.approach_key = surface_best;
-        cluster.approach_position = keyToPoint(surface_best, config);
-        cluster.approach_cost = surface_best_cost;
-        out.clusters.push_back(std::move(cluster));
-    }
-
-    std::sort(out.clusters.begin(), out.clusters.end(),
-              [](const FrontierCluster& a, const FrontierCluster& b) {
-                  if (a.approach_key.qx != b.approach_key.qx) {
-                      return a.approach_key.qx < b.approach_key.qx;
-                  }
-                  if (a.approach_key.qy != b.approach_key.qy) {
-                      return a.approach_key.qy < b.approach_key.qy;
-                  }
-                  return a.approach_key.qz < b.approach_key.qz;
-              });
-
+    const BoundedSearchResult search = runBoundedSearch(
+        map, config, out.start_key, radius_cm, step, blocked_cells, max_expansions);
+    out.parent_of = std::move(search.parent_of);
+    out.frontier_cells = std::move(search.frontier_cells);
+    out.truncated = search.truncated;
+    out.clusters = clusterFrontierCells(map, config, search.frontier_list, out.frontier_cells,
+                                        search.cost_of);
     return out;
 }
 

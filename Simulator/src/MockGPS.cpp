@@ -21,8 +21,8 @@ double snapToCm(double value, double res_cm) {
 
 } // namespace
 
-MockGPS::MockGPS(common::Position3D position,
-                 common::Orientation heading,
+MockGPS::MockGPS(const common::Position3D& position,
+                 const common::Orientation& heading,
                  common::PhysicalLength gps_resolution)
     : heading_(heading), resolution_(gps_resolution) {
     setPosition(position);
@@ -36,7 +36,7 @@ common::Orientation MockGPS::heading() const {
     return heading_;
 }
 
-void MockGPS::setPosition(common::Position3D position) {
+void MockGPS::setPosition(const common::Position3D& position) {
     using common::cm;
     using common::x_extent;
     using common::y_extent;
@@ -50,7 +50,7 @@ void MockGPS::setPosition(common::Position3D position) {
     };
 }
 
-void MockGPS::setHeading(common::Orientation heading) {
+void MockGPS::setHeading(const common::Orientation& heading) {
     heading_ = heading;
 }
 

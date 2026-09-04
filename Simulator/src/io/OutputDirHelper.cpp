@@ -1,6 +1,6 @@
-#include <Simulator/io/OutputDirHelper.h>
+#include <Simulator/io/SimulatorPaths.h>
 
-#include <user_common_207190406_209543255/TimeFormat.h>
+#include <user_common_207190406_209543255/IRunErrorLog.h>
 
 namespace simulator::io {
 

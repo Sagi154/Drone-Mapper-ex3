@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -94,13 +95,13 @@ public:
 
 TEST(RunMatrixOrchestrator, ExpandSizeIsGroupsTimesDronesTimesLidars) {
     const auto composition = makeLiteralComposition();
-    const auto cells       = simulator::RunMatrixOrchestrator::expand(composition);
 
     constexpr std::size_t kGroups = 2;
     constexpr std::size_t kDrones = 2;
     constexpr std::size_t kLidars = 3;
-    EXPECT_EQ(cells.size(), kGroups * kDrones * kLidars);
-    EXPECT_EQ(simulator::RunMatrixOrchestrator::cellCount(composition), 12U);
+    EXPECT_EQ(simulator::countRunMatrixCells(composition), 12U);
+    EXPECT_EQ(simulator::expandRunMatrix(composition).size(), 12U);
+    EXPECT_EQ(simulator::expandRunMatrix(composition).size(), kGroups * kDrones * kLidars);
 }
 
 TEST(RunMatrixOrchestrator, EverySlotWrittenOnceForOnePlugin) {
@@ -108,10 +109,10 @@ TEST(RunMatrixOrchestrator, EverySlotWrittenOnceForOnePlugin) {
     FakeRunFactory factory;
 
     const std::vector<simulator::PluginMatrixBinding> plugins = {
-        {"plugin_a.so", &factory},
+        {"plugin_a.so", std::ref(factory)},
     };
 
-    const auto table = simulator::RunMatrixOrchestrator::run(
+    const auto table = simulator::runPluginMatrix(
         plugins, composition, std::filesystem::path{"/tmp/orch_test"}, /*num_threads=*/1);
 
     ASSERT_EQ(table.size(), 1U);
@@ -134,11 +135,11 @@ TEST(RunMatrixOrchestrator, TwoPluginsGetIndependentResultRows) {
     FakeRunFactory factory_b;
 
     const std::vector<simulator::PluginMatrixBinding> plugins = {
-        {"a.so", &factory_a},
-        {"b.so", &factory_b},
+        {"a.so", std::ref(factory_a)},
+        {"b.so", std::ref(factory_b)},
     };
 
-    const auto table = simulator::RunMatrixOrchestrator::run(
+    const auto table = simulator::runPluginMatrix(
         plugins, composition, std::filesystem::path{"/tmp/orch_test2"}, /*num_threads=*/4);
 
     ASSERT_EQ(table.size(), 2U);
@@ -160,11 +161,11 @@ TEST(RunMatrixOrchestrator, ThrowingRunWritesFailureSentinelWithoutAbortingMatri
 
     // Two plugins: first throws on every cell, second succeeds.
     const std::vector<simulator::PluginMatrixBinding> plugins = {
-        {"bad.so", &throwing},
-        {"good.so", &ok_factory},
+        {"bad.so", std::ref(throwing)},
+        {"good.so", std::ref(ok_factory)},
     };
 
-    const auto table = simulator::RunMatrixOrchestrator::run(
+    const auto table = simulator::runPluginMatrix(
         plugins, composition, std::filesystem::path{"/tmp/orch_throw"}, /*num_threads=*/2);
 
     ASSERT_EQ(table.size(), 2U);

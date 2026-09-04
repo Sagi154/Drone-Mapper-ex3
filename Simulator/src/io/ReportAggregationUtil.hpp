@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <Simulator/RunMatrixOrchestrator.h>
+#include <Simulator/RunMatrixTypes.h>
 
 namespace simulator::io::detail {
 

@@ -1,6 +1,6 @@
 // test_output_dir_helper.cpp
 
-#include <Simulator/io/OutputDirHelper.h>
+#include <Simulator/io/SimulatorPaths.h>
 
 #include <gtest/gtest.h>
 

@@ -84,9 +84,6 @@ void forEachGridCenter(const MapConfig& config, const Visitor& visitor) {
     }
 }
 
-// BFS through Empty cells in `reference`, seeded at `spawn`, bounded by
-// `scoring_config` (the produced/output map's region). Occupied cells adjacent
-// to a visited Empty cell are added as "visible walls" (counted, not traversed).
 [[nodiscard]] std::unordered_set<GridKey, GridKeyHash> computeReachable(
     const common::IMap3D& reference, const Position3D& spawn, const MapConfig& scoring_config) {
     const double step = scoring_config.resolution.numerical_value_in(cm);
@@ -141,7 +138,7 @@ void forEachGridCenter(const MapConfig& config, const Visitor& visitor) {
                 queue.push(nb);
             } else if (occ == VoxelOccupancy::Occupied ||
                        occ == VoxelOccupancy::PotentiallyOccupied) {
-                reachable.insert(nb); // visible wall — counted, not traversed
+                reachable.insert(nb);
             }
         }
     }
@@ -151,8 +148,8 @@ void forEachGridCenter(const MapConfig& config, const Visitor& visitor) {
 
 } // namespace
 
-double MapsComparison::compare(const common::IMap3D& origin, const common::IMap3D& target,
-                               std::optional<Position3D> spawn) {
+double compareMaps(const common::IMap3D& origin, const common::IMap3D& target,
+                   std::optional<Position3D> spawn) {
     const MapConfig target_config = target.getMapConfig();
 
     std::optional<std::unordered_set<GridKey, GridKeyHash>> reachable_set;
@@ -169,7 +166,6 @@ double MapsComparison::compare(const common::IMap3D& origin, const common::IMap3
     std::size_t correct = 0;
     std::size_t total = 0;
 
-    // Pass 1: reference cells within the target map's region.
     forEachGridCenter(target_config, [&](const Position3D& pos) {
         if (!target.isInBounds(pos)) {
             return;
@@ -198,8 +194,6 @@ double MapsComparison::compare(const common::IMap3D& origin, const common::IMap3
         }
     });
 
-    // Pass 2: target cells with known occupancy not already covered above
-    // (extra mapped area outside the reference's known region).
     forEachGridCenter(target_config, [&](const Position3D& pos) {
         if (!target.isInBounds(pos)) {
             return;

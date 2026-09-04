@@ -2,9 +2,10 @@
 
 #include <Common/IDroneMovement.h>
 #include <Common/IMap3D.h>
-#include <Simulator/MockGPS.h>
 
 namespace simulator {
+
+class MockGPS;
 
 /// Simulated drone movement driver.
 /// Validates per-command limits and performs sphere-based collision detection
@@ -15,7 +16,7 @@ class MockMovement final : public common::IDroneMovement {
 public:
     MockMovement(MockGPS& gps,
                  const common::IMap3D& hidden_map,
-                 common::types::DroneConfigData drone_config);
+                 const common::types::DroneConfigData& drone_config);
 
     common::types::MovementResult rotate(common::types::RotationDirection direction,
                                          common::HorizontalAngle angle) override;

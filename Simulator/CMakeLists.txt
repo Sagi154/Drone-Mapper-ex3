@@ -5,10 +5,13 @@ add_executable(test_simulator_mocks
     src/MockGPS.cpp
     src/MockLidar.cpp
     src/MockMovement.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
 )
 
 target_include_directories(test_simulator_mocks PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
 )
 
 target_link_libraries(test_simulator_mocks PRIVATE
@@ -24,6 +27,7 @@ add_executable(test_map3d_impl
 
 target_include_directories(test_map3d_impl PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(test_map3d_impl PRIVATE
@@ -76,6 +80,7 @@ add_executable(test_usercommon_simulation_coord_util
 )
 target_include_directories(test_usercommon_simulation_coord_util PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/UserCommon/include
     ${CMAKE_SOURCE_DIR}/common/include
     ${CMAKE_SOURCE_DIR}/Simulator/common_simulator/include
@@ -119,6 +124,7 @@ set(SIMULATOR_CORE_SOURCES
     src/Map3DImpl.cpp
     src/SimulationRunImpl.cpp
     src/SimulationRunFactoryImpl.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/RunErrorLog.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp
@@ -455,6 +461,7 @@ set(SIMULATOR_MAIN_SOURCES
     src/io/CompetitiveReportWriter.cpp
     src/io/OutputDirHelper.cpp
     ${YAML_PARSER_SOURCES}
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/RunErrorLog.cpp
     ${CMAKE_SOURCE_DIR}/UserCommon/src/SimulationCoordUtil.cpp

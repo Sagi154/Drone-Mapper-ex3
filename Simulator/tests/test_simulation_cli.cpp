@@ -1,7 +1,7 @@
 // test_simulation_cli.cpp — standalone SimulationCli parse/validation tests.
 // No loader, threading, or plugins. Never expects exit().
 
-#include <Simulator/io/SimulationCli.h>
+#include <Simulator/io/SimulatorPaths.h>
 
 #include <gtest/gtest.h>
 

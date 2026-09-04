@@ -28,10 +28,10 @@ public:
                       std::unique_ptr<common::ILidar>          lidar,
                       std::unique_ptr<common::IMappingAlgorithm> mapping_algorithm,
                       std::unique_ptr<common::IMissionControl> mission_control,
-                      types::SimulationConfigData              simulation_config,
-                      common::types::MissionConfigData         mission_config,
+                      const types::SimulationConfigData&       simulation_config,
+                      const common::types::MissionConfigData&  mission_config,
                       std::filesystem::path                    output_map_file,
-                      std::vector<common::types::ErrorRef>     startup_errors);
+                      const std::vector<common::types::ErrorRef>& startup_errors);
 
     [[nodiscard]] types::SimulationResult run() override;
 

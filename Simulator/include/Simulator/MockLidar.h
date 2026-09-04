@@ -8,7 +8,7 @@ namespace simulator {
 
 class MockLidar final : public common::ILidar {
 public:
-    MockLidar(common::types::LidarConfigData config,
+    MockLidar(const common::types::LidarConfigData& config,
               const common::IMap3D& map,
               const common::IGPS& gps);
 

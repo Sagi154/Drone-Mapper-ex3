@@ -10,7 +10,7 @@
 
 #include <Simulator/SimulationRunFactoryImpl.h>
 
-#include <Simulator/Map3DImpl.h>
+#include "Map3DNpy.h"
 #include <Simulator/MockGPS.h>
 #include <Simulator/MockLidar.h>
 #include <Simulator/MockMovement.h>
@@ -115,11 +115,11 @@ namespace UC = user_common_207190406_209543255;
 } // namespace
 
 SimulationRunFactoryImpl::SimulationRunFactoryImpl(
-    common::MappingAlgorithmFactory  algorithm_factory,
-    common::MissionControlFactory    mission_control_factory,
-    bool                             verbose)
-    : algorithm_factory_(std::move(algorithm_factory)),
-      mission_control_factory_(std::move(mission_control_factory)),
+    const common::MappingAlgorithmFactory& algorithm_factory,
+    const common::MissionControlFactory&   mission_control_factory,
+    bool                                   verbose)
+    : algorithm_factory_(algorithm_factory),
+      mission_control_factory_(mission_control_factory),
       verbose_(verbose) {}
 
 std::unique_ptr<ISimulationRun>
@@ -139,16 +139,17 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData&      simulat
         map_array = std::make_shared<NpyArray>();
     }
 
-    auto hidden_map = std::make_unique<Map3DImpl>(map_array, MapRole::Hidden,
-                                                   hiddenMapConfig(simulation_config));
+    auto hidden_map = std::make_unique<Map3DImpl>(
+        makeMap3D(map_array, MapRole::Hidden, hiddenMapConfig(simulation_config)));
 
     // Compute and allocate output map
     const MapConfig out_cfg = outputMapConfig(simulation_config, mission_config, *hidden_map);
-    auto output_map = std::make_unique<Map3DImpl>(makeEmptyOutputArray(out_cfg),
-                                                   MapRole::Output, out_cfg);
+    auto output_map = std::make_unique<Map3DImpl>(
+        makeMap3D(makeEmptyOutputArray(out_cfg), MapRole::Output, out_cfg));
 
     // Compute world spawn position (local + map_axes_offset)
-    const Position3D world_spawn = UC::worldInitialDronePosition(simulation_config);
+    const Position3D world_spawn = UC::worldInitialDronePosition(
+        simulation_config.initial_drone_position, simulation_config.map_offset.z);
 
     if (startup_errors.empty()) {
         if (!UC::isDroneSpawnPassable(*hidden_map, drone_config.radius, world_spawn)) {

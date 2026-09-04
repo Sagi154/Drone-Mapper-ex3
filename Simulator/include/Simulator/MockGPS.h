@@ -8,15 +8,15 @@ namespace simulator {
 /// gps_resolution grid multiple, matching MissionConfigData::gps_resolution.
 class MockGPS final : public common::IGPS {
 public:
-    MockGPS(common::Position3D position,
-            common::Orientation heading,
+    MockGPS(const common::Position3D& position,
+            const common::Orientation& heading,
             common::PhysicalLength gps_resolution);
 
     [[nodiscard]] common::Position3D position() const override;
     [[nodiscard]] common::Orientation heading() const override;
 
-    void setPosition(common::Position3D position);
-    void setHeading(common::Orientation heading);
+    void setPosition(const common::Position3D& position);
+    void setHeading(const common::Orientation& heading);
 
 private:
     common::Position3D position_{};

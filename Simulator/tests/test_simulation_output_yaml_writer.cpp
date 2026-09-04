@@ -1,6 +1,6 @@
 // test_simulation_output_yaml_writer.cpp
 
-#include <Simulator/io/SimulationOutputYamlWriter.h>
+#include <Simulator/io/SimulatorReports.h>
 
 #include <gtest/gtest.h>
 #include <yaml-cpp/yaml.h>

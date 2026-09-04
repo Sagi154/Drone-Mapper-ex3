@@ -298,10 +298,10 @@ TEST(DroneControl, CollisionBlockedThrowContinues) {
     EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
 }
 
-TEST(DroneControl, NonRecoverableThrowEscapesStep) {
+TEST(DroneControl, UnsuccessfulMovementResultIsRecoverableWithoutStringMatch) {
     Fixture fixture;
-    fixture.movement.throw_on_advance_ = true;
-    fixture.movement.advance_throw_message_ = "unexpected movement failure";
+    fixture.movement.advance_ok_ = false;
+    fixture.movement.advance_fail_message_ = "no-keywords";
 
     const auto mission = defaultMission();
     const auto lidar_cfg = defaultLidar();
@@ -329,7 +329,43 @@ TEST(DroneControl, NonRecoverableThrowEscapesStep) {
         algorithm,
     };
 
-    EXPECT_THROW({ (void)control.step(); }, std::runtime_error);
+    const auto result = control.step();
+    EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
+}
+
+TEST(DroneControl, MovementExceptionRecoversWithoutMessageMatch) {
+    Fixture fixture;
+    fixture.movement.throw_on_advance_ = true;
+    fixture.movement.advance_throw_message_ = "wall";
+
+    const auto mission = defaultMission();
+    const auto lidar_cfg = defaultLidar();
+    const auto drone_cfg = defaultDrone();
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{mission, lidar_cfg, drone_cfg, fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 10.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(),
+        defaultMission(),
+        defaultLidar(),
+        fixture.lidar,
+        fixture.gps,
+        fixture.movement,
+        fixture.output_map,
+        algorithm,
+    };
+
+    const auto result = control.step();
+    EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
 }
 
 TEST(DroneControl, ExecutesScanThenContinues) {
@@ -443,7 +479,7 @@ TEST(DroneControl, RecoverableBlockedStillScans) {
     EXPECT_EQ(control.state().step_index, 1U);
 }
 
-TEST(DroneControl, HardMovementFailureSkipsScan) {
+TEST(DroneControl, UnsuccessfulMovementResultStillScans) {
     Fixture fixture;
     fixture.movement.advance_ok_ = false;
     fixture.movement.advance_fail_message_ = "actuator fault";
@@ -476,9 +512,9 @@ TEST(DroneControl, HardMovementFailureSkipsScan) {
         algorithm,
     };
 
-    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Error);
-    EXPECT_EQ(fixture.lidar.scan_count_, 0);
-    EXPECT_EQ(control.state().step_index, 0U);
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.lidar.scan_count_, 1);
+    EXPECT_EQ(control.state().step_index, 1U);
 }
 
 TEST(DroneControl, AlwaysScanAlgorithmScansOncePerStep) {

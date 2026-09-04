@@ -30,15 +30,15 @@ PluginLoader::~PluginLoader() { unloadAll(); }
 void PluginLoader::unloadAll() {
     algorithms_.clear();
     mission_controls_.clear();
-    PluginRegistrar::instance().clearPendingAlgorithmFactory();
-    PluginRegistrar::instance().clearPendingMissionControlFactory();
 
-    for (auto& entry : handles_) {
-        if (entry.handle != nullptr) {
-            ::dlclose(entry.handle);
-            entry.handle = nullptr;
-        }
+    // Moved-from / never-loaded loaders must not touch the process-wide registrar
+    // or dlclose handles they no longer own (DlHandle unique_ptr is already empty).
+    const bool owns_session = !handles_.empty() || !loaded_canonical_paths_.empty();
+    if (owns_session) {
+        PluginRegistrar::instance().clearPendingAlgorithmFactory();
+        PluginRegistrar::instance().clearPendingMissionControlFactory();
     }
+
     handles_.clear();
     loaded_canonical_paths_.clear();
 }
@@ -62,13 +62,12 @@ std::vector<std::filesystem::path> PluginLoader::listSoFiles(
     return files;
 }
 
-bool PluginLoader::tryOpen(const std::filesystem::path& so_path, std::string& canonical_out,
-                           void*& handle_out, std::string& error_detail) {
+DlHandle PluginLoader::tryOpen(const std::filesystem::path& so_path, std::string& canonical_out,
+                               std::string& error_detail) {
     canonical_out = canonicalize(so_path);
     if (loaded_canonical_paths_.contains(canonical_out)) {
         error_detail = "already loaded (reload forbidden)";
-        handle_out   = nullptr;
-        return false;
+        return {};
     }
 
     ::dlerror(); // clear
@@ -76,12 +75,10 @@ bool PluginLoader::tryOpen(const std::filesystem::path& so_path, std::string& ca
     if (handle == nullptr) {
         const char* err = ::dlerror();
         error_detail    = (err != nullptr) ? err : "dlopen returned null";
-        handle_out      = nullptr;
-        return false;
+        return {};
     }
 
-    handle_out = handle;
-    return true;
+    return DlHandle{handle};
 }
 
 PluginLoadOutcome PluginLoader::loadOneAlgorithm(const std::filesystem::path& so_path) {
@@ -92,9 +89,9 @@ PluginLoadOutcome PluginLoader::loadOneAlgorithm(const std::filesystem::path& so
     registrar.clearPendingAlgorithmFactory();
 
     std::string canonical;
-    void* handle = nullptr;
     std::string detail;
-    if (!tryOpen(so_path, canonical, handle, detail)) {
+    DlHandle handle = tryOpen(so_path, canonical, detail);
+    if (!handle) {
         std::cerr << "error: failed to load algorithm plugin '" << filename << "': " << detail
                   << '\n';
         outcome.errors.push_back(filename);
@@ -110,13 +107,13 @@ PluginLoadOutcome PluginLoader::loadOneAlgorithm(const std::filesystem::path& so
         registrar.clearPendingMissionControlFactory();
         // Record the path so a later retry cannot reload after this close.
         loaded_canonical_paths_.insert(canonical);
-        ::dlclose(handle);
+        handle.reset(); // dlclose via DlHandle destructor
         outcome.errors.push_back(filename);
         return outcome;
     }
 
     loaded_canonical_paths_.insert(canonical);
-    handles_.push_back(OpenHandle{canonical, handle});
+    handles_.push_back(std::move(handle));
     algorithms_.push_back(LoadedAlgorithmPlugin{filename, so_path, std::move(*factory)});
     return outcome;
 }
@@ -129,9 +126,9 @@ PluginLoadOutcome PluginLoader::loadOneMissionControl(const std::filesystem::pat
     registrar.clearPendingMissionControlFactory();
 
     std::string canonical;
-    void* handle = nullptr;
     std::string detail;
-    if (!tryOpen(so_path, canonical, handle, detail)) {
+    DlHandle handle = tryOpen(so_path, canonical, detail);
+    if (!handle) {
         std::cerr << "error: failed to load mission-control plugin '" << filename
                   << "': " << detail << '\n';
         outcome.errors.push_back(filename);
@@ -147,13 +144,13 @@ PluginLoadOutcome PluginLoader::loadOneMissionControl(const std::filesystem::pat
         registrar.clearPendingMissionControlFactory();
         // Record the path so a later retry cannot reload after this close.
         loaded_canonical_paths_.insert(canonical);
-        ::dlclose(handle);
+        handle.reset(); // dlclose via DlHandle destructor
         outcome.errors.push_back(filename);
         return outcome;
     }
 
     loaded_canonical_paths_.insert(canonical);
-    handles_.push_back(OpenHandle{canonical, handle});
+    handles_.push_back(std::move(handle));
     mission_controls_.push_back(
         LoadedMissionControlPlugin{filename, so_path, std::move(*factory)});
     return outcome;

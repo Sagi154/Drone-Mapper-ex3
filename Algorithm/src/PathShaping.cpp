@@ -15,6 +15,9 @@ using common::Orientation;
 using common::Position3D;
 using common::cm;
 using common::deg;
+using common::x_extent;
+using common::y_extent;
+using common::z_extent;
 
 constexpr double kSameAltitudeEpsilonCm = 1e-6;
 constexpr double kSameAxisEpsilonCm = 1e-6;
@@ -62,7 +65,7 @@ std::vector<Position3D> stringPullConstantAltitude(const common::IMap3D& map,
         std::size_t best = anchor + 1;
         for (std::size_t probe = anchor + 2; probe < path.size(); ++probe) {
             if (!sameAltitude(path[anchor], path[probe])) {
-                break;  // an altitude change ends the mergeable run
+                break;
             }
             if (!hasClearLineOfSight(map, path[anchor], path[probe], drone_radius)) {
                 break;

@@ -43,7 +43,6 @@ public:
 private:
     struct Impl;
 
-    void ensurePlanningReady();
     [[nodiscard]] std::size_t remainingSteps(const common::types::DroneState& state) const;
     void pruneExpiredBlockedCells(std::size_t step_index);
     [[nodiscard]] bool replan(const common::types::DroneState& state, bool ignore_blocked);
@@ -54,12 +53,23 @@ private:
     [[nodiscard]] common::types::DroneState predictPose(
         const common::types::DroneState& state,
         const common::types::MovementCommand& movement) const;
-    void buildArrivalSweep(const common::types::DroneState& state);
+    void buildArrivalSweep(const common::types::DroneState& state,
+                           const common::types::MapConfig& map_config);
     [[nodiscard]] bool targetClusterAlive() const;
     [[nodiscard]] bool reachedWaypoint(const common::types::DroneState& state,
-                                       const common::Position3D& target) const;
+                                       const common::Position3D& target,
+                                       const common::types::MapConfig& map_config) const;
     [[nodiscard]] bool samePosition(const common::Position3D& a,
                                     const common::Position3D& b) const;
+    [[nodiscard]] common::types::MappingStepCommand finishIfUnmapped(
+        std::optional<std::size_t> known_unmapped = std::nullopt) const;
+    [[nodiscard]] bool handleReplan(const common::types::DroneState& state,
+                                    bool plan_exhausted,
+                                    bool interval_elapsed,
+                                    bool cluster_dead);
+    [[nodiscard]] bool updateProgressWindow();
+    [[nodiscard]] common::types::MappingStepCommand emitMovementOrScan(
+        const common::types::DroneState& state, const common::types::MapConfig& map_config);
 
     std::unique_ptr<Impl> impl_;
 

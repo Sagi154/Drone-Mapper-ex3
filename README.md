@@ -89,7 +89,7 @@ Each run creates a fresh output directory (never reused):
 - Comparative mode: `<mission_control_folder>/comparative_results_<UTC time>[_N]`
 - Competition mode: `<algorithms_folder>/competition_<UTC time>[_N]`
 
-`<UTC time>` is `currentUtcTimestamp()` (`UserCommon_207190406_209543255/TimeFormat.h`); `_N`
+`<UTC time>` is `currentUtcTimestamp()` (`user_common_207190406_209543255/IRunErrorLog.h`); `_N`
 is appended starting at `_2` if a directory with that name already exists (same-second collision).
 
 Inside that directory:
@@ -102,6 +102,6 @@ Inside that directory:
   <plugin>_run_NNNN_error.log                # per-run error log
 ```
 
-`NNNN` is the flat cell index from `RunMatrixOrchestrator::expand` (0-based, zero-padded to 4
+`NNNN` is the flat cell index from `expandRunMatrix` (0-based, zero-padded to 4
 digits), unique across the whole run matrix and stable for a given composition + plugin order.
 `<plugin>` is always the loaded `.so` **filename**, never a path.

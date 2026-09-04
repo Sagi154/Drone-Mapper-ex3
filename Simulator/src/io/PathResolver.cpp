@@ -1,4 +1,4 @@
-#include <Simulator/io/PathResolver.h>
+#include <Simulator/io/SimulatorPaths.h>
 
 #include <vector>
 

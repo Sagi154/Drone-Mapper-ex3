@@ -13,9 +13,9 @@ namespace mission_control_207190406_209543255 {
 /// Executes one drone step: algorithm command, movement, scan, and voxel fusion.
 class DroneControlImpl final : public mission_control::IDroneControl {
 public:
-    DroneControlImpl(common::types::DroneConfigData drone,
-                     common::types::MissionConfigData mission,
-                     common::types::LidarConfigData lidar,
+    DroneControlImpl(const common::types::DroneConfigData& drone,
+                     const common::types::MissionConfigData& mission,
+                     const common::types::LidarConfigData& lidar,
                      common::ILidar& lidar_sensor,
                      common::IGPS& gps,
                      common::IDroneMovement& movement,
@@ -26,6 +26,10 @@ public:
     [[nodiscard]] common::types::DroneState state() const override;
 
 private:
+    [[nodiscard]] common::types::DroneStepResult applyMovement(
+        const common::types::MappingStepCommand& command);
+    void applyScanIfRequested(const common::types::MappingStepCommand& command);
+
     common::types::DroneConfigData drone_;
     common::types::MissionConfigData mission_;
     common::types::LidarConfigData lidar_;

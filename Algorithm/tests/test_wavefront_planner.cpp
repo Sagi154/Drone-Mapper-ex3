@@ -289,7 +289,7 @@ TEST(WavefrontPlanner, IsDeterministicAcrossIdenticalCalls) {
     }
     EXPECT_EQ(a.target_cluster_cells, b.target_cluster_cells);
     EXPECT_DOUBLE_EQ(a.expected_rate, b.expected_rate);
-    ASSERT_EQ(a.target_keys.size(), b.target_keys.size());
+    ASSERT_EQ(a.internals.target_keys.size(), b.internals.target_keys.size());
 }
 
 TEST(WavefrontPlanner, UnsticksWhenStartSphereHitsOccupiedFloor) {
@@ -391,7 +391,7 @@ TEST(WavefrontPlanner, AlternatesExcludeBestAndAreSortedByRate) {
     }
     EXPECT_GE(alternates[0].expected_rate, alternates[1].expected_rate);
     for (const detail::ExplorationPlan& alt : alternates) {
-        EXPECT_NE(alt.target_keys, best.target_keys);
+        EXPECT_NE(alt.internals.target_keys, best.internals.target_keys);
     }
 }
 

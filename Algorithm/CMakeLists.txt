@@ -4,6 +4,9 @@ add_library(Algorithm_207190406_209543255 SHARED
     src/PathShaping.cpp
     src/WavefrontPlanner.cpp
     src/ScanPlanning.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/LidarCone.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/ConeTemplate.cpp
 )
 set_target_properties(Algorithm_207190406_209543255 PROPERTIES PREFIX "")
 target_link_libraries(Algorithm_207190406_209543255 PRIVATE common::common)
@@ -27,6 +30,9 @@ add_executable(algorithm_test
     src/PathShaping.cpp
     src/WavefrontPlanner.cpp
     src/ScanPlanning.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/BeamMath.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/LidarCone.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/ConeTemplate.cpp
     # Stub: satisfies MappingAlgorithmRegistration ctor (provided by Simulator in prod).
     tests/StubPluginRegistration.cpp
 )

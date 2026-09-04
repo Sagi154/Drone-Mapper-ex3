@@ -3,31 +3,27 @@
 
 #pragma once
 
-#include <Common/MappingAlgorithmFactory.h>
-#include <Common/MissionControlFactory.h>
+#include <Simulator/PluginLoadTypes.h>
 
+#include <dlfcn.h>
+
+#include <cstddef>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 namespace simulator {
 
-struct LoadedAlgorithmPlugin {
-    std::string filename; // basename only — report identity
-    std::filesystem::path path;
-    common::MappingAlgorithmFactory factory;
+struct DlCloser {
+    void operator()(void* handle) const noexcept {
+        if (handle != nullptr) {
+            ::dlclose(handle);
+        }
+    }
 };
-
-struct LoadedMissionControlPlugin {
-    std::string filename;
-    std::filesystem::path path;
-    common::MissionControlFactory factory;
-};
-
-struct PluginLoadOutcome {
-    std::vector<std::string> errors; // basenames that failed this call
-};
+using DlHandle = std::unique_ptr<void, DlCloser>;
 
 class PluginLoader {
 public:
@@ -36,6 +32,8 @@ public:
 
     PluginLoader(const PluginLoader&)            = delete;
     PluginLoader& operator=(const PluginLoader&) = delete;
+    PluginLoader(PluginLoader&&) noexcept        = default;
+    PluginLoader& operator=(PluginLoader&&)      = delete;
 
     [[nodiscard]] PluginLoadOutcome loadAlgorithmSo(const std::filesystem::path& so_path);
     [[nodiscard]] PluginLoadOutcome loadAlgorithmsFromDirectory(
@@ -45,32 +43,29 @@ public:
     [[nodiscard]] PluginLoadOutcome loadMissionControlsFromDirectory(
         const std::filesystem::path& directory);
 
-    [[nodiscard]] const std::vector<LoadedAlgorithmPlugin>& algorithms() const {
-        return algorithms_;
+    [[nodiscard]] std::size_t algorithmCount() const { return algorithms_.size(); }
+    [[nodiscard]] const LoadedAlgorithmPlugin& algorithmAt(std::size_t i) const {
+        return algorithms_.at(i);
     }
-    [[nodiscard]] const std::vector<LoadedMissionControlPlugin>& missionControls() const {
-        return mission_controls_;
+    [[nodiscard]] std::size_t missionControlCount() const { return mission_controls_.size(); }
+    [[nodiscard]] const LoadedMissionControlPlugin& missionControlAt(std::size_t i) const {
+        return mission_controls_.at(i);
     }
 
     /// Destroys stored factories, then dlclose every handle. Safe to call multiple times.
     void unloadAll();
 
 private:
-    struct OpenHandle {
-        std::string canonical;
-        void* handle = nullptr;
-    };
-
     [[nodiscard]] PluginLoadOutcome loadOneAlgorithm(const std::filesystem::path& so_path);
     [[nodiscard]] PluginLoadOutcome loadOneMissionControl(const std::filesystem::path& so_path);
-    [[nodiscard]] bool tryOpen(const std::filesystem::path& so_path, std::string& canonical_out,
-                               void*& handle_out, std::string& error_detail);
+    [[nodiscard]] DlHandle tryOpen(const std::filesystem::path& so_path, std::string& canonical_out,
+                                   std::string& error_detail);
     [[nodiscard]] static std::vector<std::filesystem::path> listSoFiles(
         const std::filesystem::path& directory);
 
     std::vector<LoadedAlgorithmPlugin> algorithms_;
     std::vector<LoadedMissionControlPlugin> mission_controls_;
-    std::vector<OpenHandle> handles_;
+    std::vector<DlHandle> handles_;
     std::unordered_set<std::string> loaded_canonical_paths_;
 };
 

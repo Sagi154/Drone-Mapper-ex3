@@ -13,9 +13,9 @@ namespace simulator {
 /// loaded plugin factories) can instantiate this without knowing the plugin details.
 class SimulationRunFactoryImpl final : public ISimulationRunFactory {
 public:
-    SimulationRunFactoryImpl(common::MappingAlgorithmFactory algorithm_factory,
-                              common::MissionControlFactory   mission_control_factory,
-                              bool                            verbose);
+    SimulationRunFactoryImpl(const common::MappingAlgorithmFactory& algorithm_factory,
+                              const common::MissionControlFactory&   mission_control_factory,
+                              bool                                   verbose);
 
     [[nodiscard]] std::unique_ptr<ISimulationRun> create(
         const types::SimulationConfigData&    simulation_config,

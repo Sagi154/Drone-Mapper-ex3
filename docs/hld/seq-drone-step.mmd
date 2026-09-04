@@ -5,6 +5,7 @@ sequenceDiagram
     participant GPS as MockGPS
     participant Move as MockMovement
     participant Lidar as MockLidar
+    participant SR as applyScanToMap
     participant Map as output Map3DImpl
 
     loop until Finished / MaxSteps / Error
@@ -19,7 +20,8 @@ sequenceDiagram
         else normal movement
             DC->>Move: rotate/advance/elevate
             DC->>Lidar: scan(orientations)
-            DC->>Map: set voxels from scan
+            DC->>SR: applyScanToMap
+            SR->>Map: set voxels
         end
         DC-->>MC: DroneStepResult
     end

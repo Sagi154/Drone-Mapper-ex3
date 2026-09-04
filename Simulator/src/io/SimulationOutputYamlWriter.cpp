@@ -1,5 +1,5 @@
-#include <Simulator/io/SimulationOutputYamlWriter.h>
-#include <Simulator/OutputPathUtil.h>
+#include <Simulator/io/SimulatorPaths.h>
+#include <Simulator/io/SimulatorReports.h>
 
 #include <Common/Units.h>
 
@@ -101,7 +101,7 @@ namespace {
     node["run_id"] = entry.run_id;
     node["output_map_file"] = pathForYaml(output_dir, result.output_map_file);
     node["error_log_file"] = pathForYaml(
-        output_dir, simulator::errorLogPathFromOutputMap(result.output_map_file));
+        output_dir, errorLogPathFromOutputMap(result.output_map_file));
     node["resolution_request_status"] =
         resolutionRequestStatusLabel(result.resolution_request_status);
     node["mission_score"] = result.mission_score;

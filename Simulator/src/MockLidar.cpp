@@ -7,17 +7,16 @@
 
 #include <Simulator/MockLidar.h>
 
+#include <user_common_207190406_209543255/BeamMath.h>
+
 #include <mp-units/systems/si/math.h>
 
-#include <algorithm>
 #include <cmath>
-#include <limits>
 
 namespace simulator {
 
 namespace {
 
-namespace mp = common::mp;
 namespace si = common::si;
 using common::cm;
 using common::deg;
@@ -63,7 +62,7 @@ using common::Orientation;
 
 } // namespace
 
-MockLidar::MockLidar(common::types::LidarConfigData config,
+MockLidar::MockLidar(const common::types::LidarConfigData& config,
                      const common::IMap3D& map,
                      const common::IGPS& gps)
     : config_(config), map_(map), gps_(gps) {}
@@ -119,32 +118,18 @@ common::types::LidarScanResult MockLidar::scan(common::Orientation scan_orientat
     return results;
 }
 
-common::PhysicalLength MockLidar::traceBeam(const common::Orientation& beam_orientation) const {
-    using common::x_extent;
-    using common::y_extent;
-    using common::z_extent;
+common::PhysicalLength MockLidar::traceBeam(const common::Orientation& beam) const {
+    using user_common_207190406_209543255::kLidarMissDistance;
+    using user_common_207190406_209543255::kLidarTraceResolutionFactor;
+    namespace bm = user_common_207190406_209543255::beam_math;
+    using common::cm;
+    using common::PhysicalLength;
+    using common::Position3D;
 
-    const Orientation beam = normalize_orientation(beam_orientation);
-    const common::Position3D origin = gps_.position();
-    const auto cos_altitude = si::cos(beam.altitude);
-    const auto dx = cos_altitude * si::cos(beam.horizontal);
-    const auto dy = cos_altitude * si::sin(beam.horizontal);
-    const auto dz = si::sin(beam.altitude);
-
-    const PhysicalLength step = 0.1 * map_.getMapConfig().resolution;
-
-    const double dir_x = dx.force_numerical_value_in(mp::one);
-    const double dir_y = dy.force_numerical_value_in(mp::one);
-    const double dir_z = dz.force_numerical_value_in(mp::one);
-
+    const Position3D origin = gps_.position();
+    const PhysicalLength step = kLidarTraceResolutionFactor * map_.getMapConfig().resolution;
     for (PhysicalLength distance = 0.0 * cm; distance <= config_.z_max; distance += step) {
-        const double distance_cm = distance.force_numerical_value_in(cm);
-
-        const common::Position3D sample{
-            origin.x + dir_x * distance_cm * x_extent[cm],
-            origin.y + dir_y * distance_cm * y_extent[cm],
-            origin.z + dir_z * distance_cm * z_extent[cm],
-        };
+        const Position3D sample = bm::pointAlongBeam(origin, beam, distance);
         if (map_.atVoxel(sample) == common::types::VoxelOccupancy::Occupied) {
             if (distance < config_.z_min) {
                 return 0.0 * cm;
@@ -152,7 +137,7 @@ common::PhysicalLength MockLidar::traceBeam(const common::Orientation& beam_orie
             return distance;
         }
     }
-    return std::numeric_limits<double>::max() * cm;
+    return kLidarMissDistance;
 }
 
 } // namespace simulator

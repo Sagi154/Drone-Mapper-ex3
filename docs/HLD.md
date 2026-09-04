@@ -37,30 +37,56 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 
 ## Main components
 
-- **`main` (`Simulator/src/main.cpp`)** — Parses CLI via `SimulationCli`, creates the
-  timestamped output directory, loads the composition YAML, loads plugins through
-  `PluginLoader`, builds one `SimulationRunFactoryImpl` per plugin binding, invokes
-  `RunMatrixOrchestrator::run`, writes comparative/competitive reports and per-plugin
-  simulation-output YAML, then calls `PluginLoader::unloadAll()` before return.
+- **`main` (`Simulator/src/main.cpp`)** — Parses CLI via `parseSimulationCliArgs`
+  (`SimulationCliArgs`), creates the timestamped output directory with
+  `createOutputDir`, loads the composition YAML, loads plugins through `PluginLoader`,
+  builds one `SimulationRunFactoryImpl` per plugin binding, invokes
+  `runPluginMatrix(bindings, composition, output_root, num_threads)` (`expandRunMatrix`
+  runs inside that call), writes reports via `writeModeReport` →
+  `writeComparativeReport` / `writeCompetitiveReport` plus per-plugin
+  `writeSimulationOutputYaml`, then destroys plugin objects and calls
+  `PluginLoader::unloadAll()` before return.
+
+- **`SimulationCli` / `SimulatorPaths` (`Simulator/io/SimulatorPaths.h`)** —
+  `parseSimulationCliArgs` returns `SimulationCliArgs`. Path helpers:
+  `createOutputDir` (fresh `comparative_results_<UTC>` / `competition_<UTC>` folder)
+  and `errorLogPathFromOutputMap` (derive `<plugin>_run_NNNN_error.log`).
+
+- **`YamlConfigParsers` (`Simulator/io/YamlConfigParsers.h`)** — Five parsers:
+  `parseCompositionFile`, `parseSimulationConfig`, `parseMissionConfig`,
+  `parseDroneConfig`, `parseLidarConfig`. Parse failures are logged immediately
+  through `RunErrorLog` / `IRunErrorLog`.
+
+- **`SimulatorReports` (`Simulator/io/SimulatorReports.h`)** —
+  `writeComparativeReport`, `writeCompetitiveReport`, `writeSimulationOutputYaml`.
+  `writeModeReport` in `main.cpp` picks the mode writer.
 
 - **`PluginLoader`** — `dlopen`s each `.so` once on the main thread
   (`loadAlgorithmSo`, `loadMissionControlsFromDirectory`, or the competitive-mode
-  equivalents). After each successful load it takes the factory registered by the
-  plugin's static constructor. Never reloads a path already held open. `unloadAll()`
-  drops factories then `dlclose`s every handle.
+  equivalents). Handles are `DlHandle` (`unique_ptr<void, DlCloser>`). After each
+  successful load it takes the factory registered by the plugin's static constructor
+  into a `LoadedAlgorithmPlugin` / `LoadedMissionControlPlugin`. Access is
+  `algorithmCount` / `algorithmAt` (and the mission-control equivalents) — no
+  `algorithms()` vector getter. Never reloads a path already held open.
+  `unloadAll()` drops factories then `dlclose`s every handle.
 
 - **`PluginRegistrar`** — Simulator-owned singleton. `MappingAlgorithmRegistration` /
   `MissionControlRegistration` objects (defined in registration headers, `.cpp` in
-  Simulator only) call `setPending*Factory` during `dlopen`; the loader immediately
-  `takePending*Factory()` so each registration is consumed exactly once.
+  Simulator only) call `setPendingAlgorithmFactory` /
+  `setPendingMissionControlFactory` during `dlopen`; the loader immediately
+  `takePending*Factory()` so each registration is consumed exactly once. Factory
+  aliases are `MappingAlgorithmFactory` / `MissionControlFactory`.
 
-- **`RunMatrixOrchestrator`** — Expands a composition into a flat matrix of cells
-  (simulation × mission × drone × lidar) and runs every cell for every plugin binding.
-  Pre-sizes the result table; each slot is written exactly once.
+- **`runPluginMatrix`** — Free-function module (`RunMatrixOrchestrator.h`). Expands a
+  composition into a flat `MatrixCell` list via `expandRunMatrix` (simulation ×
+  mission × drone × lidar) **inside**
+  `runPluginMatrix(bindings, composition, output_root, num_threads)`, then runs every
+  cell for every plugin binding. Pre-sizes the result table; each slot is written
+  exactly once.
 
-- **`WorkDistributor`** — Schedules cell indices across threads. `num_threads` absent or
-  `1` → main thread only. `N >= 2` → up to `N` worker threads (capped at cell count);
-  main joins. Wraps per-cell work in `try`/`catch` so a plugin throw cannot terminate
+- **`distributeWork`** — Free-function scheduler. `num_threads` absent or `1` → main
+  thread only. `N >= 2` → up to `N` worker threads (capped at cell count); main
+  joins. Wraps per-cell work in `try`/`catch` so a plugin throw cannot terminate
   the process.
 
 - **`SimulationRunFactoryImpl`** — Implements `simulator::ISimulationRunFactory`.
@@ -70,13 +96,15 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   `SimulationRunImpl`.
 
 - **`SimulationRunImpl`** — Implements `simulator::ISimulationRun`. Calls
-  `missionControl->runMission()`, saves the output map, scores with `MapsComparison`
-  against the hidden map, and returns `SimulationResult`. Contains exceptions from
-  `runMission()` so a single bad run scores `-1` without aborting the matrix.
+  `missionControl->runMission()`, saves the output map, scores with
+  `compareMaps(hidden, output, spawn)` against the hidden map, and returns
+  `SimulationResult`. Per-run `RunErrorLog` path comes from
+  `errorLogPathFromOutputMap`. Contains exceptions from `runMission()` so a single
+  bad run scores `-1` without aborting the matrix.
 
 - **Mocks + maps + scoring (`Simulator/src/`)** — `Map3DImpl` (hidden + output),
   `MockGPS`, `MockLidar`, `MockMovement` (holds the hidden map; throws on wall/boundary
-  collision), `MapsComparison`.
+  collision), `compareMaps`. `makeMap3D` is src-only (`Map3DNpy.h`).
 
 - **`MissionControlImpl_207190406_209543255`** — Plugin entry point implementing
   `common::IMissionControl`. Creates `DroneControlImpl`, loops `step()` until the
@@ -84,19 +112,22 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 
 - **`DroneControlImpl`** — Implements `mission_control::IDroneControl`. Each step
   queries GPS, asks the algorithm for a `MappingStepCommand`, executes movement or lidar
-  scan, and writes scan results into the output map via `ScanResultToVoxels`.
+  scan, and writes scan results into the output map via `applyScanToMap`.
 
 - **`MappingAlgorithmImpl_207190406_209543255`** — Plugin entry point implementing
   `common::IMappingAlgorithm`. Reads the world through `const common::IMap3D&` only.
-  Uses Wavefront Frontier Detection over a reachability substrate
-  (`MappingAlgorithmFrontier`) to pick a cluster, then emits movement plus a
-  score-aware scan toward that cluster.
+  Uses `WavefrontPlanner` over a reachability substrate (`MappingAlgorithmFrontier`)
+  to pick a cluster, then emits movement plus a score-aware scan toward that cluster.
+  Scan templates are `ConeTemplateCache` / `VoxelStamp`.
+
+- **`SimulationCoordUtil`** — Shared world/voxel helpers:
+  `worldInitialDronePosition`, `forEachSphereSample`.
 
 **Note on `simulator::ISimulation`:** The course publishes
 `Simulator/common_simulator/include/Simulator/ISimulation.h`, but we do **not**
 implement it. Comparative/competitive orchestration, threading, and plugin loading live
-in `main` + `RunMatrixOrchestrator` instead. There is no ex2-style `SimulationManager`
-class — the executable entry point is the orchestrator.
+in `main` + `runPluginMatrix` instead. There is no ex2-style `SimulationManager`
+class — the executable entry point is `main`.
 
 ## Class diagram
 
@@ -107,17 +138,68 @@ classDiagram
     direction TB
 
     class main {
-      +parse CLI
-      +load plugins
-      +RunMatrixOrchestrator.run
-      +write reports
-      +dlclose
+      +writeModeReport()
+      +unloadAll()
+    }
+
+    class SimulationCli {
+      <<module>>
+      +parseSimulationCliArgs() SimulationCliArgs
+    }
+
+    class SimulatorPaths {
+      <<module>>
+      +createOutputDir()
+      +errorLogPathFromOutputMap()
+    }
+
+    class YamlConfigParsers {
+      <<module>>
+      +parseCompositionFile()
+      +parseSimulationConfig()
+      +parseMissionConfig()
+      +parseDroneConfig()
+      +parseLidarConfig()
+    }
+
+    class SimulatorReports {
+      <<module>>
+      +writeComparativeReport()
+      +writeCompetitiveReport()
+      +writeSimulationOutputYaml()
+    }
+
+    class runPluginMatrix {
+      <<module>>
+      +runPluginMatrix(bindings, composition, output_root, num_threads)
+      +expandRunMatrix()
+    }
+
+    class distributeWork {
+      <<module>>
+      +distributeWork()
+    }
+
+    class compareMaps {
+      <<module>>
+      +compareMaps(hidden, output, spawn)
+    }
+
+    class applyScanToMap {
+      <<module>>
+      +applyScanToMap()
     }
 
     class PluginLoader {
-      +loadAlgorithmSo(path) LoadedAlgorithmPlugin
-      +loadMissionControlSo(path) LoadedMissionControlPlugin
+      +loadAlgorithmSo() LoadedAlgorithmPlugin
+      +loadMissionControlSo() LoadedMissionControlPlugin
+      +algorithmCount()
+      +algorithmAt()
       +unloadAll()
+    }
+
+    class DlHandle {
+      <<RAII>>
     }
 
     class PluginRegistrar {
@@ -127,14 +209,30 @@ classDiagram
       +takePendingMissionControlFactory()
     }
 
-    class RunMatrixOrchestrator {
-      +expand(composition) cells
-      +run(bindings, cells, threads) results
+    class MappingAlgorithmRegistration
+    class MissionControlRegistration
+    class MappingAlgorithmFactory
+    class MissionControlFactory
+    class MappingAlgorithmDependencies
+    class MissionControlDependencies
+    class MatrixCell
+    class LoadedAlgorithmPlugin
+    class LoadedMissionControlPlugin
+
+    class RunErrorLog {
+      +log(ErrorRef)
     }
 
-    class WorkDistributor {
-      +distribute(tasks, num_threads)
+    class SimulationCoordUtil {
+      <<module>>
+      +worldInitialDronePosition()
+      +forEachSphereSample()
     }
+
+    class WavefrontPlanner
+    class MappingAlgorithmFrontier
+    class ConeTemplateCache
+    class VoxelStamp
 
     class SimulationRunFactoryImpl {
       +create(...) ISimulationRun
@@ -148,7 +246,6 @@ classDiagram
     class MockGPS
     class MockLidar
     class MockMovement
-    class MapsComparison
 
     class MissionControlImpl_207190406_209543255 {
       +runMission() MissionRunResult
@@ -174,21 +271,39 @@ classDiagram
     class ISimulationRun
     class ISimulationRunFactory
 
+    main --> SimulationCli
+    main --> SimulatorPaths
+    main --> YamlConfigParsers
     main --> PluginLoader
-    main --> PluginRegistrar
-    main --> RunMatrixOrchestrator
-    RunMatrixOrchestrator --> WorkDistributor
-    RunMatrixOrchestrator --> SimulationRunFactoryImpl
+    main --> runPluginMatrix
+    main --> SimulatorReports
+    runPluginMatrix --> distributeWork
+    runPluginMatrix --> SimulationRunFactoryImpl
+    runPluginMatrix --> MatrixCell : expandRunMatrix
+    distributeWork --> SimulationRunFactoryImpl
     SimulationRunFactoryImpl ..|> ISimulationRunFactory
     SimulationRunFactoryImpl --> SimulationRunImpl
+    SimulationRunFactoryImpl --> MappingAlgorithmDependencies
+    SimulationRunFactoryImpl --> MissionControlDependencies
     SimulationRunImpl ..|> ISimulationRun
     SimulationRunImpl --> Map3DImpl
     SimulationRunImpl --> MockGPS
     SimulationRunImpl --> MockLidar
     SimulationRunImpl --> MockMovement
-    SimulationRunImpl --> MapsComparison
+    SimulationRunImpl --> compareMaps
+    SimulationRunImpl --> RunErrorLog
     SimulationRunImpl --> IMissionControl
     SimulationRunImpl --> IMappingAlgorithm
+    PluginLoader --> DlHandle
+    PluginLoader --> LoadedAlgorithmPlugin
+    PluginLoader --> LoadedMissionControlPlugin
+    PluginLoader ..> PluginRegistrar : registration ctors
+    MappingAlgorithmRegistration --> PluginRegistrar : setPendingAlgorithmFactory
+    MissionControlRegistration --> PluginRegistrar : setPendingMissionControlFactory
+    LoadedAlgorithmPlugin --> MappingAlgorithmFactory
+    LoadedMissionControlPlugin --> MissionControlFactory
+    MappingAlgorithmFactory --> MappingAlgorithmDependencies
+    MissionControlFactory --> MissionControlDependencies
     MissionControlImpl_207190406_209543255 ..|> IMissionControl
     MissionControlImpl_207190406_209543255 --> DroneControlImpl
     DroneControlImpl ..|> IDroneControl
@@ -196,22 +311,30 @@ classDiagram
     DroneControlImpl --> ILidar
     DroneControlImpl --> IGPS
     DroneControlImpl --> IDroneMovement
-    DroneControlImpl --> IMutableMap3D
+    DroneControlImpl --> applyScanToMap
+    applyScanToMap --> IMutableMap3D
     MappingAlgorithmImpl_207190406_209543255 ..|> IMappingAlgorithm
     MappingAlgorithmImpl_207190406_209543255 --> IMap3D
+    MappingAlgorithmImpl_207190406_209543255 --> WavefrontPlanner
+    MappingAlgorithmImpl_207190406_209543255 --> MappingAlgorithmFrontier
+    MappingAlgorithmImpl_207190406_209543255 --> ConeTemplateCache
+    MappingAlgorithmImpl_207190406_209543255 --> VoxelStamp
     Map3DImpl ..|> IMutableMap3D
     IMutableMap3D --|> IMap3D
     MockLidar ..|> ILidar
     MockGPS ..|> IGPS
     MockMovement ..|> IDroneMovement
-    PluginLoader ..> PluginRegistrar : registration ctors
+    SimulationCoordUtil ..> Map3DImpl : world spawn
+    SimulatorPaths ..> RunErrorLog : errorLogPathFromOutputMap
 ```
 
 ## Sequence: one comparative cell
 
 Comparative mode fixes one algorithm `.so` and varies every `MissionControl` `.so` in a
-folder. For each `(plugin binding × matrix cell)` the orchestrator creates a fresh run,
-executes it, and collects scores.
+folder. `main` parses CLI, creates the output dir, parses the composition, loads
+plugins, then `runPluginMatrix` expands cells and `distributeWork` creates a fresh run
+per `(plugin binding × matrix cell)`. After `runMission()` the output map is saved
+**before** `compareMaps`.
 
 ![Comparative cell sequence](hld/seq-comparative-cell.png)
 
@@ -219,33 +342,43 @@ executes it, and collects scores.
 sequenceDiagram
     actor User
     participant Main as simulator main
+    participant Cli as parseSimulationCliArgs
+    participant Out as createOutputDir
+    participant Comp as parseCompositionFile
     participant Loader as PluginLoader
     participant Reg as PluginRegistrar
-    participant Orch as RunMatrixOrchestrator
+    participant Dist as distributeWork
     participant Factory as SimulationRunFactoryImpl
     participant Run as SimulationRunImpl
     participant MC as MissionControlImpl_207190406_209543255
-    participant Score as MapsComparison
+    participant Score as compareMaps
+    participant Rep as writeComparativeReport
 
     User->>Main: -comparative simulation=... mission_control_folder=... algorithm=...
+    Main->>Cli: parseSimulationCliArgs
+    Main->>Out: createOutputDir
+    Main->>Comp: parseCompositionFile
     Main->>Loader: loadAlgorithmSo + loadMissionControlsFromDirectory
     Loader->>Reg: REGISTER_* static ctors fill pending factories
-    Main->>Orch: expand composition to cells
+    Main->>Main: expandRunMatrix inside runPluginMatrix
     loop each cell x each MissionControl binding
-        Orch->>Factory: create(sim, mission, drone, lidar, algorithm factory, mc factory, ...)
+        Main->>Dist: distributeWork
+        Dist->>Factory: create(...)
         Factory->>Run: wire maps, mocks, plugins
-        Orch->>Run: run()
+        Dist->>Run: run()
         Run->>MC: runMission()
         MC-->>Run: MissionRunResult
-        Run->>Score: compare(hidden, output)
-        Run-->>Orch: SimulationResult (score, steps, paths)
+        Run->>Run: output_map.save
+        Run->>Score: compareMaps(hidden, output, spawn)
+        Run-->>Dist: SimulationResult
     end
-    Main->>Main: write comparative_report.yaml + per-plugin YAML
+    Main->>Rep: writeComparativeReport + per-plugin YAML
     Main->>Loader: destroy plugin objects then unloadAll / dlclose
 ```
 
 Competition mode is the mirror image: one `MissionControl` `.so` is fixed and every
-algorithm in a folder is varied; the same orchestrator/factory/run path applies.
+algorithm in a folder is varied; the same `runPluginMatrix` / factory / run path
+applies (`writeCompetitiveReport` instead of `writeComparativeReport`).
 
 ## Sequence: DroneControl step loop
 
@@ -264,6 +397,7 @@ sequenceDiagram
     participant GPS as MockGPS
     participant Move as MockMovement
     participant Lidar as MockLidar
+    participant SR as applyScanToMap
     participant Map as output Map3DImpl
 
     loop until Finished / MaxSteps / Error
@@ -278,7 +412,8 @@ sequenceDiagram
         else normal movement
             DC->>Move: rotate/advance/elevate
             DC->>Lidar: scan(orientations)
-            DC->>Map: set voxels from scan
+            DC->>SR: applyScanToMap
+            SR->>Map: set voxels
         end
         DC-->>MC: DroneStepResult
     end
@@ -321,8 +456,9 @@ Each run owns two `Map3DImpl` instances:
 
 The algorithm receives `const common::IMap3D&` through `MappingAlgorithmDependencies`
 and reads voxel occupancy for planning only — it never mutates the map. All scan writes
-go through `DroneControlImpl` → `ScanResultToVoxels` → output `Map3DImpl`.
+go through `DroneControlImpl` → `applyScanToMap` → output `Map3DImpl`.
 
-After the mission, `SimulationRunImpl` calls `MapsComparison` to score the output map
-against the hidden map. World <-> voxel conversion and axis offsets are centralized in
-`user_common_207190406_209543255::SimulationCoordUtil`.
+After the mission, `SimulationRunImpl` saves the output map then calls
+`compareMaps(hidden, output, spawn)` to score it. World <-> voxel conversion and axis
+offsets are centralized in `user_common_207190406_209543255::SimulationCoordUtil`
+(`worldInitialDronePosition`, `forEachSphereSample`).
