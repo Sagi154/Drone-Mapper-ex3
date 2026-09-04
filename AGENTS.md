@@ -76,7 +76,7 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 | `docs/error-handling-matrix.md` | Mandatory + optional fault-handling table (course staff PDF) |
 | `docs/map3d-contract.md` | `.npy` dtype rules (maps are **mixed** `int8`/`uint8`), world↔voxel mapping |
 | `docs/review-error-codes.md` | AdvCpp rubric codes (`e*`, `b*`) — no ex3-specific guideline published yet |
-| `docs/known-issues.md` | Working Known Issues rows (14 remaining after 2026-09-01 prune of resolved/stale; excel export is a later zip step) |
+| `docs/known-issues.md` | Working Known Issues rows (13 remaining after SimulationImpl; excel export is a later zip step) |
 | `docs/known-issues-guidelines.md` | Optional Known Issues excel — grade-neutral-or-better to submit |
 | `docs/open-questions.md` | Genuine ambiguities with a working assumption each — check the forum |
 | `docs/ex2-grading-handoff.md` | Lessons from the Ex2 grade (appealed to **87.5/100**) — frozen-API drift, obsolete bugs, and the ALG28 unbounded-BFS hang; not a plan for sequencing Ex3 |

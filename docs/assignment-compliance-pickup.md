@@ -182,7 +182,7 @@ is explicitly allowed.
 
 `docs/known-issues.md` — staff example-table columns. Resolved/stale rows removed and
 renumbered `1..n` (2026-09-01). Remaining: optional Common-issues PDF skips, lazy `.so`
-load, unused `ISimulation`, Unmapped-as-passable, plan-batching short-lidar score drop.
+load, Unmapped-as-passable, plan-batching short-lidar score drop.
 English only. At zip time, copy into the Google Sheet and export `.xlsx` to the zip root —
 do not submit the markdown.
 
