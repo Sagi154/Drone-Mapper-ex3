@@ -16,6 +16,13 @@ implemented differently, and remaining bugs so graders do not treat them as
 surprises. The markdown table is the working copy; it is **not** submitted
 as-is. At zip time it gets copied into the staff sheet and exported as `.xlsx`.
 
+If you later **implement** an optional / bonus row (#1–#11), do not leave it
+here. Remove it from `docs/known-issues.md` and **claim it in `bonus.txt`**
+(what you did, plus file:line). Staff will not infer extra credit from the
+code alone. Skip `bonus.txt` for #12–#13 (different design) and #14 (bug);
+those are not bonuses. If nothing optional was implemented, do not add
+`bonus.txt`.
+
 ---
 
 ## Optional Common-issues rows (#1–#10)
@@ -111,7 +118,12 @@ optional work and intentional design.
 ## How to read this as a student
 
 - **#1–#11:** “We did the mandatory path; we did not implement optional/bonus
-  recovery or lazy `.so` loading.”
-- **#12–#13:** “We did it on purpose, differently, and we can defend it.”
+  recovery or lazy `.so` loading.” If one of these is later implemented, drop
+  the row and list it in `bonus.txt` with file:line. Do not claim a nearby
+  workaround that does not match the PDF (e.g. Continue on Movement `false` is
+  not CI7).
+- **#12–#13:** “We did it on purpose, differently, and we can defend it.” Not
+  `bonus.txt`.
 - **#14:** “Short-lidar `large_out` (and small+short) still underperform
-  because batched plans go stale.”
+  because batched plans go stale.” Fixing it helps the algorithm contest; it
+  is not an extra-credit line in `bonus.txt`.
