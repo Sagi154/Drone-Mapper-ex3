@@ -6,7 +6,7 @@ doc is for us, not for the zip.
 
 Resolved items were already pruned. Almost all remaining rows are **skipped
 optional recovery** from the Common-issues PDF, not mandatory bugs. The one
-real behavioral problem is **#14**.
+real behavioral problem is **#13**.
 
 ## What the list is for
 
@@ -19,7 +19,7 @@ as-is. At zip time it gets copied into the staff sheet and exported as `.xlsx`.
 If you later **implement** an optional / bonus row (#1–#11), do not leave it
 here. Remove it from `docs/known-issues.md` and **claim it in `bonus.txt`**
 (what you did, plus file:line). Staff will not infer extra credit from the
-code alone. Skip `bonus.txt` for #12–#13 (different design) and #14 (bug);
+code alone. Skip `bonus.txt` for #12 (Unmapped, different design) and #13 (bug);
 those are not bonuses. If nothing optional was implemented, do not add
 `bonus.txt`.
 
@@ -58,21 +58,14 @@ splitting them would have been the most useful optional recovery.
 
 ---
 
-## Bonus / different design (#11–#13)
+## Bonus / different design (#11–#12)
 
 **#11 — eager plugin load (Low, Feature/Missing)**  
 Lazy load/unload of `.so` files is an explicit **bonus**. You load every
 required plugin on the main thread before the run matrix, and `dlclose` at
 shutdown. The assignment allows that. Do not claim the bonus in `bonus.txt`.
 
-**#12 — no `ISimulation` implementation (Low, developed differently)**  
-The published header `ISimulation` has `run(composition, output_path)`. Your
-real orchestration is `main.cpp` + `RunMatrixOrchestrator`, because
-comparative/competitive mode, plugin set, and `num_threads` do not fit that
-signature. The HLD already says this. Risk is only if a grader greps for a
-class that `public ISimulation` and treats the missing impl as incomplete.
-
-**#13 — Unmapped cells are walkable (Low, developed differently)**  
+**#12 — Unmapped cells are walkable (Low, developed differently)**  
 Unknown voxels are **not** treated as walls. Dijkstra prefers Empty (cost 1)
 over Unmapped (cost 4). If a “path through unknown” hits a hidden wall, you
 recover with Continue + replan (soft stall, a couple of ticks), not
@@ -83,9 +76,16 @@ Reproducibility is **Rare** because it only shows up when the planned path goes
 through Unmapped that turns out to be a wall. Reason here is “lack of
 knowledge” (of the right policy), not lack of time.
 
+A 2026-09 attempt to pass independence VAR-01 (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`)
+with an Occupied-AABB execution gate plus shrink / floor-support / attic-first
+was reverted: it zeroed illegal moves and unstuck `house_full`, then cliffed
+`large_out` scores and put one cell over 60 s. The tree is parked at
+`backup/var01-2026-09-05` (tag `backup-var01-2026-09-05`). Write-up:
+`docs/archive/2026-09-05-var01-attempt.md`.
+
 ---
 
-## The actual bug (#14)
+## The actual bug (#13)
 
 **`large_out` short-lidar scores got worse after plan-batching.** Medium
 severity, always reproducible on Release serial timing of the `large_out`
@@ -122,8 +122,7 @@ optional work and intentional design.
   the row and list it in `bonus.txt` with file:line. Do not claim a nearby
   workaround that does not match the PDF (e.g. Continue on Movement `false` is
   not CI7).
-- **#12–#13:** “We did it on purpose, differently, and we can defend it.” Not
-  `bonus.txt`.
-- **#14:** “Short-lidar `large_out` (and small+short) still underperform
+- **#12:** Unmapped (different design, not `bonus.txt`).
+- **#13:** “Short-lidar `large_out` (and small+short) still underperform
   because batched plans go stale.” Fixing it helps the algorithm contest; it
   is not an extra-credit line in `bonus.txt`.

@@ -3,6 +3,7 @@
 #include <Simulator/ISimulationRun.h>
 #include <Simulator/ISimulationRunFactory.h>
 #include <Simulator/RunMatrixOrchestrator.h>
+#include <Simulator/SimulationImpl.h>
 #include <Simulator/SimulationTypes.h>
 
 #include <gtest/gtest.h>
@@ -174,4 +175,63 @@ TEST(RunMatrixOrchestrator, ThrowingRunWritesFailureSentinelWithoutAbortingMatri
     EXPECT_EQ(table[0].results[0].mission_score, -1.0);
     EXPECT_EQ(table[0].results[1].mission_score, -1.0);
     EXPECT_EQ(ok_factory.create_calls.load(), 2);
+}
+
+TEST(SimulationImpl, RunViaISimulationFillsManagerReportForOneComposition) {
+    const auto composition = makeLiteralComposition();
+    FakeRunFactory factory;
+    simulator::SimulationImpl impl(factory, "plugin_a.so", /*num_threads=*/1);
+
+    simulator::ISimulation& sim = impl;
+    const auto report =
+        sim.run(composition, std::filesystem::path{"/tmp/isimulation_impl"});
+
+    EXPECT_EQ(report.composition_file, composition.composition_file);
+    EXPECT_FALSE(report.generated_at_utc.empty());
+    EXPECT_EQ(report.generated_at_utc.back(), 'Z');
+    EXPECT_EQ(report.metric, "maps_comparison_score_0_100");
+    EXPECT_EQ(std::get<0>(report.score_range), 0.0);
+    EXPECT_EQ(std::get<1>(report.score_range), 100.0);
+    EXPECT_EQ(report.error_score, -1);
+    ASSERT_EQ(report.runs.size(), 12U);
+    EXPECT_EQ(factory.create_calls.load(), 12);
+    for (std::size_t i = 0; i < 6; ++i) {
+        EXPECT_EQ(report.runs[i].mission_score, 10.0) << "cell " << i;
+    }
+    for (std::size_t i = 6; i < 12; ++i) {
+        EXPECT_EQ(report.runs[i].mission_score, 20.0) << "cell " << i;
+    }
+    EXPECT_EQ(report.runs[0].output_map_file.filename().string(),
+              "plugin_a.so_run_0000_output_map.npy");
+}
+
+TEST(SimulationImpl, EmptyCompositionYieldsEmptyRunsWithoutCreateCalls) {
+    simulator::types::SimulationCompositionData composition;
+    composition.composition_file = "empty.yaml";
+    FakeRunFactory factory;
+    simulator::SimulationImpl impl(factory, "none.so", /*num_threads=*/1);
+
+    const auto report =
+        impl.run(composition, std::filesystem::path{"/tmp/isimulation_empty"});
+
+    EXPECT_EQ(report.composition_file, "empty.yaml");
+    EXPECT_TRUE(report.runs.empty());
+    EXPECT_EQ(factory.create_calls.load(), 0);
+}
+
+TEST(SimulationImpl, ThrowingRunIsContainedAsErrorScore) {
+    simulator::types::SimulationCompositionData composition;
+    composition.simulation_mission_groups.push_back(
+        {simulator::types::SimulationConfigData{}, {common::types::MissionConfigData{}}});
+    composition.drone_configs.resize(1);
+    composition.lidar_configs.resize(1);
+
+    ThrowingFactory throwing;
+    simulator::SimulationImpl impl(throwing, "bad.so", /*num_threads=*/1);
+
+    const auto report =
+        impl.run(composition, std::filesystem::path{"/tmp/isimulation_throw"});
+
+    ASSERT_EQ(report.runs.size(), 1U);
+    EXPECT_EQ(report.runs[0].mission_score, -1.0);
 }

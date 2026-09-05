@@ -55,7 +55,7 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 | `populate-known-issues` | Adding a row to `docs/known-issues.md` (optional excel export later) |
 | `advcpp-rubric-review` | Subjective AdvCpp rubric review (`e01`–`e23`): dispatches one explore subagent per code group (headers/API, C++ idiom, structure/flow, HLD alignment), reports findings as a judgment-call table — not a pass/fail script. Run before submission or after major refactors. |
 | `verify-instructor-test-catalog` | End-to-end instructor-catalog verification: Docker build + `ctest` + `run_all.sh` + `pre-submission-review` + `advcpp-rubric-review` → one PASS/FAIL/AMBIGUOUS report keyed by catalog ID |
-| `verify-independent-component-variants` | Independence harness (VAR-01…04): Docker build + `check_foreign_host` / `check_foreign_mission_control` / `check_adversarial_plugins` / optional `check_baseline_algorithm` → PASS/FAIL/SKIP per variant (not catalog IDs) |
+| `verify-independent-component-variants` | Independence harness (VAR-01…04, all mandatory): Docker build + `check_foreign_host` / `check_foreign_mission_control` / `check_adversarial_plugins` / `check_baseline_algorithm` → PASS/FAIL/SKIP per variant (not catalog IDs) |
 | `verify-cell-runtime` | Per-cell wall-clock vs the ~60 s / ~10 s small-map bar: Release serial 24-cell timing (not 8-thread compose wall). Use after algorithm changes, after a 24-cell score column, or when checking b05 timeout risk. Do not invent a smaller `max_steps` or a wall-clock abort in Algorithm/MC |
 
 ## Key docs
@@ -76,7 +76,7 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 | `docs/error-handling-matrix.md` | Mandatory + optional fault-handling table (course staff PDF) |
 | `docs/map3d-contract.md` | `.npy` dtype rules (maps are **mixed** `int8`/`uint8`), world↔voxel mapping |
 | `docs/review-error-codes.md` | AdvCpp rubric codes (`e*`, `b*`) — no ex3-specific guideline published yet |
-| `docs/known-issues.md` | Working Known Issues rows (14 remaining after 2026-09-01 prune of resolved/stale; excel export is a later zip step) |
+| `docs/known-issues.md` | Working Known Issues rows (13 remaining after SimulationImpl; excel export is a later zip step) |
 | `docs/known-issues-guidelines.md` | Optional Known Issues excel — grade-neutral-or-better to submit |
 | `docs/open-questions.md` | Genuine ambiguities with a working assumption each — check the forum |
 | `docs/ex2-grading-handoff.md` | Lessons from the Ex2 grade (appealed to **87.5/100**) — frozen-API drift, obsolete bugs, and the ALG28 unbounded-BFS hang; not a plan for sequencing Ex3 |

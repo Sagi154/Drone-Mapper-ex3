@@ -3,7 +3,8 @@ name: verify-cell-runtime
 description: >-
   Measures wall-clock time and score for each of the 24 inputs/sim_compose.yaml
   cells serially on Release, then compares them to the per-cell runtime bar
-  (~10s small maps, ~60s grader-risk, no cell routinely near 60s). Use when
+  (~10s small maps, ~60s grader-risk, no cell routinely near 60s) and the
+  documented 2026-09-03 baseline (scores + walls in this skill). Use when
   changing the mapping algorithm, after a 24-cell score column, when checking
   b05 timeout risk, or when asked whether cells are too slow / how long each
   run takes. Do not treat num_threads=8 matrix wall-clock as per-cell time.
@@ -16,6 +17,10 @@ Times **each** of the 24 composition cells as its own process (Release,
 **2** (per-cell). It is **not** `run_benchmark.py --num-threads 8` (clock **3**).
 
 Announce: “Using verify-cell-runtime.”
+
+When reporting a full 24-cell run, compare **scores** (must match or explain
+regressions) and **walls** (noise OK; watch WARN→FAIL) against the
+[Documented baseline (2026-09-03)](#documented-baseline-2026-09-03) below.
 
 ## Time caps for algorithm work — follow these, do not invent others.
 
@@ -129,6 +134,57 @@ Overall: FAIL if any FAIL/HANG. Otherwise PASS with WARNs listed.
 
 Overall **FAIL** does not mean “add a timer.” It means profile `nextStep` / `exploreReachable` on the slow cells (usually `house_full` / `large_out`).
 
+After a full 24-cell run, also diff scores against the [Documented baseline (2026-09-03)](#documented-baseline-2026-09-03). Score drift on outdoor cells is a regression until explained (see libm / quantity-path notes in `docs/benchmarks/2026-09-03-main-score-parity.md`).
+
+## Documented baseline (2026-09-03)
+
+**Canonical per-cell Release baseline** after libm score-parity restore (merged via PR #16). Use this table when judging later runs — do not treat noisy Sep-3 HANG runs or older 8-thread compose walls as the per-cell reference.
+
+| Field | Value |
+|-------|--------|
+| Date | 2026-09-03 |
+| Tree | `fix-advcpp-rubric-findings` post score-fix (scores identical to `main` @ `9374aea`) |
+| Build | Release `build/opt`, Docker `drone-mapper-ex3-dev` |
+| Method | `time_each_cell.py --hang-timeout 200`, `num_threads=1`, one process per cell |
+| Overall | **PASS** — FAIL=0, WARN=2, wall_sum≈176s, wall_max≈46.2s, cells_ge_60s=0 |
+| CSV (skill) | `.cursor/skills/verify-cell-runtime/baseline-2026-09-03-per-cell-wall.csv` |
+| CSV / write-up (docs) | `docs/benchmarks/2026-09-03-branch-after-score-fix-per-cell-wall.csv`, `docs/benchmarks/2026-09-03-main-score-parity.md` |
+
+Fair `main` @ `9374aea` re-time the same day: same **scores**, wall_sum **170.6s**, wall_max **45.4s** (noise only).
+
+### Per-cell baseline (score + wall)
+
+| Cell | Group | Score | Steps | Status | wall_s | Verdict |
+|------|-------|------:|------:|--------|-------:|---------|
+| house_simulation+house_mission_lower\|drone_small\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.10 | PASS |
+| house_simulation+house_mission_lower\|drone_small\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.08 | PASS |
+| house_simulation+house_mission_lower\|drone_large\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.07 | PASS |
+| house_simulation+house_mission_lower\|drone_large\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.11 | PASS |
+| house_simulation+house_mission_full\|drone_small\|lidar_long | house_full | 37.19 | 2100 | COMPLETED | 10.69 | PASS |
+| house_simulation+house_mission_full\|drone_small\|lidar_short | house_full | 48.33 | 2500 | COMPLETED | 13.78 | PASS |
+| house_simulation+house_mission_full\|drone_large\|lidar_long | house_full | 20.99 | 700 | COMPLETED | 8.05 | PASS |
+| house_simulation+house_mission_full\|drone_large\|lidar_short | house_full | 15.34 | 700 | COMPLETED | 9.14 | PASS |
+| large_simulation_out+large_mission_out\|drone_small\|lidar_long | large_out | 82.27 | 3200 | COMPLETED | 7.26 | PASS |
+| large_simulation_out+large_mission_out\|drone_small\|lidar_short | large_out | 44.56 | 4100 | COMPLETED | 46.11 | WARN |
+| large_simulation_out+large_mission_out\|drone_large\|lidar_long | large_out | 74.01 | 3700 | COMPLETED | 14.52 | PASS |
+| large_simulation_out+large_mission_out\|drone_large\|lidar_short | large_out | 32.00 | 2200 | COMPLETED | 46.24 | WARN |
+| large_simulation_room+large_mission_room\|drone_small\|lidar_long | large_room | 95.04 | 351 | COMPLETED | 0.22 | PASS |
+| large_simulation_room+large_mission_room\|drone_small\|lidar_short | large_room | 95.10 | 289 | COMPLETED | 0.28 | PASS |
+| large_simulation_room+large_mission_room\|drone_large\|lidar_long | large_room | 94.74 | 187 | COMPLETED | 0.14 | PASS |
+| large_simulation_room+large_mission_room\|drone_large\|lidar_short | large_room | 96.47 | 156 | COMPLETED | 0.23 | PASS |
+| small_simulation_out+small_mission_out\|drone_small\|lidar_long | small_out | 77.05 | 1500 | COMPLETED | 3.51 | PASS |
+| small_simulation_out+small_mission_out\|drone_small\|lidar_short | small_out | 78.69 | 1500 | COMPLETED | 4.66 | PASS |
+| small_simulation_out+small_mission_out\|drone_large\|lidar_long | small_out | 50.55 | 800 | COMPLETED | 1.73 | PASS |
+| small_simulation_out+small_mission_out\|drone_large\|lidar_short | small_out | 93.43 | 1500 | COMPLETED | 5.61 | PASS |
+| small_simulation_room+small_mission_room\|drone_small\|lidar_long | small_room | 86.47 | 996 | COMPLETED | 0.89 | PASS |
+| small_simulation_room+small_mission_room\|drone_small\|lidar_short | small_room | 72.76 | 996 | COMPLETED | 1.32 | PASS |
+| small_simulation_room+small_mission_room\|drone_large\|lidar_long | small_room | 87.04 | 994 | COMPLETED | 0.54 | PASS |
+| small_simulation_room+small_mission_room\|drone_large\|lidar_short | small_room | 87.83 | 993 | COMPLETED | 0.82 | PASS |
+
+**Expected WARNs (baseline):** `large_out` × short lidar only (~45–46s). Do not treat those as new regressions unless they cross 60s or scores change.
+
+**Score check:** later runs should match the Score column bit-for-bit (or to reported CSV precision). Wall times may vary a few percent; wall_sum ~170–180s on a clean machine is normal.
+
 ## Focused first (iteration order)
 
 If the user did not ask for all 24:
@@ -150,3 +206,4 @@ python3 .cursor/skills/verify-cell-runtime/scripts/time_each_cell.py \
 - Killing a cell at 60 s inside the algorithm
 - Lowering YAML `max_steps` to “make it faster”
 - Skipping long missions because they are “allowed 10000 steps”
+- Treating machine-load HANG/timeouts (or Debug builds) as the baseline instead of the 2026-09-03 table above

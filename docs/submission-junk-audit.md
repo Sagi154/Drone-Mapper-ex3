@@ -129,7 +129,7 @@ markdown itself is also not a deliverable.
 
 | Thing | Why keep it |
 |-------|-------------|
-| `simulator::ISimulation` | Frozen published header. Unused by design (`docs/known-issues.md` row 12). Deleting it would violate the frozen-interface rule. |
+| `simulator::ISimulation` | Frozen published header, implemented by `SimulationImpl`; do not delete the header. |
 | `common/` | 18 skeleton files only. No extras. |
 | `UserCommon/` (no `CMakeLists.txt`) | Correct. `LidarCone` / `ConeTemplate` / `BeamMath` are still used. |
 | `HLD.pdf` at repo root | Required. Editable source stays in `docs/` and should not be zipped. |

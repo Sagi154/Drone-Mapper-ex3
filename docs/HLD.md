@@ -123,11 +123,13 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 - **`SimulationCoordUtil`** — Shared world/voxel helpers:
   `worldInitialDronePosition`, `forEachSphereSample`.
 
-**Note on `simulator::ISimulation`:** The course publishes
-`Simulator/common_simulator/include/Simulator/ISimulation.h`, but we do **not**
-implement it. Comparative/competitive orchestration, threading, and plugin loading live
-in `main` + `runPluginMatrix` instead. There is no ex2-style `SimulationManager`
-class — the executable entry point is `main`.
+- **`SimulationImpl`** — Implements published `simulator::ISimulation`.
+  Constructor takes one `ISimulationRunFactory&`, the plugin filename used
+  in per-run map names, and `num_threads`. `run(composition, output_path)`
+  delegates to `runPluginMatrix` for that single binding and returns
+  `SimulationManagerReport`. Comparative/competitive CLI, plugin folders,
+  and aggregate YAML still live in `main` — `ISimulation::run` cannot
+  express mode or a plugin set.
 
 ## Class diagram
 
@@ -242,6 +244,11 @@ classDiagram
       +run() SimulationResult
     }
 
+    class SimulationImpl {
+      +run(composition, output_path) SimulationManagerReport
+    }
+    class ISimulation
+
     class Map3DImpl
     class MockGPS
     class MockLidar
@@ -294,6 +301,9 @@ classDiagram
     SimulationRunImpl --> RunErrorLog
     SimulationRunImpl --> IMissionControl
     SimulationRunImpl --> IMappingAlgorithm
+    SimulationImpl ..|> ISimulation
+    SimulationImpl --> runPluginMatrix
+    SimulationImpl --> ISimulationRunFactory
     PluginLoader --> DlHandle
     PluginLoader --> LoadedAlgorithmPlugin
     PluginLoader --> LoadedMissionControlPlugin
