@@ -49,6 +49,9 @@ Highest-leverage next work is below.
    rubric). Also run `.cursor/skills/verify-independent-component-variants/SKILL.md` (default
    VAR-01…03; add `--with-baseline` for VAR-04) after merging
    `independent-component-variants`.
+4. **VAR-01 algorithm gate (parked 2026-09-05):** do not resume Option A / shrink /
+   floor-support from this branch. The attempt is on `backup/var01-2026-09-05`
+   (tag `backup-var01-2026-09-05`). See `docs/archive/2026-09-05-var01-attempt.md`.
 
 ---
 

@@ -76,6 +76,13 @@ Reproducibility is **Rare** because it only shows up when the planned path goes
 through Unmapped that turns out to be a wall. Reason here is “lack of
 knowledge” (of the right policy), not lack of time.
 
+A 2026-09 attempt to pass independence VAR-01 (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`)
+with an Occupied-AABB execution gate plus shrink / floor-support / attic-first
+was reverted: it zeroed illegal moves and unstuck `house_full`, then cliffed
+`large_out` scores and put one cell over 60 s. The tree is parked at
+`backup/var01-2026-09-05` (tag `backup-var01-2026-09-05`). Write-up:
+`docs/archive/2026-09-05-var01-attempt.md`.
+
 ---
 
 ## The actual bug (#13)
