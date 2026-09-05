@@ -304,9 +304,11 @@ TEST(MappingAlgorithm, FrontierPrefersEmptyOverUnmappedPath) {
     return config;
 }
 
-// What: 10 cm grid, radius 7.5 cm, Occupied face neighbour (nearest box dist 5 ≤ 7.5).
-// Expected: start not passable — the old centre-distance gate silently skipped this probe.
-TEST(MappingAlgorithm, FrontierRejectsOccupiedFaceNeighbourOnCm10Grid) {
+// What: 10 cm grid. `face` at +1 step is a corner-anchored voxel spanning [60,70) — its
+// near face is a full 10 cm from `centre` (50,50,50), not 5 cm (that was the old, wrong
+// midpoint-box model). A sphere reaches it only once radius >= step_cm (10 cm here).
+// Expected: start not passable exactly at radius == step_cm (touching, inclusive).
+TEST(MappingAlgorithm, FrontierRejectsOccupiedNeighbourAtFullStepWhenRadiusReachesIt) {
     const ct::MapConfig config = makeCm10Config();
     Map map{{11, 11, 11}, config};
     const Position3D centre = pointCm(50, 50, 50);
@@ -315,11 +317,11 @@ TEST(MappingAlgorithm, FrontierRejectsOccupiedFaceNeighbourOnCm10Grid) {
     map.set(face, ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_FALSE(frontier.exploreReachable(map, centre, 7.5 * cm, {}, 1).start_passable);
+    EXPECT_FALSE(frontier.exploreReachable(map, centre, 10.0 * cm, {}, 1).start_passable);
 }
 
-// What: same Occupied face neighbour but radius 4 cm (nearest 5 > 4).
-// Expected: still passable — sphere does not reach the neighbour box.
+// What: same Occupied face neighbour (full step away, near face at 10 cm), radius 4 cm.
+// Expected: still passable — sphere (radius 4) does not reach a face 10 cm away.
 TEST(MappingAlgorithm, FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall) {
     const ct::MapConfig config = makeCm10Config();
     Map map{{11, 11, 11}, config};
@@ -332,9 +334,10 @@ TEST(MappingAlgorithm, FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall) {
     EXPECT_TRUE(frontier.exploreReachable(map, centre, 4.0 * cm, {}, 1).start_passable);
 }
 
-// What: face neighbour Unmapped, centre Empty, radius 7.5 on 10 cm grid.
-// Expected: hasNotMappedInSphere sees the face cell (same geometry as passability).
-TEST(MappingAlgorithm, FrontierHasUnmappedFaceNeighbourOnCm10Grid) {
+// What: face neighbour Unmapped, centre Empty, full step (10 cm) away on a 10 cm grid.
+// Expected: hasNotMappedInSphere sees the face cell once radius >= step_cm (same corrected
+// geometry as passability); a smaller radius (9.9 or 4.0) does not reach it.
+TEST(MappingAlgorithm, FrontierHasUnmappedNeighbourOnCm10GridAtFullStep) {
     const ct::MapConfig config = makeCm10Config();
     Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
     const Position3D centre = pointCm(50, 50, 50);
@@ -342,7 +345,8 @@ TEST(MappingAlgorithm, FrontierHasUnmappedFaceNeighbourOnCm10Grid) {
     map.set(centre, ct::VoxelOccupancy::Empty);
     map.set(face, ct::VoxelOccupancy::Unmapped);
 
-    EXPECT_TRUE(detail::hasNotMappedInSphere(map, centre, 7.5 * cm));
+    EXPECT_TRUE(detail::hasNotMappedInSphere(map, centre, 10.0 * cm));
+    EXPECT_FALSE(detail::hasNotMappedInSphere(map, centre, 9.9 * cm));
     EXPECT_FALSE(detail::hasNotMappedInSphere(map, centre, 4.0 * cm));
 }
 
@@ -381,15 +385,50 @@ TEST(MappingAlgorithm, ExploreReachableRespectsExpansionCap) {
 TEST(MappingAlgorithm, ExploreReachableReportsStartPassabilityWithCapOfOne) {
     // A cap of 1 makes this an O(1) start-passability probe — the replacement for
     // diagnose().start_passable, which task 6 deletes.
+    // Occupied neighbour is a full step (10 cm) away (corner-anchored voxel [60,70)):
+    // radius 10 touches it, radius 4 does not.
     const ct::MapConfig config = makeCm10Config();
     Map map{{11, 11, 11}, config};
     map.set(pointCm(50, 50, 50), ct::VoxelOccupancy::Empty);
     map.set(pointCm(60, 50, 50), ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 50), 7.5 * cm, {}, 1)
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 50), 10.0 * cm, {}, 1)
                      .start_passable);
     EXPECT_TRUE(frontier.exploreReachable(map, pointCm(50, 50, 50), 4.0 * cm, {}, 1)
+                    .start_passable);
+}
+
+// What: reproduces the VAR-01 small_room failure directly. Floor voxel [0,10) is Occupied;
+// centre sits exactly on the floor's top face (z=10, a lattice corner shared with the floor
+// voxel below). Any radius > 0 overlaps a corner-touching Occupied voxel at distance 0.
+// Expected: not passable, for both drone radii used in inputs/drone/*.yaml.
+TEST(MappingAlgorithm, FrontierRejectsStandingExactlyOnOccupiedFloor) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    map.set(pointCm(50, 50, 0), ct::VoxelOccupancy::Occupied);  // floor voxel [0,10) in z
+
+    const detail::MappingAlgorithmFrontier frontier;
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 10), 4.0 * cm, {}, 1)
+                     .start_passable);
+    EXPECT_FALSE(frontier.exploreReachable(map, pointCm(50, 50, 10), 7.5 * cm, {}, 1)
+                     .start_passable);
+}
+
+// What: same floor, but centre one full step higher (z=20, i.e. 10 cm clearance above the
+// floor's top face). Neither drone radius (max 7.5 cm) reaches back down to the floor.
+// Expected: passable — this is the "still flies one voxel above a mapped floor" guardrail
+// (do-not-repeat lesson 3 in the design spec: a correct fix must not turn the floor a drone
+// is actually flying above into an obstacle).
+TEST(MappingAlgorithm, FrontierAllowsFlyingOneStepAboveOccupiedFloor) {
+    const ct::MapConfig config = makeCm10Config();
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
+    map.set(pointCm(50, 50, 0), ct::VoxelOccupancy::Occupied);  // floor voxel [0,10) in z
+
+    const detail::MappingAlgorithmFrontier frontier;
+    EXPECT_TRUE(frontier.exploreReachable(map, pointCm(50, 50, 20), 4.0 * cm, {}, 1)
+                    .start_passable);
+    EXPECT_TRUE(frontier.exploreReachable(map, pointCm(50, 50, 20), 7.5 * cm, {}, 1)
                     .start_passable);
 }
 
