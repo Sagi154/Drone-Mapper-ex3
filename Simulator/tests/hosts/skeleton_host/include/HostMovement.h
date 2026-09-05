@@ -25,10 +25,13 @@ public:
 
     [[nodiscard]] std::size_t illegalMoveAttempts() const { return illegal_move_attempts_; }
 
+    void setDiagOutputMap(const HostMap3D* output_map) { diag_output_map_ = output_map; }
+
 private:
     [[nodiscard]] common::types::MovementResult fail(const std::string& message);
     [[nodiscard]] bool centerInMissionBounds(double x, double y, double z) const;
     [[nodiscard]] bool sphereHitsWallOrLeavesMap(double x, double y, double z) const;
+    void diagCulprits(double x, double y, double z) const;
     [[nodiscard]] bool pathBlocked(double x0,
                                    double y0,
                                    double z0,
@@ -38,6 +41,7 @@ private:
 
     HostGPS& gps_;
     const HostMap3D& hidden_map_;
+    const HostMap3D* diag_output_map_ = nullptr;
     common::types::MappingBounds mission_bounds_{};
     double radius_cm_ = 0;
     std::size_t illegal_move_attempts_ = 0;
