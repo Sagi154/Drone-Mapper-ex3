@@ -82,31 +82,33 @@ constexpr Offset kOffsets[6] = {
     return kEmptyTraversalCost;
 }
 
-// True iff the axis-aligned voxel box centered at (dx,dy,dz)*step with half-extent
-// step/2 intersects the closed sphere of radius at the origin. Centre-distance
-// (forEachSphereSample) skips face neighbours when radius < step; box nearest-point
-// restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
+// True iff neighbour voxel (dx,dy,dz) intersects the closed sphere of the given radius
+// centred at a lattice point. A lattice point is the LOW CORNER of its own voxel
+// (Map3DImpl indexes floor((pos - offset) / resolution), matched by skeleton_host's
+// HostMap3D), so neighbour d spans [d*step, (d+1)*step) relative to that point. The voxel
+// on the "behind" side of the centre (any nonzero offset with all axes in {-1,0}) shares
+// the corner with the centre voxel and touches it at distance 0; the voxel a full step
+// "ahead" (any axis == +1) only touches once radius >= step_cm. See
+// docs/superpowers/specs/2026-09-05-var01-sphere-clearance-fix-design.md §2.1/§5.1.
 [[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz, double step_cm,
                                            double radius_cm) {
     if (dx == 0 && dy == 0 && dz == 0) {
         return true;
     }
-    const double half = step_cm * 0.5;
-    const double ox = static_cast<double>(dx) * step_cm;
-    const double oy = static_cast<double>(dy) * step_cm;
-    const double oz = static_cast<double>(dz) * step_cm;
-    const auto nearest1d = [half](double o) {
-        if (0.0 < o - half) {
-            return o - half;
+    const auto nearest1d = [step_cm](int d) {
+        const double lo = static_cast<double>(d) * step_cm;
+        const double hi = lo + step_cm;
+        if (lo > 0.0) {
+            return lo;
         }
-        if (0.0 > o + half) {
-            return o + half;
+        if (hi < 0.0) {
+            return hi;
         }
         return 0.0;
     };
-    const double nx = nearest1d(ox);
-    const double ny = nearest1d(oy);
-    const double nz = nearest1d(oz);
+    const double nx = nearest1d(dx);
+    const double ny = nearest1d(dy);
+    const double nz = nearest1d(dz);
     return (nx * nx + ny * ny + nz * nz) <= (radius_cm * radius_cm);
 }
 

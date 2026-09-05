@@ -469,14 +469,16 @@ TEST(MappingAlgorithm, ExploreReachableTerminatesWithoutOccupancyBound) {
 
 TEST(MappingAlgorithm, FindUnstickPathStepsToAdjacentEmpty) {
     const ct::MapConfig config = makeCm10Config();
-    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Occupied};
+    Map map{{11, 11, 11}, config, ct::VoxelOccupancy::Empty};
     const Position3D start = pointCm(50, 50, 50);
-    const Position3D neighbour = pointCm(60, 50, 50);
-    map.set(start, ct::VoxelOccupancy::Occupied);
-    map.set(neighbour, ct::VoxelOccupancy::Empty);
+    map.set(pointCm(40, 50, 50), ct::VoxelOccupancy::Occupied);
 
     const detail::MappingAlgorithmFrontier frontier;
-    // Radius 4 cm: nearest Occupied box is 5 cm away, so the Empty neighbour is passable.
+    // Occupied -X voxel shares the start lattice corner (distance 0), so start is not
+    // passable. The +X face neighbour is a full step ahead of that Occupied voxel and is
+    // Empty, so it is passable at radius 4 cm (< step). The old midpoint-box model treated
+    // the Occupied neighbour as 5 cm away and required a sea-of-Occupied map with a single
+    // Empty hole; that hole's low-corner-sharing voxels would now block it at any r > 0.
     const detail::FrontierPathResult result = frontier.findUnstickPath(map, start, 4.0 * cm);
 
     ASSERT_TRUE(result.found);
