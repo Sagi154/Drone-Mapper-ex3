@@ -218,8 +218,21 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
     const MovementLimits limits = limitsFrom(in.drone);
     const std::size_t reserve = reserveFor(in.lidar);
 
-    const ReachabilityResult reach = frontier_.exploreReachable(
-        in.map, in.state.position, in.drone.radius, blocked, maxExpansionsForMap(in.map));
+    const std::size_t full_map_cap = maxExpansionsForMap(in.map);
+    const std::size_t local_cap = std::min(full_map_cap, kLocalSearchExpansionCap);
+    ReachabilityResult reach =
+        frontier_.exploreReachable(in.map, in.state.position, in.drone.radius, blocked, local_cap);
+    if (reach.start_passable && reach.clusters.empty() && local_cap < full_map_cap) {
+        // The bounded local search found no frontier cluster at all (as opposed to "found
+        // clusters but they were all too far to afford" — buildCandidatePlans already handles
+        // that via the `travel + reserve > remaining_steps` budget check). Escalate once to a
+        // full-map search rather than reporting "nothing left to explore" prematurely. This is a
+        // single fallback attempt, not a loop/binary-search (Global Constraints: no iterative
+        // refinement on the hot path) — if the full-map search also finds nothing, plan()
+        // correctly falls through to its existing "no clusters" empty-plan return below.
+        reach = frontier_.exploreReachable(in.map, in.state.position, in.drone.radius, blocked,
+                                           full_map_cap);
+    }
     if (!reach.start_passable) {
         const FrontierPathResult unstick =
             frontier_.findUnstickPath(in.map, in.state.position, in.drone.radius);

@@ -117,4 +117,12 @@ public:
 /// Voxel count of the mission bounds — the expansion cap for every search.
 [[nodiscard]] std::size_t maxExpansionsForMap(const common::IMap3D& map);
 
+// Reachability search bound for an ordinary replan. Chosen so a single replan's bounded BFS
+// (runBoundedSearch, MappingAlgorithmFrontier.cpp) costs low-single-digit milliseconds even on
+// the largest sim_compose.yaml map (large_out, 31x31x31 = 29,791 voxels), instead of scaling
+// with the whole map on every stall-triggered replan. See root-cause investigation in
+// docs/superpowers/plans/2026-09-06-var01-approach-a-runtime-fix.md. Tuned empirically in
+// Task 4; if you change this value, re-run verify-cell-runtime on the full 24-cell suite.
+constexpr std::size_t kLocalSearchExpansionCap = 3000;
+
 } // namespace algorithm_207190406_209543255::detail
