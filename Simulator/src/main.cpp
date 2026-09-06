@@ -6,6 +6,7 @@
 #include <Simulator/io/YamlConfigParsers.h>
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/TimeFormat.h>
 
 #include <cstddef>
 #include <filesystem>
