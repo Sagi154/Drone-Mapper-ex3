@@ -36,7 +36,7 @@ example.
 | `CMakePresets.json`, `vcpkg.json`, `vcpkg-configuration.json` | Needed for the README `cmake --preset default` path | Yes, if graders use your build |
 | `inputs/` | Instructor maps/YAML; README example uses them | Include if graders run the example |
 | Known Issues `.xlsx` | Optional staff excel, not the markdown | Optional, at zip time |
-| `bonus.txt` | Include — we claim CI9 (and later CI2/CI10/CI3/CI8) | Include |
+| `bonus.txt` | Include — we claim CI9, CI2, CI10, CI3, and CI8 | Include |
 | `docs/known-issues.md` | Working list; do not submit markdown | No |
 | `docs/HLD.md` + `docs/hld/*.mmd` | Source for `HLD.pdf` | No — PDF only |
 | `scripts/render_hld_pdf.sh` | PDF render helper | No |

@@ -3,7 +3,7 @@
 **Written to this file:** 2026-09-03.  
 **Re-verify:** 2026-09-03 (four explore groups A–D against the live tree after Tasks 1–7 on `fix-advcpp-rubric-findings`, plus leftover-site cleanup in Task 8).  
 **Score-parity follow-up:** 2026-09-03 (libm unwrap in movement/beam/sphere/scoring/planner hot paths so all 24 `sim_compose.yaml` scores match `main` `9374aea`; see `docs/benchmarks/2026-09-03-main-score-parity.md`).  
-**Landed 2026-09-06:** `docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md` on `known-issues-fixes`. Cheap gated sites from the table below were fixed; leftovers are Known Issues rows 14–19. 24-cell `score_sum` still **1832.747**. `HLD.pdf` regenerated (**231,157** bytes).
+**Landed 2026-09-06:** `docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md` on `known-issues-fixes`. Cheap gated sites from the table below were fixed; leftovers are Known Issues rows **#9–#14** (were #14–#19 before optional CI recoveries compacted the table). 24-cell `score_sum` still **1832.747**. `HLD.pdf` was regenerated again with the CI recovery HLD updates (size drifts; trust `docs/HLD.md`).
 **How to read this:** `e01`–`e23` are grader judgment from `context/Error Code Key.xlsx` / `docs/review-error-codes.md`. A site here is “worth a second look,” not an automated FAIL. `b*` codes are runtime deductions and are **not** in this table.
 
 Severity: **m** = minor, **n** = normal, **s** = severe (spreadsheet columns).
@@ -18,22 +18,22 @@ Source files confirmed before the pass: `docs/review-error-codes.md`, `context/A
 
 The 2026-09-03 combined table below is the **snapshot the later plan consumed**. Do not treat unchecked line numbers as current. Plan:
 `docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`. Known Issues:
-`docs/known-issues.md` rows 14–19 / `docs/known-issues-explained.md`.
+`docs/known-issues.md` rows **#9–#14** / `docs/known-issues-explained.md` (compacted after CI9/CI2/CI10/CI3/CI8).
 
 | Code | Sites in the 2026-09-03 table | 2026-09-06 outcome |
 |------|-------------------------------|--------------------|
 | e01 | *(none then)* | UTC helpers split out of `IRunErrorLog.h` into `TimeFormat.h` (plan Task 1). |
-| e03 | libm unwraps + factory resolution | MockMovement **limit checks** and output-map resolution converted (Tasks 9–10). Remaining hot-path trig **kept** (KI #14). |
+| e03 | libm unwraps + factory resolution | MockMovement **limit checks** and output-map resolution converted (Tasks 9–10). Remaining hot-path trig **kept** (KI #9). |
 | e04 | C arrays (neighbors/axes) | Replaced with `std::array` (Task 11). Cache-key `double` compare left. |
 | e06 / e08 | DroneControl lidar/GPS; unused `mission_`; MappingAlgorithm helpers | const-ref sensors, dropped `mission_`, helpers off the class API (Tasks 2–3, 5). |
 | e07 | *(none then)* | `ConeTemplateCache::get` / `PluginLoader::tryOpen` marked `const` (Task 4). |
-| e10 | PluginLoader load-one, wrapDeg, keyToPoint, plus leftovers | Those three shared (Tasks 6–8). Remaining loops/walks are KI #19. |
-| e13 | raw pointers / out-params | Deferred (KI #16). |
+| e10 | PluginLoader load-one, wrapDeg, keyToPoint, plus leftovers | Those three shared (Tasks 6–8). Remaining loops/walks are KI #14. |
+| e13 | raw pointers / out-params | Deferred (KI #11). |
 | e14 / e15 | HLD class + sequence drift | Diagrams and `HLD.md` / `HLD.pdf` updated (Task 16). |
-| e16 | `double` cone/frontier APIs | Deferred (KI #15). |
+| e16 | `double` cone/frontier APIs | Deferred (KI #10). |
 | e17 | fat interface includes | Forward-declare + out-of-line dtor on the planned headers (Task 12). MockLidar/MockMovement/`RunErrorLog.h` minors left. |
-| e21 | several re-walks | `ScanResultToVoxels` fused (Task 13). Other sites KI #18. |
-| e22 | cache `const vector&` / `detail` headers | Deferred (KI #17). |
+| e21 | several re-walks | `ScanResultToVoxels` fused (Task 13). Other sites KI #13. |
+| e22 | cache `const vector&` / `detail` headers | Deferred (KI #12). |
 | e23 | named magic numbers | Named (Task 14). |
 | GUIDELINE | invalid YAML crash | Non-scalar `simulation_config` and nested parse failures set `ok=false` (Task 15). |
 

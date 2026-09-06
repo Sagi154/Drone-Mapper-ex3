@@ -23,13 +23,13 @@ implemented differently, and remaining bugs so graders do not treat them as
 surprises. The markdown table is the working copy; it is **not** submitted
 as-is. At zip time it gets copied into the staff sheet and exported as `.xlsx`.
 
-If you later **implement** an optional / bonus row (#1–#6), do not leave it
-here. Remove it from `docs/known-issues.md` and **claim it in `bonus.txt`**
-(what you did, plus file:line). Staff will not infer extra credit from the
-code alone. Skip `bonus.txt` for #7 (Unmapped, different design), #8 (bug), and
-#9–#14 (deferred rubric nits); those are not bonuses. CI9, CI2, CI10, CI3, and
-CI8 are already claimed in `bonus.txt`. If nothing optional was implemented, do
-not add `bonus.txt`.
+If you later **implement** another optional / bonus row (#1–#6), do not leave
+it here. Remove it from `docs/known-issues.md` and **append** the claim in
+`bonus.txt` (what you did, plus file:line). Staff will not infer extra credit
+from the code alone. Skip `bonus.txt` for #7 (Unmapped, different design), #8
+(bug), and #9–#14 (deferred rubric nits); those are not bonuses. CI9, CI2,
+CI10, CI3, and CI8 are already claimed in zip-root `bonus.txt` — keep that
+file in the submission.
 
 ---
 
