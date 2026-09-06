@@ -86,13 +86,6 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
            bounds.max_height == 0.0 * z_extent[cm];
 }
 
-[[nodiscard]] bool isWithinMappingBounds(const Position3D& pos,
-                                         const common::types::MappingBounds& bounds) {
-    return pos.x >= bounds.min_x && pos.x <= bounds.max_x && pos.y >= bounds.min_y &&
-           pos.y <= bounds.max_y && pos.z >= bounds.min_height &&
-           pos.z <= bounds.max_height;
-}
-
 [[nodiscard]] Position3D predictedDestination(const Position3D& pos,
                                               const common::Orientation& heading,
                                               const common::types::MovementCommand& command) {
@@ -234,10 +227,6 @@ common::types::DroneStepResult DroneControlImpl::applyMovement(
     if (move.type == common::types::MovementCommandType::Advance ||
         move.type == common::types::MovementCommandType::Elevate) {
         const Position3D dest = predictedDestination(here, heading, move);
-        if (!isUnsetMissionBounds(mission_bounds_) &&
-            !isWithinMappingBounds(dest, mission_bounds_)) {
-            return {common::types::DroneStepStatus::Continue, {}};
-        }
         if (!output_map_.isInBounds(dest)) {
             return {common::types::DroneStepStatus::Continue, {}};
         }

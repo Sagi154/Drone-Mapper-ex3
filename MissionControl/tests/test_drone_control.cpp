@@ -686,7 +686,6 @@ TEST(DroneControl, ElevateIsClampedToMissionHeight) {
             .status = common::types::AlgorithmStatus::Working,
         }},
     };
-    // Extend FakeMovement to record last_elevate_ the same way as last_advance_.
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
