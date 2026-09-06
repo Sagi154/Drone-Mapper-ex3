@@ -23,6 +23,54 @@ namespace {
     return std::filesystem::absolute(path, ec).lexically_normal().string();
 }
 
+// Shared dlopen → pending-factory-take → store/error-path for algorithm and mission-control.
+// tryOpen is private, so callers pass a bound opener instead of PluginLoader::tryOpen.
+template <typename Loaded, typename TryOpenFn, typename ClearOwnFn, typename TakeFactoryFn,
+          typename BuildLoadedFn>
+[[nodiscard]] PluginLoadOutcome loadOnePlugin(TryOpenFn&& try_open,
+                                              const std::filesystem::path& so_path,
+                                              std::vector<DlHandle>& handles,
+                                              std::unordered_set<std::string>& loaded_paths,
+                                              std::vector<Loaded>& storage, const char* kind_label,
+                                              ClearOwnFn&& clear_own_pending,
+                                              TakeFactoryFn&& take_factory,
+                                              BuildLoadedFn&& build_loaded) {
+    PluginLoadOutcome outcome;
+    const std::string filename = basenameOf(so_path);
+
+    auto& registrar = PluginRegistrar::instance();
+    clear_own_pending(registrar);
+
+    std::string canonical;
+    std::string detail;
+    DlHandle handle = try_open(so_path, canonical, detail);
+    if (!handle) {
+        std::cerr << "error: failed to load " << kind_label << " '" << filename << "': " << detail
+                  << '\n';
+        outcome.errors.push_back(filename);
+        return outcome;
+    }
+
+    auto factory = take_factory(registrar);
+    if (!factory.has_value() || !*factory) {
+        std::cerr << "error: " << kind_label << " '" << filename
+                  << "' loaded but did not register a factory\n";
+        // Clear both slots — a wrong-kind .so may have filled the other pending slot.
+        registrar.clearPendingAlgorithmFactory();
+        registrar.clearPendingMissionControlFactory();
+        // Record the path so a later retry cannot reload after this close.
+        loaded_paths.insert(canonical);
+        handle.reset(); // dlclose via DlHandle destructor
+        outcome.errors.push_back(filename);
+        return outcome;
+    }
+
+    loaded_paths.insert(canonical);
+    handles.push_back(std::move(handle));
+    storage.push_back(build_loaded(filename, so_path, std::move(*factory)));
+    return outcome;
+}
+
 } // namespace
 
 PluginLoader::~PluginLoader() { unloadAll(); }
@@ -82,78 +130,31 @@ DlHandle PluginLoader::tryOpen(const std::filesystem::path& so_path, std::string
 }
 
 PluginLoadOutcome PluginLoader::loadOneAlgorithm(const std::filesystem::path& so_path) {
-    PluginLoadOutcome outcome;
-    const std::string filename = basenameOf(so_path);
-
-    auto& registrar = PluginRegistrar::instance();
-    registrar.clearPendingAlgorithmFactory();
-
-    std::string canonical;
-    std::string detail;
-    DlHandle handle = tryOpen(so_path, canonical, detail);
-    if (!handle) {
-        std::cerr << "error: failed to load algorithm plugin '" << filename << "': " << detail
-                  << '\n';
-        outcome.errors.push_back(filename);
-        return outcome;
-    }
-
-    auto factory = registrar.takePendingAlgorithmFactory();
-    if (!factory.has_value() || !*factory) {
-        std::cerr << "error: algorithm plugin '" << filename
-                  << "' loaded but did not register a factory\n";
-        // Clear both slots — a wrong-kind .so may have filled the MC pending slot.
-        registrar.clearPendingAlgorithmFactory();
-        registrar.clearPendingMissionControlFactory();
-        // Record the path so a later retry cannot reload after this close.
-        loaded_canonical_paths_.insert(canonical);
-        handle.reset(); // dlclose via DlHandle destructor
-        outcome.errors.push_back(filename);
-        return outcome;
-    }
-
-    loaded_canonical_paths_.insert(canonical);
-    handles_.push_back(std::move(handle));
-    algorithms_.push_back(LoadedAlgorithmPlugin{filename, so_path, std::move(*factory)});
-    return outcome;
+    return loadOnePlugin(
+        [this](const std::filesystem::path& path, std::string& canonical, std::string& detail) {
+            return tryOpen(path, canonical, detail);
+        },
+        so_path, handles_, loaded_canonical_paths_, algorithms_, "algorithm plugin",
+        [](PluginRegistrar& registrar) { registrar.clearPendingAlgorithmFactory(); },
+        [](PluginRegistrar& registrar) { return registrar.takePendingAlgorithmFactory(); },
+        [](std::string filename, const std::filesystem::path& path,
+           common::MappingAlgorithmFactory factory) {
+            return LoadedAlgorithmPlugin{std::move(filename), path, std::move(factory)};
+        });
 }
 
 PluginLoadOutcome PluginLoader::loadOneMissionControl(const std::filesystem::path& so_path) {
-    PluginLoadOutcome outcome;
-    const std::string filename = basenameOf(so_path);
-
-    auto& registrar = PluginRegistrar::instance();
-    registrar.clearPendingMissionControlFactory();
-
-    std::string canonical;
-    std::string detail;
-    DlHandle handle = tryOpen(so_path, canonical, detail);
-    if (!handle) {
-        std::cerr << "error: failed to load mission-control plugin '" << filename
-                  << "': " << detail << '\n';
-        outcome.errors.push_back(filename);
-        return outcome;
-    }
-
-    auto factory = registrar.takePendingMissionControlFactory();
-    if (!factory.has_value() || !*factory) {
-        std::cerr << "error: mission-control plugin '" << filename
-                  << "' loaded but did not register a factory\n";
-        // Clear both slots — a wrong-kind .so may have filled the algorithm pending slot.
-        registrar.clearPendingAlgorithmFactory();
-        registrar.clearPendingMissionControlFactory();
-        // Record the path so a later retry cannot reload after this close.
-        loaded_canonical_paths_.insert(canonical);
-        handle.reset(); // dlclose via DlHandle destructor
-        outcome.errors.push_back(filename);
-        return outcome;
-    }
-
-    loaded_canonical_paths_.insert(canonical);
-    handles_.push_back(std::move(handle));
-    mission_controls_.push_back(
-        LoadedMissionControlPlugin{filename, so_path, std::move(*factory)});
-    return outcome;
+    return loadOnePlugin(
+        [this](const std::filesystem::path& path, std::string& canonical, std::string& detail) {
+            return tryOpen(path, canonical, detail);
+        },
+        so_path, handles_, loaded_canonical_paths_, mission_controls_, "mission-control plugin",
+        [](PluginRegistrar& registrar) { registrar.clearPendingMissionControlFactory(); },
+        [](PluginRegistrar& registrar) { return registrar.takePendingMissionControlFactory(); },
+        [](std::string filename, const std::filesystem::path& path,
+           common::MissionControlFactory factory) {
+            return LoadedMissionControlPlugin{std::move(filename), path, std::move(factory)};
+        });
 }
 
 PluginLoadOutcome PluginLoader::loadAlgorithmSo(const std::filesystem::path& so_path) {
