@@ -23,9 +23,6 @@ using common::Orientation;
 using common::Position3D;
 using common::cm;
 using common::deg;
-using common::x_extent;
-using common::y_extent;
-using common::z_extent;
 using user_common_207190406_209543255::kDownwardScanThreshold;
 using user_common_207190406_209543255::kHouseMaxZSpan;
 using user_common_207190406_209543255::kHouseMinXySpan;
@@ -52,18 +49,6 @@ struct ScoredDirection {
     Orientation direction{};
     const ctpl::detail::ConeTemplate* cone = nullptr;
 };
-
-[[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
-    const double step = config.resolution.force_numerical_value_in(cm);
-    const double ox = config.offset.x.force_numerical_value_in(cm);
-    const double oy = config.offset.y.force_numerical_value_in(cm);
-    const double oz = config.offset.z.force_numerical_value_in(cm);
-    return Position3D{
-        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
-        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
-        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
-    };
-}
 
 [[nodiscard]] std::array<double, 3> unitVector(const Orientation& dir) {
     const Position3D tip = bm::pointAlongBeam(Position3D{}, dir, 1.0 * cm);

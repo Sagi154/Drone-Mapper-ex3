@@ -52,18 +52,6 @@ constexpr Offset kOffsets[6] = {
     return config.resolution.force_numerical_value_in(cm);
 }
 
-[[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
-    const double step = gridStepCm(config);
-    const double ox = config.offset.x.force_numerical_value_in(cm);
-    const double oy = config.offset.y.force_numerical_value_in(cm);
-    const double oz = config.offset.z.force_numerical_value_in(cm);
-    return Position3D{
-        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
-        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
-        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
-    };
-}
-
 [[nodiscard]] types::VoxelOccupancy occupancyAt(const IMap3D& map, const Position3D& pos) {
     if (!map.isInBounds(pos)) {
         return types::VoxelOccupancy::OutOfBounds;
@@ -414,6 +402,18 @@ GridKey quantizePosition(const Position3D& pos, const types::MapConfig& config) 
         static_cast<int>(std::lround((px - ox) / step)),
         static_cast<int>(std::lround((py - oy) / step)),
         static_cast<int>(std::lround((pz - oz) / step)),
+    };
+}
+
+Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
+    const double step = gridStepCm(config);
+    const double ox = config.offset.x.force_numerical_value_in(cm);
+    const double oy = config.offset.y.force_numerical_value_in(cm);
+    const double oz = config.offset.z.force_numerical_value_in(cm);
+    return Position3D{
+        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
+        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
+        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
     };
 }
 

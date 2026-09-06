@@ -94,6 +94,8 @@ public:
 
 [[nodiscard]] GridKey quantizePosition(const common::Position3D& pos, const common::types::MapConfig& config);
 
+[[nodiscard]] common::Position3D keyToPoint(const GridKey& key, const common::types::MapConfig& config);
+
 [[nodiscard]] bool hasNotMappedInSphere(const common::IMap3D& map,
                                         const common::Position3D& centre,
                                         common::PhysicalLength radius);
