@@ -138,15 +138,19 @@ After a full 24-cell run, also diff scores against the [Documented baseline (202
 
 ## Documented baseline (2026-09-06)
 
-**Canonical per-cell Release baseline** after VAR-01 Approach A landed on `known-issues-fixes`: corner-anchored `sphereIntersectsCellBox` plus `kLocalSearchExpansionCap = 3000` (one full-map fallback). Use this table when judging later runs. Do not treat the 2026-09-03 `large_out` short-lidar WARNs (~45–46s) as expected anymore.
+**Canonical per-cell Release baseline** after VAR-01 Approach A, refreshed 2026-09-06
+on `known-issues-fixes` after the AdvCpp rubric refactors. Scores/steps are bit-identical
+to the earlier `a254810` landing (`score_sum = 1832.747`). Walls are noise vs that run
+(29.9s vs 30.4s). Do not treat the 2026-09-03 `large_out` short-lidar WARNs (~45–46s)
+as expected anymore.
 
 | Field | Value |
 |-------|--------|
 | Date | 2026-09-06 |
-| Tree | `known-issues-fixes` @ `a254810` (algorithm `2732aca`) |
-| Build | Release `build/opt`, Docker `drone-mapper-ex3-dev`, wiped `build/opt` + `tmp/bench-out` |
+| Tree | `known-issues-fixes` @ `c70762c` |
+| Build | Release `build/opt`, Docker `drone-mapper-ex3-dev`; rebuilt Algorithm / simulator / MissionControl; wiped `tmp/bench-out` only (kept vcpkg in `build/opt`) |
 | Method | `time_each_cell.py`, `num_threads=1`, one process per cell |
-| Overall | **PASS** — FAIL=0, WARN=0, wall_sum=30.4s, wall_max=3.0s, cells_ge_60s=0 |
+| Overall | **PASS** — FAIL=0, WARN=0, wall_sum=29.9s, wall_max=3.0s, cells_ge_60s=0 |
 | score_sum | **1832.747** |
 | CSV (skill) | `.cursor/skills/verify-cell-runtime/baseline-2026-09-06-per-cell-wall.csv` |
 | CSV / write-up (docs) | `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv`, `docs/benchmarks/2026-09-06-var01-approach-a.md` |
@@ -158,30 +162,30 @@ Fair `main` @ `9374aea` (2026-09-03) is historical only: score_sum 1769.8, wall_
 
 | Cell | Group | Score | Steps | Status | wall_s | Verdict |
 |------|-------|------:|------:|--------|-------:|---------|
-| house_simulation+house_mission_lower\|drone_small\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.11 | PASS |
+| house_simulation+house_mission_lower\|drone_small\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.12 | PASS |
 | house_simulation+house_mission_lower\|drone_small\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.08 | PASS |
 | house_simulation+house_mission_lower\|drone_large\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.07 | PASS |
 | house_simulation+house_mission_lower\|drone_large\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.07 | PASS |
 | house_simulation+house_mission_full\|drone_small\|lidar_long | house_full | 47.46 | 2700 | COMPLETED | 2.80 | PASS |
-| house_simulation+house_mission_full\|drone_small\|lidar_short | house_full | 21.00 | 1100 | COMPLETED | 2.10 | PASS |
-| house_simulation+house_mission_full\|drone_large\|lidar_long | house_full | 20.08 | 800 | COMPLETED | 1.71 | PASS |
-| house_simulation+house_mission_full\|drone_large\|lidar_short | house_full | 14.89 | 600 | COMPLETED | 1.42 | PASS |
-| large_simulation_out+large_mission_out\|drone_small\|lidar_long | large_out | 73.50 | 1700 | COMPLETED | 0.89 | PASS |
-| large_simulation_out+large_mission_out\|drone_small\|lidar_short | large_out | 74.95 | 4100 | COMPLETED | 2.73 | PASS |
-| large_simulation_out+large_mission_out\|drone_large\|lidar_long | large_out | 75.59 | 3400 | COMPLETED | 1.47 | PASS |
-| large_simulation_out+large_mission_out\|drone_large\|lidar_short | large_out | 72.02 | 3500 | COMPLETED | 2.76 | PASS |
+| house_simulation+house_mission_full\|drone_small\|lidar_short | house_full | 21.00 | 1100 | COMPLETED | 2.09 | PASS |
+| house_simulation+house_mission_full\|drone_large\|lidar_long | house_full | 20.08 | 800 | COMPLETED | 1.68 | PASS |
+| house_simulation+house_mission_full\|drone_large\|lidar_short | house_full | 14.89 | 600 | COMPLETED | 1.43 | PASS |
+| large_simulation_out+large_mission_out\|drone_small\|lidar_long | large_out | 73.50 | 1700 | COMPLETED | 0.85 | PASS |
+| large_simulation_out+large_mission_out\|drone_small\|lidar_short | large_out | 74.95 | 4100 | COMPLETED | 2.79 | PASS |
+| large_simulation_out+large_mission_out\|drone_large\|lidar_long | large_out | 75.59 | 3400 | COMPLETED | 1.45 | PASS |
+| large_simulation_out+large_mission_out\|drone_large\|lidar_short | large_out | 72.02 | 3500 | COMPLETED | 2.72 | PASS |
 | large_simulation_room+large_mission_room\|drone_small\|lidar_long | large_room | 97.68 | 187 | COMPLETED | 0.15 | PASS |
-| large_simulation_room+large_mission_room\|drone_small\|lidar_short | large_room | 97.26 | 193 | COMPLETED | 0.24 | PASS |
-| large_simulation_room+large_mission_room\|drone_large\|lidar_long | large_room | 97.31 | 198 | COMPLETED | 0.14 | PASS |
-| large_simulation_room+large_mission_room\|drone_large\|lidar_short | large_room | 97.52 | 198 | COMPLETED | 0.29 | PASS |
-| small_simulation_out+small_mission_out\|drone_small\|lidar_long | small_out | 93.87 | 1993 | COMPLETED | 1.07 | PASS |
-| small_simulation_out+small_mission_out\|drone_small\|lidar_short | small_out | 94.14 | 1993 | COMPLETED | 2.37 | PASS |
-| small_simulation_out+small_mission_out\|drone_large\|lidar_long | small_out | 45.38 | 1600 | COMPLETED | 2.97 | PASS |
-| small_simulation_out+small_mission_out\|drone_large\|lidar_short | small_out | 83.86 | 1994 | COMPLETED | 2.45 | PASS |
-| small_simulation_room+small_mission_room\|drone_small\|lidar_long | small_room | 85.96 | 990 | COMPLETED | 0.90 | PASS |
-| small_simulation_room+small_mission_room\|drone_small\|lidar_short | small_room | 87.31 | 993 | COMPLETED | 1.13 | PASS |
-| small_simulation_room+small_mission_room\|drone_large\|lidar_long | small_room | 85.30 | 996 | COMPLETED | 0.93 | PASS |
-| small_simulation_room+small_mission_room\|drone_large\|lidar_short | small_room | 67.65 | 993 | COMPLETED | 1.53 | PASS |
+| large_simulation_room+large_mission_room\|drone_small\|lidar_short | large_room | 97.26 | 193 | COMPLETED | 0.23 | PASS |
+| large_simulation_room+large_mission_room\|drone_large\|lidar_long | large_room | 97.31 | 198 | COMPLETED | 0.13 | PASS |
+| large_simulation_room+large_mission_room\|drone_large\|lidar_short | large_room | 97.52 | 198 | COMPLETED | 0.28 | PASS |
+| small_simulation_out+small_mission_out\|drone_small\|lidar_long | small_out | 93.87 | 1993 | COMPLETED | 1.02 | PASS |
+| small_simulation_out+small_mission_out\|drone_small\|lidar_short | small_out | 94.14 | 1993 | COMPLETED | 2.35 | PASS |
+| small_simulation_out+small_mission_out\|drone_large\|lidar_long | small_out | 45.38 | 1600 | COMPLETED | 3.03 | PASS |
+| small_simulation_out+small_mission_out\|drone_large\|lidar_short | small_out | 83.86 | 1994 | COMPLETED | 2.30 | PASS |
+| small_simulation_room+small_mission_room\|drone_small\|lidar_long | small_room | 85.96 | 990 | COMPLETED | 0.82 | PASS |
+| small_simulation_room+small_mission_room\|drone_small\|lidar_short | small_room | 87.31 | 993 | COMPLETED | 1.09 | PASS |
+| small_simulation_room+small_mission_room\|drone_large\|lidar_long | small_room | 85.30 | 996 | COMPLETED | 0.91 | PASS |
+| small_simulation_room+small_mission_room\|drone_large\|lidar_short | small_room | 67.65 | 993 | COMPLETED | 1.47 | PASS |
 
 **Expected WARNs (baseline):** none. Do not treat a new ≥45s cell as “the old large_out WARN.”
 
