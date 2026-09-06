@@ -7,9 +7,9 @@ doc is for us, not for the zip.
 Resolved items were already pruned. Rows **#1–#6** are **skipped optional
 recovery** (or bonus) from the Common-issues PDF, not mandatory bugs. **#7**
 is Unmapped policy. The one remaining mapping-score problem is **#8**.
-Rows **#9–#14** are deferred AdvCpp rubric nits from the 2026-09-06 findings
-plan (`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`); they
-are code-quality leftovers, not runtime failures. CI9 (step `Error`: log and
+Rows **#9–#16** are deferred AdvCpp rubric nits from the 2026-09-06 findings
+plan (`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`) plus
+the same-day re-verify; they are code-quality leftovers, not runtime failures. CI9 (step `Error`: log and
 continue), CI2 (ignore world/map OOB), CI10 (clamp to mission bounds), CI3
 (retry invalid `nextStep` then throw), and CI8 (split oversize into in-limit
 fragments) are implemented and claimed in `bonus.txt`; they are not remaining
@@ -27,7 +27,7 @@ If you later **implement** another optional / bonus row (#1–#6), do not leave
 it here. Remove it from `docs/known-issues.md` and **append** the claim in
 `bonus.txt` (what you did, plus file:line). Staff will not infer extra credit
 from the code alone. Skip `bonus.txt` for #7 (Unmapped, different design), #8
-(bug), and #9–#14 (deferred rubric nits); those are not bonuses. CI9, CI2,
+(bug), and #9–#16 (deferred rubric nits); those are not bonuses. CI9, CI2,
 CI10, CI3, and CI8 are already claimed in zip-root `bonus.txt` — keep that
 file in the submission.
 
@@ -162,24 +162,27 @@ each replan is. Fixing remaining band gaps is mapping-track work, not
   underperform vs ex2 bands.” Fixing it helps the algorithm contest; it
   is not an extra-credit line in `bonus.txt`. The 2026-09-03 `large_out` short
   cliff is no longer the measured baseline.
-- **#9–#14:** Deferred AdvCpp rubric leftovers (libm unwraps, `double` APIs,
+- **#9–#16:** Deferred AdvCpp rubric leftovers (libm unwraps, `double` APIs,
   raw pointers, leaky `detail` types, remaining e21 walks, remaining e10
-  duplication). Listed so graders see we looked and chose not to touch the
-  hot path. Not `bonus.txt`.
+  duplication, HLD sequence/class gaps, leftover magic numbers). Listed so
+  graders see we looked and chose not to touch the hot path. Not `bonus.txt`.
 
 ---
 
-## Deferred AdvCpp rubric leftovers (#9–#14)
+## Deferred AdvCpp rubric leftovers (#9–#16)
 
 These came from `docs/advcpp-rubric-review.md` and were **consciously skipped**
-by the 2026-09-06 fix plan (Tasks 1–16 landed the cheap, gated sites). Type is
-`Code`. Reproducibility is **Not relevant**.
+by the 2026-09-06 fix plan (Tasks 1–16 landed the cheap, gated sites). The
+2026-09-06 re-verify confirmed those leftovers and added HLD e15/e14 plus
+leftover e23 literals. Type is `Code`. Reproducibility is **Not relevant**.
 
 | # | Rubric | What is still true |
 |---|--------|--------------------|
-| **9 (e03)** | Hot-path `std::sin`/`std::cos`/`sqrt` unwraps | Tasks 9–10 only converted MockMovement limit checks and output-map resolution. Remaining trig stays libm so the 24-cell scores do not drift. |
+| **9 (e03)** | Hot-path `std::sin`/`std::cos`/`sqrt` unwraps | Tasks 9–10 converted MockMovement limit checks and output-map resolution. MockLidar ring offsets now use `si::sin`/`si::cos`. Remaining trig (including `DroneControlImpl::predictedDestination`) stays libm so the 24-cell scores do not drift. |
 | **10 (e16)** | `double` cm/radian APIs on cone/frontier/planner | Cosmetic type-safety; blast radius is the score table. |
 | **11 (e13)** | Raw `const T*` / out-params (`MatrixCell`, `WavefrontPlanner::plan`, …) | Structural API change, not a mechanical rename. |
 | **12 (e22)** | `ConeTemplateCache::get` returns `const vector&`; `detail` types in ScanPlanning/ExplorationPlan headers | Same class of invasive header change. |
-| **13 (e21)** | String-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` without the `runBoundedSearch` memo | Task 13 only fused the scan-supplement walk in `ScanResultToVoxels`. |
-| **14 (e10)** | LidarCone/ConeTemplate walk overlap, MockLidar ring rebuild, PluginLoader directory loops | Tasks 6–8 shared load-one, `wrapDeg`, and `keyToPoint` only. |
+| **13 (e21)** | String-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` without the `runBoundedSearch` memo, plus extra double walks | Task 13 only fused the scan-supplement walk in `ScanResultToVoxels`. |
+| **14 (e10)** | LidarCone/ConeTemplate walk overlap, MockLidar ring rebuild, PluginLoader directory loops, plus bind/CLI/`isUnsetBoundaries` copies | Tasks 6–8 shared load-one, `wrapDeg`, and `keyToPoint` only. |
+| **15 (e15/e14)** | Comparative sequence attributes expand/distribute to `Main`; class diagram omits a few UserCommon modules | Prose is correct; mermaid in `seq-comparative-cell.mmd` is stale. Main architecture classes are already on the diagram. |
+| **16 (e23)** | Leftover magic numbers after Task 14 | One row covers all remaining literals (`+ 2.0`, `0.5`, `1e-9`, `1.0` cm, `360.0 * deg`). |
