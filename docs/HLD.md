@@ -42,10 +42,9 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   `createOutputDir`, loads the composition YAML, loads plugins through `PluginLoader`,
   builds one `SimulationRunFactoryImpl` per plugin binding, invokes
   `runPluginMatrix(bindings, composition, output_root, num_threads)` (`expandRunMatrix`
-  runs inside that call), writes reports via `writeModeReport` →
-  `writeComparativeReport` / `writeCompetitiveReport` plus per-plugin
-  `writeSimulationOutputYaml`, then destroys plugin objects and calls
-  `PluginLoader::unloadAll()` before return.
+  runs inside that call), writes per-plugin `writeSimulationOutputYaml` then
+  `writeModeReport` → `writeComparativeReport` / `writeCompetitiveReport`, then
+  destroys plugin objects and calls `PluginLoader::unloadAll()` before return.
 
 - **`SimulationCli` / `SimulatorPaths` (`Simulator/io/SimulatorPaths.h`)** —
   `parseSimulationCliArgs` returns `SimulationCliArgs`. Path helpers:
@@ -55,7 +54,10 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 - **`YamlConfigParsers` (`Simulator/io/YamlConfigParsers.h`)** — Five parsers:
   `parseCompositionFile`, `parseSimulationConfig`, `parseMissionConfig`,
   `parseDroneConfig`, `parseLidarConfig`. Parse failures are logged immediately
-  through `RunErrorLog` / `IRunErrorLog`.
+  through `RunErrorLog` / `IRunErrorLog`. A non-scalar `simulation_config` or a
+  failed nested drone/lidar parse makes `parseCompositionFile` return
+  `ok = false` (`COMPOSITION_INVALID`) instead of throwing or keeping a
+  default-constructed config.
 
 - **`SimulatorReports` (`Simulator/io/SimulatorReports.h`)** —
   `writeComparativeReport`, `writeCompetitiveReport`, `writeSimulationOutputYaml`.

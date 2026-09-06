@@ -10,6 +10,9 @@ Google Sheet clone and export `.xlsx` into the zip root. Agent instructions:
 Resolved and stale rows are removed (verbose flag, default-composition scoring,
 README, HLD, MockMovement catch in DroneControl, UserCommon-only-in-Simulator,
 scan-batch hang, foreign-MC step inflation). Numbers are compacted `1..n`.
+Rows 14–19 are deferred AdvCpp rubric leftovers from
+`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`
+(explained in `docs/known-issues-explained.md`).
 
 | # | Type | Sub Type | Description | Severity | Reproducibility | Reproduce steps | Reason | Reason notes |
 |---|------|----------|-------------|----------|-----------------|-----------------|--------|--------------|

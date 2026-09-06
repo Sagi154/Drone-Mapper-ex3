@@ -1,5 +1,9 @@
 # AdvCpp Rubric Findings Fix — Implementation Plan
 
+**Status (2026-09-06): complete.** Tasks 0–17 executed on `fix-advcpp-rubric-findings`, then
+fast-forwarded into `known-issues-fixes`. Debug `ctest` 175/175. 24-cell scores matched
+baseline `score_sum = 1832.747`. Not pushed. Deferred leftovers are Known Issues rows 14–19.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development, but with the human-approval override in "Execution Mode" below (per-task, not continuous). Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix the low-risk, high-confidence findings from the `advcpp-rubric-review` pass run on
@@ -131,7 +135,7 @@ revisit in a dedicated, higher-scrutiny plan if the human wants them fixed later
 | e16 (`double radius_cm`/`step_cm`/radian APIs across `ConeTemplate`, `LidarCone`, `MappingAlgorithmFrontier`, `WavefrontPlanner`) | Touches every call site on the scan/frontier hot path for a cosmetic type-safety win (1–2 rubric points); regression blast radius is the whole 24-cell score table. |
 | e13 (raw `const T*` in `MatrixCell`, `WavefrontPlanner::plan`'s out-param, `rankClusters`, `ScanPlanning::ScoredDirection`) | Structural API changes across planner/report code for a `m`/`n` rubric line; not mechanical enough for a single cheap-model task with a tight diff. |
 | e22 (`ConeTemplateCache::get` returning `const vector&`, `ScanPlanning.h`/`ExplorationPlan.h` exposing `detail` types) | Same class of invasive, hot-path-adjacent API change; low value for the risk. |
-| Remaining e21 sites beyond Task 15 below (`PathShaping` string-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` missing the `runBoundedSearch` memo) | Each needs its own correctness argument on the hot path; bundling them risks a silent score regression that's hard to attribute to one of several simultaneous changes. |
+| Remaining e21 sites beyond Task 13 (`PathShaping` string-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` missing the `runBoundedSearch` memo) | Each needs its own correctness argument on the hot path; bundling them risks a silent score regression that's hard to attribute to one of several simultaneous changes. |
 | Remaining e10 duplication (`LidarCone`/`ConeTemplate` walk overlap, `MockLidar::scan` ring rebuild, `PluginLoader::loadPlugins`/`applyFilesystemChecks` comparative-vs-competition loops) | Lower rubric weight than Tasks 7–9; higher effort to de-duplicate safely than the single-file swaps already in scope. |
 
 ---
@@ -293,7 +297,7 @@ Run the full 24-cell suite per the skill. Expected: identical `score_sum`/per-ce
 Task 0 confirmation (this task touches no algorithm logic — `wall_s` noise only). Report the table.
 **Stop. Wait for approval.** (gate done 2026-09-06: PASS, scores match Task 0)
 
-- [ ] **Step 7: Commit (after approval)**
+- [x] **Step 7: Commit (after approval)**
 
 ```bash
 git add -A
@@ -324,7 +328,7 @@ Committed as `730b4b5` after human approval.
   (rotate/advance/elevate are non-const on `IDroneMovement`). No other task in this plan depends
   on this signature.
 
-- [ ] **Step 1: Confirm `step()` never calls a mutating method on `lidar_sensor_`/`gps_`**
+- [x] **Step 1: Confirm `step()` never calls a mutating method on `lidar_sensor_`/`gps_`**
 
 Read `MissionControl/src/DroneControlImpl.cpp`'s `step()` and `state()`. Confirm every use of
 `lidar_sensor_` is `lidar_sensor_.scan(...)` (check `ILidar::scan`'s declared const-ness in
@@ -333,7 +337,7 @@ Read `MissionControl/src/DroneControlImpl.cpp`'s `step()` and `state()`. Confirm
 read-only). If either interface method is *not* const, stop this task and report — do not force a
 const binding that would fail to compile; leave the finding as a Known Issue instead.
 
-- [ ] **Step 2: Change the header**
+- [x] **Step 2: Change the header**
 
 In `DroneControlImpl.h`, change:
 
@@ -368,12 +372,12 @@ and the two member declarations:
     const common::IGPS& gps_;
 ```
 
-- [ ] **Step 3: Update the `.cpp` ctor definition** to match (`const common::ILidar&
+- [x] **Step 3: Update the `.cpp` ctor definition** to match (`const common::ILidar&
   lidar_sensor`, `const common::IGPS& gps` in the parameter list and member-init list — the
   member-init list itself does not change syntactically, only the types flow through from the
   header).
 
-- [ ] **Step 4: Build and test**
+- [x] **Step 4: Build and test**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -387,11 +391,11 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 Expected: compiles clean (no `-Wall -Wextra -Werror -pedantic` warnings — a non-const→const-ref
 narrowing here should not trigger any), `MissionControl` test suite green.
 
-- [ ] **Step 5: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 5: `verify-cell-runtime` gate + stop for approval**
 
 Expected: identical scores to Task 0/1's confirmation. **Stop. Wait for approval.**
 
-- [ ] **Step 6: Commit (after approval)**
+- [x] **Step 6: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: take DroneControlImpl's lidar and GPS by const-ref"
@@ -417,7 +421,7 @@ git commit -am "refactor: take DroneControlImpl's lidar and GPS by const-ref"
   check every construction site (`rg -n "DroneControlImpl(" --type cpp`, likely
   `SimulationRunFactoryImpl.cpp`) and remove the argument there too.
 
-- [ ] **Step 1: Grep to confirm `mission_` is truly dead**
+- [x] **Step 1: Grep to confirm `mission_` is truly dead**
 
 ```bash
 rg -n "mission_\b" MissionControl/src/DroneControlImpl.cpp
@@ -427,15 +431,15 @@ Expected: only the ctor's member-init (`mission_(mission)`) and the header's dec
 anywhere in `step()`/`state()`/`applyMovement()`/`applyScanIfRequested()`. If you find a real read,
 stop this task and report instead of deleting a used member.
 
-- [ ] **Step 2: Remove from the header**
+- [x] **Step 2: Remove from the header**
 
 Delete the `const common::types::MissionConfigData& mission` parameter from the ctor declaration
 and delete the `common::types::MissionConfigData mission_;` member.
 
-- [ ] **Step 3: Remove from the `.cpp`** — drop the parameter from the ctor definition and its
+- [x] **Step 3: Remove from the `.cpp`** — drop the parameter from the ctor definition and its
   member-init entry.
 
-- [ ] **Step 4: Fix every call site**
+- [x] **Step 4: Fix every call site**
 
 ```bash
 rg -n "DroneControlImpl(" --type-add 'cpp:*.{cpp,h}' -t cpp
@@ -444,17 +448,17 @@ rg -n "DroneControlImpl(" --type-add 'cpp:*.{cpp,h}' -t cpp
 Remove the now-extra `mission` argument at each construction site (do not remove any *other*
 argument — only the one this task deleted).
 
-- [ ] **Step 5: Build and test** — same command as Task 2 Step 4. Expected: green, no leftover
+- [x] **Step 5: Build and test** — same command as Task 2 Step 4. Expected: green, no leftover
   "unused parameter" warnings anywhere else that called this ctor.
 
-- [ ] **Step 6: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 6: `verify-cell-runtime` gate + stop for approval**
 
 Run the **Clean verify-cell-runtime procedure** (wipe `build/opt` + `tmp/bench-out`, fresh CMake
 configure, full Release rebuild). Never reuse a previous `build/opt`.
 
 Expected: identical scores. **Stop. Wait for approval.**
 
-- [ ] **Step 7: Commit (after approval)**
+- [x] **Step 7: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: drop DroneControlImpl's unused mission config member"
@@ -482,7 +486,7 @@ git commit -am "refactor: drop DroneControlImpl's unused mission config member"
   (`built_`, `res_cm_`, `z_min_`, `z_max_`, `d_`, `fov_circles_`, `templates_`) become `mutable`.
   `PluginLoader::tryOpen(...)` is now `const`.
 
-- [ ] **Step 1: `ConeTemplateCache` — mark the cache fields `mutable`, mark `get` const**
+- [x] **Step 1: `ConeTemplateCache` — mark the cache fields `mutable`, mark `get` const**
 
 In `ConeTemplate.h`:
 
@@ -511,7 +515,7 @@ Update `ConeTemplate.cpp`'s `ConeTemplateCache::get` definition signature to add
 (no body changes — every assignment to `templates_`/`built_`/etc. is now legal because those
 fields are `mutable`).
 
-- [ ] **Step 2: Grep for any caller that holds a non-const `ConeTemplateCache&` specifically
+- [x] **Step 2: Grep for any caller that holds a non-const `ConeTemplateCache&` specifically
   *because* `get` was non-const** (unlikely, but confirm):
 
 ```bash
@@ -522,7 +526,7 @@ If a caller stores `ConeTemplateCache&` as a member purely to call `get`, it may
 changed to `const ConeTemplateCache&` too — but that is optional polish, not required by this task;
 skip it if it would touch a file outside this task's list.
 
-- [ ] **Step 3: `PluginLoader::tryOpen` — add `const`**
+- [x] **Step 3: `PluginLoader::tryOpen` — add `const`**
 
 In `PluginLoader.h`:
 
@@ -536,7 +540,7 @@ Read `PluginLoader.cpp`'s `tryOpen` body first: confirm it only *reads* `loaded_
 `mission_controls_`, or `handles_`. If it does mutate any of those, do not add `const` — report
 instead of forcing a cast. If confirmed read-only, add `const` to the `.cpp` definition too.
 
-- [ ] **Step 4: Build and test**
+- [x] **Step 4: Build and test**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -547,13 +551,13 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 '
 ```
 
-- [ ] **Step 5: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 5: `verify-cell-runtime` gate + stop for approval**
 
 `ConeTemplateCache::get` is on the scan hot path — this is the one sub-part of this task worth
 double-checking for wall-time noise, but no *score* change is expected (identical logic, only
 `const`-ness changed). **Stop. Wait for approval.**
 
-- [ ] **Step 6: Commit (after approval)**
+- [x] **Step 6: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: mark ConeTemplateCache::get and PluginLoader::tryOpen const"
@@ -587,12 +591,12 @@ the core `nextStep` call graph; keep the diff mechanical (pure relocation, zero 
   into an anonymous namespace in the `.cpp` if they take no `Impl` state. **Do not change any
   function's parameters, return type, or logic — only its enclosing scope.**
 
-- [ ] **Step 1: Read `MappingAlgorithmImpl.cpp`'s `Impl` struct definition** to see whether `Impl`
+- [x] **Step 1: Read `MappingAlgorithmImpl.cpp`'s `Impl` struct definition** to see whether `Impl`
   already declares its own methods (likely yes, since `impl_->something()` is the pimpl pattern) or
   whether the outer class's private methods are free functions taking `Impl&`/`const Impl&`
   explicitly. Match whichever pattern the `.cpp` already uses — do not introduce a second pattern.
 
-- [ ] **Step 2: For each header-declared private method, classify it:**
+- [x] **Step 2: For each header-declared private method, classify it:**
   - **Stateless** (only reads its parameters, e.g. `samePosition(a, b)`, `predictPose(state,
     movement)` if it does not touch `impl_`) → move to an anonymous namespace in
     `MappingAlgorithmImpl.cpp`, drop the declaration from the header, drop the
@@ -604,11 +608,11 @@ the core `nextStep` call graph; keep the diff mechanical (pure relocation, zero 
     definition's qualifier from `MappingAlgorithmImpl_207190406_209543255::foo` to `Impl::foo`,
     and update the outer class's `nextStep`/dtor to call `impl_->foo(...)` instead of `foo(...)`.
 
-- [ ] **Step 3: Trim the header** — delete every one of these fifteen private method declarations
+- [x] **Step 3: Trim the header** — delete every one of these fifteen private method declarations
   from `MappingAlgorithmImpl.h`; leave `impl_`, the six `static constexpr` tuning constants, the
   public ctor/`nextStep`/dtor, and the deleted copy/move members untouched.
 
-- [ ] **Step 4: Build after every 2–3 methods moved**, not all fifteen at once — this keeps compile
+- [x] **Step 4: Build after every 2–3 methods moved**, not all fifteen at once — this keeps compile
   errors attributable to the last small edit:
 
 ```bash
@@ -619,7 +623,7 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 '
 ```
 
-- [ ] **Step 5: Full test pass**
+- [x] **Step 5: Full test pass**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -633,7 +637,7 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 Expected: 100% of the existing `Algorithm` test suite passes with zero assertion changes — if any
 test needed to change, this task stopped being a pure relocation; revert and re-scope.
 
-- [ ] **Step 6: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 6: `verify-cell-runtime` gate + stop for approval**
 
 Run the **Clean verify-cell-runtime procedure** (wipe `build/opt` + `tmp/bench-out`, fresh CMake
 configure, full Release rebuild). Never reuse a previous `build/opt`.
@@ -642,7 +646,7 @@ Expected: **byte-identical** `score_sum` and per-cell scores/steps to baseline (
 same compiled logic). Any score or step-count delta here is a bug — do not proceed to commit if
 one appears; debug it as this task's own problem before reporting. **Stop. Wait for approval.**
 
-- [ ] **Step 7: Commit (after approval)**
+- [x] **Step 7: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: move MappingAlgorithmImpl's private helpers out of the class API"
@@ -666,14 +670,14 @@ same dlopen → pending-factory-take → error-path flow, just against a differe
 - Produces: no public API change — `loadOneAlgorithm`/`loadOneMissionControl` keep their existing
   signatures and behavior; only their bodies share a common private template/lambda.
 
-- [ ] **Step 1: Read both methods' current bodies side-by-side** and identify the exact shape of
+- [x] **Step 1: Read both methods' current bodies side-by-side** and identify the exact shape of
   the shared flow: `tryOpen` → on failure, build a `PluginLoadOutcome` failure with
   `error_detail`; on success, `PluginRegistrar::takePending*Factory()` → on empty optional, failure
   outcome ("plugin did not register a factory"); on success, push into `algorithms_`/
   `mission_controls_`, push the handle into `handles_`, insert into `loaded_canonical_paths_`,
   return success outcome.
 
-- [ ] **Step 2: Write one private template method** in `PluginLoader.cpp`'s anonymous namespace or
+- [x] **Step 2: Write one private template method** in `PluginLoader.cpp`'s anonymous namespace or
   as a private `PluginLoader` method parameterized on the factory-take function and the
   storage vector, e.g.:
 
@@ -714,17 +718,17 @@ Adjust the exact parameter/return types to match what `PluginLoadOutcome`,
 `Simulator/include/Simulator/PluginLoadTypes.h` and the registrar header before writing this — the
 sketch above is the shape, not verbatim code to paste unchecked).
 
-- [ ] **Step 3: Rewrite `loadOneAlgorithm`/`loadOneMissionControl`** to each be a 2–4 line call into
+- [x] **Step 3: Rewrite `loadOneAlgorithm`/`loadOneMissionControl`** to each be a 2–4 line call into
   `loadOnePlugin<...>(...)` with their own `take_factory`/`build_loaded` lambdas.
 
-- [ ] **Step 4: Build and test** — same as Task 4 Step 4, filtered to `Simulator`.
+- [x] **Step 4: Build and test** — same as Task 4 Step 4, filtered to `Simulator`.
 
-- [ ] **Step 5: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 5: `verify-cell-runtime` gate + stop for approval**
 
 Plugin loading happens once per run, before any mission step — expected: zero score/step change,
 possibly a few ms off total wall time (noise). **Stop. Wait for approval.**
 
-- [ ] **Step 6: Commit (after approval)**
+- [x] **Step 6: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: share PluginLoader's algorithm/mission-control load flow"
@@ -756,28 +760,28 @@ git commit -am "refactor: share PluginLoader's algorithm/mission-control load fl
   quantity-typed) function, later tasks may reuse it — none currently plan to, but note it in the
   task's report so a future cleanup pass knows it exists.
 
-- [ ] **Step 1: Read all three implementations** (`BeamMath.cpp::normalizeOrientation`'s internal
+- [x] **Step 1: Read all three implementations** (`BeamMath.cpp::normalizeOrientation`'s internal
   wrap logic, `MockLidar.cpp`'s local `wrap_deg`/`normalize_orientation`, `PathShaping.cpp`'s local
   `wrapDeg`) and confirm they compute the same result for the same input domain (mod-360 wrap into
   `[0, 360)` or `(-180, 180]` — confirm which convention `BeamMath.cpp` uses and that the other two
   match it exactly, including tie-breaking at the boundary). **If the conventions differ even
   slightly, do not force a merge that changes behavior — report the discrepancy instead.**
 
-- [ ] **Step 2: If `MockLidar.cpp`'s use is exactly `normalizeOrientation`'s job**, delete its local
+- [x] **Step 2: If `MockLidar.cpp`'s use is exactly `normalizeOrientation`'s job**, delete its local
   helpers, add `#include <user_common_207190406_209543255/BeamMath.h>`, replace call sites.
 
-- [ ] **Step 3: If `PathShaping.cpp`'s `wrapDeg` is a lower-level primitive that
+- [x] **Step 3: If `PathShaping.cpp`'s `wrapDeg` is a lower-level primitive that
   `normalizeOrientation` calls internally but doesn't expose**, extract that primitive into
   `BeamMath.h` as `[[nodiscard]] double wrapDeg(double degrees);` (or the quantity-typed
   equivalent already used elsewhere in `BeamMath.h`), have `normalizeOrientation` call it too (no
   behavior change to `normalizeOrientation`), then have `PathShaping.cpp` call the shared one and
   delete its local copy.
 
-- [ ] **Step 4: Build and test** — `ctest --test-dir build/default --output-on-failure -R
+- [x] **Step 4: Build and test** — `ctest --test-dir build/default --output-on-failure -R
   "Algorithm|Simulator|UserCommon"` (adjust the `-R` filter to whatever suite names actually exist —
   check with `ctest --test-dir build/default -N` first).
 
-- [ ] **Step 5: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 5: `verify-cell-runtime` gate + stop for approval**
 
 This is the one task in this cluster with real hot-path exposure (`PathShaping` runs every replan;
 `MockLidar` runs every scan). Expected: **no** score change if Step 1's equivalence check was
@@ -785,7 +789,7 @@ correct — a score change here means the "same convention" assumption was wrong
 it, report and let the human decide whether to accept the small drift or revert. **Stop. Wait for
 approval.**
 
-- [ ] **Step 6: Commit (after approval)**
+- [x] **Step 6: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: share one angle-wrap helper across MockLidar and PathShaping"
@@ -814,13 +818,13 @@ git commit -am "refactor: share one angle-wrap helper across MockLidar and PathS
   common::types::MapConfig&) -> common::Position3D` becomes a header-declared free function next
   to `quantizePosition` in `MappingAlgorithmFrontier.h`.
 
-- [ ] **Step 1: Read both `keyToPoint` implementations byte-for-byte.** They must be identical
+- [x] **Step 1: Read both `keyToPoint` implementations byte-for-byte.** They must be identical
   (same corner-anchored math as `quantizePosition`'s inverse, per the Approach A geometry fix) — if
   they differ in even one term, stop and report; do not silently pick one and call it a dedup, since
   that would be a behavior change requiring its own `verify-cell-runtime` justification, not this
   task's.
 
-- [ ] **Step 2: Add the declaration to `MappingAlgorithmFrontier.h`**, right after
+- [x] **Step 2: Add the declaration to `MappingAlgorithmFrontier.h`**, right after
   `quantizePosition`'s declaration:
 
 ```cpp
@@ -831,13 +835,13 @@ Move the definition (currently duplicated) into `MappingAlgorithmFrontier.cpp` i
 there, in the `algorithm_207190406_209543255::detail` namespace, unqualified free function (matching
 `quantizePosition`'s existing definition style in that file).
 
-- [ ] **Step 3: Delete `ScanPlanning.cpp`'s local `keyToPoint`**, add `#include
+- [x] **Step 3: Delete `ScanPlanning.cpp`'s local `keyToPoint`**, add `#include
   "MappingAlgorithmFrontier.h"` if not already present (it likely already is, since
   `ScanPlanning.cpp` almost certainly uses `GridKey`), and update its call sites to the
   now-shared, unqualified `keyToPoint(...)` (same namespace, no qualification needed if both files
   are in `algorithm_207190406_209543255::detail`).
 
-- [ ] **Step 4: Build and test**
+- [x] **Step 4: Build and test**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -848,12 +852,12 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 '
 ```
 
-- [ ] **Step 5: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 5: `verify-cell-runtime` gate + stop for approval**
 
 Expected: byte-identical scores (Step 1's equivalence check makes this a pure dedup). **Stop. Wait
 for approval.**
 
-- [ ] **Step 6: Commit (after approval)**
+- [x] **Step 6: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: share one keyToPoint between ScanPlanning and MappingAlgorithmFrontier"
@@ -873,7 +877,7 @@ unwrap to `std::abs` on a raw `double` just to compare magnitude against a quant
 **Interfaces:** none — this is a pure internal rewrite of three limit checks; `MockMovement`'s
 public methods (`rotate`, `advance`, `elevate`) keep their exact signatures and return values.
 
-- [ ] **Step 1: Check what `DroneControlImpl` (or wherever the rubric review's "DroneControl
+- [x] **Step 1: Check what `DroneControlImpl` (or wherever the rubric review's "DroneControl
   already does this" comment points) actually does**, to match the established quantity-abs idiom
   in this codebase exactly:
 
@@ -881,7 +885,7 @@ public methods (`rotate`, `advance`, `elevate`) keep their exact signatures and 
 rg -n "mp_units::abs|abs(" MissionControl/src/DroneControlImpl.cpp
 ```
 
-- [ ] **Step 2: Rewrite `rotate`'s check.** Current:
+- [x] **Step 2: Rewrite `rotate`'s check.** Current:
 
 ```cpp
     const double deg_val = angle.numerical_value_in(deg);
@@ -903,7 +907,7 @@ Confirm `mp_units::abs` accepts `common::HorizontalAngle` and that `angle`/`dron
 directly comparable (same quantity type) before deleting the unwrap — if a `quantity_cast` is
 needed, add it, don't force a comparison that won't compile.
 
-- [ ] **Step 3: Rewrite `advance`'s check** the same way with `common::PhysicalLength`:
+- [x] **Step 3: Rewrite `advance`'s check** the same way with `common::PhysicalLength`:
 
 ```cpp
     if (mp_units::abs(distance) > drone_.max_advance) {
@@ -918,10 +922,10 @@ Recompute `dist_cm` from `distance.numerical_value_in(cm)` right where the trig 
 leave the existing `dist_cm` line in place below the now-simplified limit check — whichever keeps
 the diff smallest.
 
-- [ ] **Step 4: Rewrite `elevate`'s check** the same way with `common::PhysicalLength` /
+- [x] **Step 4: Rewrite `elevate`'s check** the same way with `common::PhysicalLength` /
   `drone_.max_elevate`, same caveat about keeping `dist_cm` for the deferred trig block below it.
 
-- [ ] **Step 5: Build and test**
+- [x] **Step 5: Build and test**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -937,14 +941,14 @@ Expected: identical pass/fail behavior on the existing rotate/advance/elevate-li
 at the boundary, since `mp_units::abs(x) > limit` must reject/accept the same boundary cases as
 `std::abs(x_cm) > limit_cm` did).
 
-- [ ] **Step 6: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 6: `verify-cell-runtime` gate + stop for approval**
 
 Run the **Clean verify-cell-runtime procedure** (wipe `build/opt` + `tmp/bench-out`, fresh CMake
 configure, full Release rebuild). Never reuse a previous `build/opt`.
 
 Expected: identical scores (same comparison, just not unwrapped). **Stop. Wait for approval.**
 
-- [ ] **Step 7: Commit (after approval)**
+- [x] **Step 7: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: compare MockMovement's limit checks as quantities, not raw doubles"
@@ -964,7 +968,7 @@ cm` unwraps just to divide by a plain `double` factor.
 
 **Interfaces:** none — internal helper, same return value for the same input.
 
-- [ ] **Step 1: Read the surrounding lines exactly** (shown in the exploration above):
+- [x] **Step 1: Read the surrounding lines exactly** (shown in the exploration above):
 
 ```cpp
     const double factor = mission.output_mapping_resolution_factor >= 1.0
@@ -974,7 +978,7 @@ cm` unwraps just to divide by a plain `double` factor.
         (sim.map_resolution.force_numerical_value_in(cm) / factor) * cm;
 ```
 
-- [ ] **Step 2: Rewrite as a direct quantity division:**
+- [x] **Step 2: Rewrite as a direct quantity division:**
 
 ```cpp
     const double factor = mission.output_mapping_resolution_factor >= 1.0
@@ -988,7 +992,7 @@ per mp-units' scalar-division operator) — if the compiler disagrees (e.g. it r
 but equivalent quantity type that needs `quantity_cast`), add the minimal cast, don't force
 `force_numerical_value_in` back in.
 
-- [ ] **Step 3: Build and test**
+- [x] **Step 3: Build and test**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -1003,13 +1007,13 @@ Expected: identical `config.resolution` values (floating-point division associat
 whether or not you round-trip through `cm` — verify with the existing test's exact assertions, not
 just "it compiles").
 
-- [ ] **Step 4: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 4: `verify-cell-runtime` gate + stop for approval**
 
 This value feeds every output map's resolution — a real risk spot for silent map-shape drift.
 Expected: identical scores; if not, do not proceed, this is the one place in this task cluster
 where "just compiles" isn't enough evidence. **Stop. Wait for approval.**
 
-- [ ] **Step 5: Commit (after approval)**
+- [x] **Step 5: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: compute output map resolution as a quantity division"
@@ -1036,7 +1040,7 @@ where `std::array` is the idiomatic choice.
 **Interfaces:** none — this is purely a container-type swap; every one of these tables is consumed
 by a range-`for` or indexed loop that works identically over `std::array<T, N>`.
 
-- [ ] **Step 1: `ScanPlanning.cpp`** — find `kFaceOffsets`'s current declaration
+- [x] **Step 1: `ScanPlanning.cpp`** — find `kFaceOffsets`'s current declaration
   (`rg -n "kFaceOffsets" Algorithm/src/ScanPlanning.cpp`). If it is e.g.:
 
 ```cpp
@@ -1052,14 +1056,14 @@ constexpr std::array<Offset, 6> kFaceOffsets = { /* ... same initializer ... */ 
 Add `#include <array>` if not already present. Leave every element value untouched — copy the
 existing initializer list verbatim.
 
-- [ ] **Step 2: `MappingAlgorithmFrontier.cpp`** — same transformation for its 6-neighbor offset
+- [x] **Step 2: `MappingAlgorithmFrontier.cpp`** — same transformation for its 6-neighbor offset
   table (`rg -n "static const|constexpr.*\[6\]|\[4\]" Algorithm/src/MappingAlgorithmFrontier.cpp`
   to find it precisely; it uses the same `{dx, dy, dz}` face-offset shape as `ScanPlanning.cpp`'s —
   confirm whether it's worth sharing one table between the two files as a bonus, but do **not**
   expand this task's scope to a cross-file share unless it is a trivial one-line change; if it
   needs new plumbing, leave the two tables separate and just convert each to `std::array` in place).
 
-- [ ] **Step 3: `WavefrontPlanner.cpp`** — find:
+- [x] **Step 3: `WavefrontPlanner.cpp`** — find:
 
 ```cpp
 const double dx[4] = { /* ... */ };
@@ -1077,7 +1081,7 @@ constexpr std::array<double, 4> dy = { /* ... same values ... */ };
 dependency — check first; if they depend on a runtime value, keep them non-`constexpr` but still
 `std::array`.)
 
-- [ ] **Step 4: `LidarCone.cpp`** — find:
+- [x] **Step 4: `LidarCone.cpp`** — find:
 
 ```cpp
 const Orientation axes[] = { /* ... */ };
@@ -1094,7 +1098,7 @@ needs an explicit or deduced size; use `std::to_array` instead if you'd rather n
 `constexpr auto axes = std::to_array<Orientation>({ /* ... */ });`, requires `#include <array>` and
 C++20, which this project already targets).
 
-- [ ] **Step 5: `MapsComparison.cpp`** — find:
+- [x] **Step 5: `MapsComparison.cpp`** — find:
 
 ```cpp
 static const int kDx[6] = { /* ... */ };
@@ -1107,7 +1111,7 @@ internal linkage in a `.cpp`, so `static` is redundant once you switch; if the c
 elsewhere keeps `static constexpr` together, match that convention instead of fighting it — check
 `rg -n "static constexpr" Simulator/src/MapsComparison.cpp` for the file's own precedent first).
 
-- [ ] **Step 6: Build after each file**, not all five at once:
+- [x] **Step 6: Build after each file**, not all five at once:
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -1117,19 +1121,19 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 '
 ```
 
-- [ ] **Step 7: Full test pass**
+- [x] **Step 7: Full test pass**
 
 ```bash
 ctest --test-dir build/default --output-on-failure -R "Algorithm|Simulator|UserCommon"
 ```
 
-- [ ] **Step 8: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 8: `verify-cell-runtime` gate + stop for approval**
 
 Expected: identical scores (every table's *values* are unchanged; only the container type moved
 from a raw array to `std::array`, which has identical layout/iteration semantics). **Stop. Wait
 for approval.**
 
-- [ ] **Step 9: Commit (after approval)**
+- [x] **Step 9: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: replace C-style neighbor/axis tables with std::array"
@@ -1158,7 +1162,7 @@ the forward-declare + `unique_ptr` pattern to compile — `unique_ptr<T>`'s dest
 complete at the point the *owning* type's destructor is instantiated, which must now be in the
 `.cpp` where the real headers are included).
 
-- [ ] **Step 1: `SimulationRunImpl.h`** — for each `unique_ptr<I...>` member that is only
+- [x] **Step 1: `SimulationRunImpl.h`** — for each `unique_ptr<I...>` member that is only
   destroyed (never otherwise dereferenced in the header, e.g. inline getters that return the raw
   pointer are fine, but anything calling a method on `*member_` in the header is not), replace
   `#include <Common/I....h>` with a forward declaration:
@@ -1183,7 +1187,7 @@ Add a declared-but-not-defined destructor to the class:
     ~SimulationRunImpl() override;
 ```
 
-- [ ] **Step 2: `SimulationRunImpl.cpp`** — add back the full `#include`s for whichever headers
+- [x] **Step 2: `SimulationRunImpl.cpp`** — add back the full `#include`s for whichever headers
   the `.cpp` now needs (it already almost certainly includes most of them, since it calls real
   methods on these interfaces), and define the destructor:
 
@@ -1194,7 +1198,7 @@ SimulationRunImpl::~SimulationRunImpl() = default;
 placed after every member's real type is complete (i.e. after the `#include`s, anywhere in the
 `.cpp`, conventionally right after the ctor).
 
-- [ ] **Step 3: `DroneControlImpl.h`** — same pattern for its five reference members. **Caveat:**
+- [x] **Step 3: `DroneControlImpl.h`** — same pattern for its five reference members. **Caveat:**
   Task 2 already changed `lidar_sensor_`/`gps_` to `const common::ILidar&`/`const common::IGPS&`
   — do this task *after* Task 2 is committed so the forward-declare list matches the then-current
   member types. A reference member does not need a declared destructor (no ownership, nothing to
@@ -1205,7 +1209,7 @@ placed after every member's real type is complete (i.e. after the `#include`s, a
   forward declarations plus keeping `#include <MissionControl/IDroneControl.h>` since that's the
   base class, which must stay complete).
 
-- [ ] **Step 4: `PluginLoader.h`** — move `#include <dlfcn.h>` out of the header. `DlCloser`'s
+- [x] **Step 4: `PluginLoader.h`** — move `#include <dlfcn.h>` out of the header. `DlCloser`'s
   `operator()` calls `::dlclose`, so either:
   - (a) forward-declare nothing and instead give `DlCloser` a non-inline `operator()` declared in
     the header, defined in `PluginLoader.cpp` (which already includes `<dlfcn.h>` or now needs to):
@@ -1228,7 +1232,7 @@ void DlCloser::operator()(void* handle) const noexcept {
 }
 ```
 
-- [ ] **Step 5: Build after each of the three files**, one at a time:
+- [x] **Step 5: Build after each of the three files**, one at a time:
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -1243,17 +1247,17 @@ either adding back one specific include in the `.h` (if the header truly needs t
 e.g. an inline method calls something on it) or moving the offending inline method's body into the
 `.cpp` instead of over-including.
 
-- [ ] **Step 6: Full test pass**
+- [x] **Step 6: Full test pass**
 
 ```bash
 ctest --test-dir build/default --output-on-failure -R "Simulator|MissionControl"
 ```
 
-- [ ] **Step 7: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 7: `verify-cell-runtime` gate + stop for approval**
 
 Expected: identical scores (compile-time-only change). **Stop. Wait for approval.**
 
-- [ ] **Step 8: Commit (after approval)**
+- [x] **Step 8: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: forward-declare interface headers instead of including them"
@@ -1274,7 +1278,7 @@ git commit -am "refactor: forward-declare interface headers instead of including
 **byte-identical** to before; this task only changes *how many times* the scan is walked, not
 *what* gets written to the map.
 
-- [ ] **Step 1: Read both functions completely** and write down, in the task report (not in code),
+- [x] **Step 1: Read both functions completely** and write down, in the task report (not in code),
   the exact order of operations each currently performs per beam: what `applyScanToMap`'s first
   pass writes (likely per-beam-hit voxel marking) and what `supplementGridAlignedFusion`'s second
   pass adds (likely grid-aligned samples along the beam that the raw hit walk skips). Confirm
@@ -1285,14 +1289,14 @@ git commit -am "refactor: forward-declare interface headers instead of including
   this dependency, stop and report — do not merge.** If both passes are purely per-beam-independent
   (each beam's grid-aligned fusion only reads/writes that beam's own path), proceed.
 
-- [ ] **Step 2: Merge into one per-beam walk.** Restructure `applyScanToMap` so that, for each
+- [x] **Step 2: Merge into one per-beam walk.** Restructure `applyScanToMap` so that, for each
   beam, it performs the original hit-walk step immediately followed by that beam's
   grid-aligned-fusion step, before moving to the next beam — instead of looping over all beams
   twice. Delete `supplementGridAlignedFusion` as a separate second pass and inline its per-beam
   logic into the same loop (keep it as a private helper function taking one beam's data, just
   called once per beam inside the merged loop instead of once per beam in its own separate loop).
 
-- [ ] **Step 3: Build and test**
+- [x] **Step 3: Build and test**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -1306,7 +1310,7 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 Expected: **every** existing test on `applyScanToMap`/map contents passes with identical
 assertions — this is the strongest signal that Step 1's independence check was correct.
 
-- [ ] **Step 4: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 4: `verify-cell-runtime` gate + stop for approval**
 
 This is a real hot-path change (every scan, every step that scans). Expected: identical scores; a
 small wall-time *improvement* is plausible (one fewer full walk per scan) and welcome, but is not
@@ -1314,7 +1318,7 @@ the goal — do not chase it if it doesn't materialize. Any score change means S
 assumption was wrong somewhere the tests didn't catch — do not proceed, report instead. **Stop.
 Wait for approval.**
 
-- [ ] **Step 5: Commit (after approval)**
+- [x] **Step 5: Commit (after approval)**
 
 ```bash
 git commit -am "perf: fuse grid-aligned scan supplementing into the primary beam walk"
@@ -1350,7 +1354,7 @@ task/commit/verify-cell-runtime cycle would be nine near-identical gates for one
 but still run the tests and the one `verify-cell-runtime` gate for the whole batch before
 committing.
 
-- [ ] **Step 1: `DroneConfigYamlParser.cpp`** — find the diameter→radius line
+- [x] **Step 1: `DroneConfigYamlParser.cpp`** — find the diameter→radius line
   (`rg -n "/ 2" Simulator/src/io/DroneConfigYamlParser.cpp`). If it reads roughly:
 
 ```cpp
@@ -1369,7 +1373,7 @@ and use `diameter_value / kDiameterToRadius`. (If the surrounding code already w
 `PhysicalLength` quantities rather than raw `double`, keep the constant typed the same way — do
 not introduce an unwrap that wasn't there before.)
 
-- [ ] **Step 2: `ScanPlanning.cpp` zenith/nadir** — find the travel-probe lines using bare `90.0 *
+- [x] **Step 2: `ScanPlanning.cpp` zenith/nadir** — find the travel-probe lines using bare `90.0 *
   deg` / `-90.0 * deg` (`rg -n "90.0 \* deg" Algorithm/src/ScanPlanning.cpp`). Add near the top of
   the file (anonymous namespace, alongside any other file-local constants already there):
 
@@ -1384,14 +1388,14 @@ constexpr common::VerticalAngle kNadir = -90.0 * common::deg;
 variable's declared type at the call site rather than assuming `VerticalAngle`.) Replace both bare
 literals with `kZenith`/`kNadir`.
 
-- [ ] **Step 3: `ScanPlanning.cpp`'s bare `1e-6`** — if `WavefrontPlanner.cpp` (Step 6 below)
+- [x] **Step 3: `ScanPlanning.cpp`'s bare `1e-6`** — if `WavefrontPlanner.cpp` (Step 6 below)
   ends up needing the *same* epsilon value for the *same* purpose (ceiling-height comparison), and
   both files already share other constants via a common header, consider one shared
   `kHeightEpsilonCm` — but only if there is already a shared constants header both files include;
   do **not** create a new shared header just for this. Otherwise, add a file-local
   `kCeilingHeightEpsilonCm = 1e-6` (or typed equivalent) in each file independently.
 
-- [ ] **Step 4: `ScanResultToVoxels.cpp` occupancy ranks** — find the bare `3`/`2`/`1`/`0` priority
+- [x] **Step 4: `ScanResultToVoxels.cpp` occupancy ranks** — find the bare `3`/`2`/`1`/`0` priority
   literals (`rg -n "\b[0-3]\b" MissionControl/src/ScanResultToVoxels.cpp` — noisy, narrow to the
   actual rank-assignment lines by reading the file). Name them for what they mean, e.g.:
 
@@ -1407,7 +1411,7 @@ constexpr int kOutOfBoundsRank = 0;
 (Match the actual semantics — confirm which literal maps to which `VoxelOccupancy` value by reading
 the surrounding code; do not guess the mapping shown here without checking.)
 
-- [ ] **Step 5: Shared `kErrorScore`** — `main.cpp` and `SimulationRunImpl.cpp` (and
+- [x] **Step 5: Shared `kErrorScore`** — `main.cpp` and `SimulationRunImpl.cpp` (and
   `RunMatrixOrchestrator.cpp`, per the finding) each declare their own `-1`/`-1.0` sentinel for a
   failed run's score. Pick one location to own the canonical constant — the most natural home is
   wherever `SimulationResult`/`MissionRunResult`'s score field is first produced on the
@@ -1425,14 +1429,14 @@ Replace every bare `-1`/`-1.0` score sentinel in `main.cpp`, `SimulationRunImpl.
 `-1` that means something else in these files (e.g. an unrelated index sentinel) — only the score
 sentinel.
 
-- [ ] **Step 6: `MappingAlgorithmImpl.cpp`'s duplicate epsilon** — find where `kPositionEpsilon` is
+- [x] **Step 6: `MappingAlgorithmImpl.cpp`'s duplicate epsilon** — find where `kPositionEpsilon` is
   already declared (per the finding, nearby) and where `movementToward` uses a second bare `1e-6`
   instead. Replace the bare literal with `kPositionEpsilon` — **only if** both epsilons are used for
   the same kind of comparison (position-closeness); if `movementToward`'s `1e-6` is actually a
   different unit/purpose (e.g. an angle epsilon, not a position epsilon), do not force the reuse —
   add its own named constant instead and report the distinction.
 
-- [ ] **Step 7: `WavefrontPlanner.cpp`** — name its bare `1e-6` ceiling epsilon (same pattern as
+- [x] **Step 7: `WavefrontPlanner.cpp`** — name its bare `1e-6` ceiling epsilon (same pattern as
   Step 3/6) and its bare `1.0` `expected_rate` for forced/escape plans (appears twice):
 
 ```cpp
@@ -1443,7 +1447,7 @@ constexpr double kForcedEscapeExpectedRate = 1.0;
 
 Replace both occurrences.
 
-- [ ] **Step 8: Build and full test pass**
+- [x] **Step 8: Build and full test pass**
 
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
@@ -1454,12 +1458,12 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg -v "<worktree>:/work" -w //work \
 '
 ```
 
-- [ ] **Step 9: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 9: `verify-cell-runtime` gate + stop for approval**
 
 Expected: byte-identical scores — every constant carries the exact same numeric value as the
 literal it replaced. **Stop. Wait for approval.**
 
-- [ ] **Step 10: Commit (after approval)**
+- [x] **Step 10: Commit (after approval)**
 
 ```bash
 git commit -am "refactor: name magic numbers flagged by the AdvCpp rubric review (e23)"
@@ -1489,7 +1493,7 @@ file's existing error-reporting idiom) instead of throwing; a composition file w
 drone/lidar config fails to parse now reports `ok = false` with an error entry, instead of silently
 including a default-constructed config.
 
-- [ ] **Step 1: Write the failing tests first (TDD).** Add to the composition-parser test file:
+- [x] **Step 1: Write the failing tests first (TDD).** Add to the composition-parser test file:
 
 ```cpp
 TEST(CompositionYamlParserTest, NonScalarSimulationConfigIsRejectedGracefully) {
@@ -1526,7 +1530,7 @@ Adapt the exact fixture-writing mechanics (temp file helpers, `FakeRunErrorLog` 
 implements `IRunErrorLog` in this test file already) to match this file's existing conventions —
 read the file first; do not invent a second temp-file helper if one exists.
 
-- [ ] **Step 2: Run the new tests and confirm they fail** (first one either throws uncaught or
+- [x] **Step 2: Run the new tests and confirm they fail** (first one either throws uncaught or
   currently returns `ok = true`; second currently returns `ok = true` because the finding says so).
 
 ```bash
@@ -1535,7 +1539,7 @@ ctest --test-dir build/default --output-on-failure -R CompositionYamlParser
 
 Expected: FAIL (or crash) on both new tests.
 
-- [ ] **Step 3: Fix `parseOneSimulationGroup`'s non-scalar guard.** Current:
+- [x] **Step 3: Fix `parseOneSimulationGroup`'s non-scalar guard.** Current:
 
 ```cpp
     if (!entry["simulation_config"]) {
@@ -1562,7 +1566,7 @@ New:
         resolveConfigPath(base_dir, entry["simulation_config"].as<std::string>());
 ```
 
-- [ ] **Step 4: Fix the drone/lidar-config parse-failure gap in `parseCompositionFile`.** Current:
+- [x] **Step 4: Fix the drone/lidar-config parse-failure gap in `parseCompositionFile`.** Current:
 
 ```cpp
     for (const auto& p : drone_paths) {
@@ -1613,14 +1617,14 @@ Match `ConfigParseResult`'s actual error-entry type (confirm the `{code, message
 snippet above assumes a two-field aggregate matching the existing `result.errors.push_back({...})`
 calls already in this same file).
 
-- [ ] **Step 5: Run the new tests again — confirm both pass.** Then run the full existing suite to
+- [x] **Step 5: Run the new tests again — confirm both pass.** Then run the full existing suite to
   confirm no regression on any composition file that currently parses successfully:
 
 ```bash
 ctest --test-dir build/default --output-on-failure -R "CompositionYamlParser|Simulator"
 ```
 
-- [ ] **Step 6: `verify-cell-runtime` gate + stop for approval**
+- [x] **Step 6: `verify-cell-runtime` gate + stop for approval**
 
 Run the **Clean verify-cell-runtime procedure** (wipe `build/opt` + `tmp/bench-out`, fresh CMake
 configure, full Release rebuild). Never reuse a previous `build/opt`.
@@ -1630,7 +1634,7 @@ all-scalar `simulation_config` values and successfully-parsing drone/lidar confi
 change to the 24-cell table (this task only changes behavior on inputs the current suite doesn't
 exercise). **Stop. Wait for approval.**
 
-- [ ] **Step 7: Commit (after approval)**
+- [x] **Step 7: Commit (after approval)**
 
 ```bash
 git commit -am "fix: reject non-scalar simulation_config and propagate nested config parse failures"
@@ -1665,7 +1669,7 @@ as "no scan write" (live code still scans after a recoverable `Continue`).
 
 **Interfaces:** none — documentation only.
 
-- [ ] **Step 1: Class diagram** — open `docs/hld/class-overview.mmd` and add:
+- [x] **Step 1: Class diagram** — open `docs/hld/class-overview.mmd` and add:
   - `IRunErrorLog` as an interface, with `RunErrorLog ..|> IRunErrorLog` (find `RunErrorLog`'s
     existing node and add the realization arrow plus the new interface node next to it, following
     this file's existing style for other `I*` interfaces).
@@ -1683,7 +1687,7 @@ as "no scan write" (live code still scans after a recoverable `Continue`).
     currently misattributed (per the rubric review's finding), keeping `main --> PluginLoader` as
     the calling edge.
 
-- [ ] **Step 2: Comparative-cell sequence** — open `docs/hld/seq-comparative-cell.mmd` and:
+- [x] **Step 2: Comparative-cell sequence** — open `docs/hld/seq-comparative-cell.mmd` and:
   - Move the `distributeWork` call outside the per-cell loop: draw one `expandRunMatrix` call that
     produces the full cell list, then one `distributeWork` call over that whole list, rather than a
     loop containing `distributeWork` per cell (read `Simulator/src/RunMatrixOrchestrator.cpp`'s
@@ -1699,7 +1703,7 @@ as "no scan write" (live code still scans after a recoverable `Continue`).
   - Split the report step into two calls: `writeSimulationOutputYaml` (per-plugin) then
     `writeModeReport`/`writeComparativeReport` (aggregate), instead of one combined step.
 
-- [ ] **Step 3: Drone-step sequence** — open `docs/hld/seq-drone-step.mmd` and:
+- [x] **Step 3: Drone-step sequence** — open `docs/hld/seq-drone-step.mmd` and:
   - Add the footprint-carve step (`markDroneFootprintEmpty`) before `nextStep`, matching
     `DroneControlImpl::step()`'s actual order (read the `.cpp` to confirm exact placement).
   - Remove the "Continue → no scan write" claim from the recoverable-throw alt branch; show that
@@ -1708,24 +1712,24 @@ as "no scan write" (live code still scans after a recoverable `Continue`).
   - Add an `AlgorithmStatus::Finished` alt branch (no further move/scan) and an over-limit/`Error`
     alt branch, alongside the existing normal-step branch.
 
-- [ ] **Step 4: `docs/HLD.md` prose fix** — find the `MockMovement` description (per the rubric
+- [x] **Step 4: `docs/HLD.md` prose fix** — find the `MockMovement` description (per the rubric
   review, around the line describing collision handling) and correct "throws or returns a message
   containing `blocked`/`boundary`" to accurately state that `MockMovement::advance`/`elevate` only
   **throw** `std::runtime_error` on collision (never return a failed `MovementResult` for that
   case — only the pre-throw limit checks in Task 9 return `{false, message}`), and that
   `DroneControlImpl` catches the exception (and any failed `MovementResult`) and continues.
 
-- [ ] **Step 5: Regenerate the rendered artifacts.** Locate the render script/command this project
+- [x] **Step 5: Regenerate the rendered artifacts.** Locate the render script/command this project
   already used to produce `docs/hld/*.png` and `HLD.pdf` (check `docs/HLD.md`'s own notes, or
   `rg -rn "mmdc\|mermaid-cli\|render_hld" .` for a prior invocation) and re-run it so the PNGs and
   the PDF reflect the corrected diagrams. If no such script exists in the repo, ask the human how
   the original diagrams were rendered before inventing a new toolchain step.
 
-- [ ] **Step 6: Confirm `verify-cell-runtime` still matches baseline** (trivial — no code changed;
+- [x] **Step 6: Confirm `verify-cell-runtime` still matches baseline** (trivial — no code changed;
   this step exists only to honor the Execution Mode's uniform per-task gate). Report the table
   (expected identical to Task 15's). **Stop. Wait for approval.**
 
-- [ ] **Step 7: Commit (after approval)**
+- [x] **Step 7: Commit (after approval)**
 
 ```bash
 git commit -am "docs: fix HLD class and sequence diagram drift found by rubric review"
@@ -1738,14 +1742,14 @@ git commit -am "docs: fix HLD class and sequence diagram drift found by rubric r
 **Files:** none new — read-only review of Tasks 1–16's combined diff, plus
 `docs/known-issues.md` if any deferred finding should be recorded there.
 
-- [ ] **Step 1: Generate the whole-branch diff** against the base recorded in Task 0:
+- [x] **Step 1: Generate the whole-branch diff** against the base recorded in Task 0:
 
 ```bash
 git diff known-issues-fixes...fix-advcpp-rubric-findings --stat
 git diff known-issues-fixes...fix-advcpp-rubric-findings > /tmp/advcpp-rubric-fixes-full.diff
 ```
 
-- [ ] **Step 2: Dispatch a final code-review subagent** (model: still `cursor-grok-4.6-high`, per
+- [x] **Step 2: Dispatch a final code-review subagent** (model: still `cursor-grok-4.6-high`, per
   this whole plan's cost constraint — even the "most capable" recommendation in
   `subagent-driven-development`'s Model Selection section is overridden by the user's explicit
   "don't use expensive models" instruction for this plan) over the full diff, checking: (a) every
@@ -1754,13 +1758,13 @@ git diff known-issues-fixes...fix-advcpp-rubric-findings > /tmp/advcpp-rubric-fi
   grep sweep); (c) the branch's `ctest --test-dir build/default --output-on-failure` and one final
   `verify-cell-runtime` 24-cell run are both clean.
 
-- [ ] **Step 3: File Known Issues rows** for the "Deferred findings" table at the top of this plan,
+- [x] **Step 3: File Known Issues rows** for the "Deferred findings" table at the top of this plan,
   using `.cursor/skills/populate-known-issues/SKILL.md`'s column schema, so the AdvCpp rubric's e03
   (hot-path libm parity — already documented as accepted), e13, e16, e21 (remaining sites), e22, and
   e10 (remaining duplication) findings are recorded as consciously-not-fixed rather than silently
   dropped.
 
-- [ ] **Step 4: Report final status** — full task list with commit shas, final 24-cell table vs.
+- [x] **Step 4: Report final status** — full task list with commit shas, final 24-cell table vs.
   baseline, and the Known Issues rows filed. **Stop. Wait for the human's decision on how to land
   this branch** (merge to `known-issues-fixes` via PR, per `finishing-a-development-branch`, is the
   expected next step, but that decision belongs to the human, not this plan).
@@ -1785,9 +1789,8 @@ git diff known-issues-fixes...fix-advcpp-rubric-findings > /tmp/advcpp-rubric-fi
 
 ## Execution Handoff
 
-Plan complete and saved to
-`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`. Per the Execution Mode section,
-this plan does **not** use continuous subagent-driven-development or a separate executing-plans
-session — it uses subagent-driven-development's per-task dispatch/review mechanics, but with the
-human-approval gate re-inserted after every task's `verify-cell-runtime` run, as explicitly
-requested. Say "start Task 0" (or "start Task N" to resume) when ready.
+**Done.** Plan executed and saved at
+`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`. Tasks 0–17 are checked off;
+the branch was merged locally into `known-issues-fixes`. Do not re-dispatch implementers from
+this file. Remaining e03/e13/e16/e21/e22/e10 leftovers are Known Issues rows 14–19, not a
+second plan.

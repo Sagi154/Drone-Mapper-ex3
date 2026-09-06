@@ -4,9 +4,12 @@ Plain-language walkthrough of the remaining rows in `docs/known-issues.md`.
 That file is the working list for the optional staff Known Issues excel; this
 doc is for us, not for the zip.
 
-Resolved items were already pruned. Almost all remaining rows are **skipped
-optional recovery** from the Common-issues PDF, not mandatory bugs. The one
-real behavioral problem is **#13**.
+Resolved items were already pruned. Rows **#1–#11** are **skipped optional
+recovery** (or bonus) from the Common-issues PDF, not mandatory bugs. **#12**
+is Unmapped policy. The one remaining mapping-score problem is **#13**.
+Rows **#14–#19** are deferred AdvCpp rubric nits from the 2026-09-06 findings
+plan (`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`); they
+are code-quality leftovers, not runtime failures.
 
 ## What the list is for
 
@@ -19,9 +22,9 @@ as-is. At zip time it gets copied into the staff sheet and exported as `.xlsx`.
 If you later **implement** an optional / bonus row (#1–#11), do not leave it
 here. Remove it from `docs/known-issues.md` and **claim it in `bonus.txt`**
 (what you did, plus file:line). Staff will not infer extra credit from the
-code alone. Skip `bonus.txt` for #12 (Unmapped, different design) and #13 (bug);
-those are not bonuses. If nothing optional was implemented, do not add
-`bonus.txt`.
+code alone. Skip `bonus.txt` for #12 (Unmapped, different design), #13 (bug), and
+#14–#19 (deferred rubric nits); those are not bonuses. If nothing optional was
+implemented, do not add `bonus.txt`.
 
 ---
 
@@ -117,3 +120,24 @@ each replan is. Fixing remaining band gaps is mapping-track work, not
   underperform vs ex2 bands.” Fixing it helps the algorithm contest; it
   is not an extra-credit line in `bonus.txt`. The 2026-09-03 `large_out` short
   cliff is no longer the measured baseline.
+- **#14–#19:** Deferred AdvCpp rubric leftovers (libm unwraps, `double` APIs,
+  raw pointers, leaky `detail` types, remaining e21 walks, remaining e10
+  duplication). Listed so graders see we looked and chose not to touch the
+  hot path. Not `bonus.txt`.
+
+---
+
+## Deferred AdvCpp rubric leftovers (#14–#19)
+
+These came from `docs/advcpp-rubric-review.md` and were **consciously skipped**
+by the 2026-09-06 fix plan (Tasks 1–16 landed the cheap, gated sites). Type is
+`Code`. Reproducibility is **Not relevant**.
+
+| # | Rubric | What is still true |
+|---|--------|--------------------|
+| **14 (e03)** | Hot-path `std::sin`/`std::cos`/`sqrt` unwraps | Tasks 9–10 only converted MockMovement limit checks and output-map resolution. Remaining trig stays libm so the 24-cell scores do not drift. |
+| **15 (e16)** | `double` cm/radian APIs on cone/frontier/planner | Cosmetic type-safety; blast radius is the score table. |
+| **16 (e13)** | Raw `const T*` / out-params (`MatrixCell`, `WavefrontPlanner::plan`, …) | Structural API change, not a mechanical rename. |
+| **17 (e22)** | `ConeTemplateCache::get` returns `const vector&`; `detail` types in ScanPlanning/ExplorationPlan headers | Same class of invasive header change. |
+| **18 (e21)** | String-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` without the `runBoundedSearch` memo | Task 13 only fused the scan-supplement walk in `ScanResultToVoxels`. |
+| **19 (e10)** | LidarCone/ConeTemplate walk overlap, MockLidar ring rebuild, PluginLoader directory loops | Tasks 6–8 shared load-one, `wrapDeg`, and `keyToPoint` only. |
