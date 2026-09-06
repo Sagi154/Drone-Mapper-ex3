@@ -14,7 +14,6 @@ namespace mission_control_207190406_209543255 {
 class DroneControlImpl final : public mission_control::IDroneControl {
 public:
     DroneControlImpl(const common::types::DroneConfigData& drone,
-                     const common::types::MissionConfigData& mission,
                      const common::types::LidarConfigData& lidar,
                      const common::ILidar& lidar_sensor,
                      const common::IGPS& gps,
@@ -31,7 +30,6 @@ private:
     void applyScanIfRequested(const common::types::MappingStepCommand& command);
 
     common::types::DroneConfigData drone_;
-    common::types::MissionConfigData mission_;
     common::types::LidarConfigData lidar_;
     const common::ILidar& lidar_sensor_;
     const common::IGPS& gps_;

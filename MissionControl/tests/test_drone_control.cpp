@@ -188,7 +188,6 @@ TEST(DroneControl, FirstStepPassesNullScanToAlgorithm) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -217,7 +216,6 @@ TEST(DroneControl, ReturnsCompletedWhenAlgorithmFinishes) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -248,7 +246,6 @@ TEST(DroneControl, ReturnsErrorWhenMovementExceedsDroneLimits) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -285,7 +282,6 @@ TEST(DroneControl, CollisionBlockedThrowContinues) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -320,7 +316,6 @@ TEST(DroneControl, UnsuccessfulMovementResultIsRecoverableWithoutStringMatch) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -355,7 +350,6 @@ TEST(DroneControl, MovementExceptionRecoversWithoutMessageMatch) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -389,7 +383,6 @@ TEST(DroneControl, ExecutesScanThenContinues) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -424,7 +417,6 @@ TEST(DroneControl, ExecutesMovementAndScanInOneStep) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -465,7 +457,6 @@ TEST(DroneControl, RecoverableBlockedStillScans) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -503,7 +494,6 @@ TEST(DroneControl, UnsuccessfulMovementResultStillScans) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,
@@ -537,7 +527,6 @@ TEST(DroneControl, AlwaysScanAlgorithmScansOncePerStep) {
 
     mission_control_207190406_209543255::DroneControlImpl control{
         defaultDrone(),
-        defaultMission(),
         defaultLidar(),
         fixture.lidar,
         fixture.gps,

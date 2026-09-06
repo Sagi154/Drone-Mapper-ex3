@@ -55,7 +55,6 @@ MissionControlImpl_207190406_209543255::MissionControlImpl_207190406_209543255(
       verbose_(dependencies.verbose),
       drone_control_(std::make_unique<DroneControlImpl>(
           dependencies.drone_config,
-          dependencies.mission_config,
           dependencies.lidar.config(),
           dependencies.lidar,
           dependencies.gps,

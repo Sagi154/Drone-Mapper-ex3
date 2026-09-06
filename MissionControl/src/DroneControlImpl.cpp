@@ -70,7 +70,6 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
 } // namespace
 
 DroneControlImpl::DroneControlImpl(const common::types::DroneConfigData& drone,
-                                   const common::types::MissionConfigData& mission,
                                    const common::types::LidarConfigData& lidar,
                                    const common::ILidar& lidar_sensor,
                                    const common::IGPS& gps,
@@ -78,7 +77,6 @@ DroneControlImpl::DroneControlImpl(const common::types::DroneConfigData& drone,
                                    common::IMutableMap3D& output_map,
                                    common::IMappingAlgorithm& mapping_algorithm)
     : drone_(drone),
-      mission_(mission),
       lidar_(lidar),
       lidar_sensor_(lidar_sensor),
       gps_(gps),
