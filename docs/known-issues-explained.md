@@ -42,7 +42,7 @@ recovery does not mark them as forgotten bugs. All are **Low** except #6
 | **2 (CI3)** | Invalid command: retry `nextStep` N times, then throw | First bad command → `DroneStepStatus::Error`, no retry |
 | **3 (CI4)** | Empty move **and** empty scan (NOOP): retry N times, then throw | No NOOP retry; the mission just continues or ends |
 | **4 (CI6)** | Empty LiDAR result: re-scan N times, then throw | No empty-scan retry |
-| **5 (CI7)** | Movement returns `false` (not a wall throw): retry N, then throw | Some “blocked/boundary” cases become Continue; otherwise Error. No N-retry-then-throw. Distinct from mandatory CI5 (the throw path) |
+| **5 (CI7)** | Movement returns `false` (not a wall throw): retry N, then throw | Any `success==false` becomes Continue (no string match, no Error). No N-retry-then-throw. Distinct from mandatory CI5 (the throw path) |
 | **6 (CI8)** | Oversize Advance/Elevate/Rotate: **split** into several legal steps | Rejected immediately as Error (`movementWithinLimits`) |
 | **7 (CI9)** | Step `Error`: log and **keep** the `max_steps` loop | Log `DRONE_STEP_FAILED` and **stop** the mission |
 | **8 (CI10)** | Move that would leave **mission** bounds: clamp/shorten it | Not amended. Different from #1 (world OOB ignore vs mission-bounds clamp) |

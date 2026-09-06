@@ -6,25 +6,27 @@
 
 **Goal:** Implement four optional Common-issues recoveries in MissionControl — CI9 (continue after step `Error`), CI2+CI10 (ignore world-OOB moves; clamp to mission bounds), CI3 (retry invalid commands then throw), CI8 (split oversize moves into legal steps) — claim them in `bonus.txt`, drop the Known Issues rows, and prove each slice does not regress 24-cell scores or independence harnesses.
 
-**Architecture:** All behavior lives in our MissionControl plugin. `MissionControlImpl` already owns `DroneControlImpl`. CI9 is a mission-loop change (log `DRONE_STEP_FAILED` and keep `max_steps`). CI2/CI10/CI3/CI8 are `DroneControlImpl::step` / `applyMovement` recoveries around the existing one-command path. `SimulationRunImpl::run` already catches exceptions from `runMission()` (`MISSION_EXCEPTION`) — CI3 relies on that, and must not wrap the new throw in the wall-collision `catch`. Our mapping algorithm is required not to emit illegal moves, so honest 24-cell **scores must stay bit-identical** to the 2026-09-03 baseline; any score change is a stop-the-line regression.
+**Architecture:** All behavior lives in our MissionControl plugin. `MissionControlImpl` already owns `DroneControlImpl`. CI9 is a mission-loop change (log `DRONE_STEP_FAILED` and keep `max_steps`). CI2/CI10/CI3/CI8 are `DroneControlImpl::step` / `applyMovement` recoveries around the existing one-command path. `SimulationRunImpl::run` already catches exceptions from `runMission()` (`MISSION_EXCEPTION`) — CI3 relies on that, and must not wrap the new throw in the wall-collision `catch`. Our mapping algorithm is required not to emit illegal moves, so honest 24-cell **scores must stay bit-identical** to the **2026-09-06** VAR-01 Approach A baseline (`docs/benchmarks/2026-09-06-var01-approach-a.md`, score_sum **1832.7**, wall_max **3.0s**, WARN=0). Any score change is a stop-the-line regression. Do **not** compare against the historical 2026-09-03 table (1769.8, `large_out` short WARNs).
 
 **Tech Stack:** C++20, gtest, mp-units, Docker image `drone-mapper-ex3-dev`, CMake presets `default` (unit tests) and `build/opt` Release (cell timing).
 
-**Specs:** `docs/error-handling-matrix.md` (staff PDF), `docs/known-issues.md` rows 7 / 1 / 8 / 2 / 6, `docs/known-issues-explained.md`.
+**Refresh (2026-09-06):** Algorithm VAR-01 Approach A landed (corner-anchored clearance + local search cap). Verification baseline is 2026-09-06, not 2026-09-03. Known Issues compacted to 13 rows (`SimulationImpl` exists; mapping bug is #13). CI9/CI2/CI10/CI3/CI8 themselves are still unimplemented — this plan’s MissionControl work is unchanged.
+
+**Specs:** `docs/error-handling-matrix.md` (staff PDF), `docs/known-issues.md` rows **7 (CI9), 1 (CI2), 8 (CI10), 2 (CI3), 6 (CI8)** as of 2026-09-06 (13 rows total; `ISimulation` is already implemented and **not** on the list; mapping-track bug is **#13** not old #14). `docs/known-issues-explained.md`.
 
 ## Global Constraints
 
 - Never edit `common/`, `Simulator/common_simulator/`, or `MissionControl/common_mission_control/` (frozen `IDroneControl` included).
 - No `new`/`delete`; no `exit()`/`abort()`; no magic retry counts (e23 — named `constexpr`).
-- Do not change Algorithm, MockMovement wall-throw (mandatory CI5), or Continue-on-`MovementResult::success==false` (that is **not** CI7).
+- Do not change Algorithm, MockMovement wall-throw (mandatory CI5), or Continue-on-`MovementResult::success==false` (that is **not** CI7; today **every** `false` is Continue, not “otherwise Error”).
 - Do **not** implement CI4 (NOOP retry), CI6 (empty LiDAR retry), CI7 (retry Movement `false`), CI11, CI12.
 - Do **not** add a wall-clock abort, alarm, or invented smaller `max_steps` in Algorithm or MissionControl (`verify-cell-runtime`).
-- Do **not** globally unmask cone gain or start unrelated mapping-algorithm work.
-- Git: confirm toplevel is this project (never `C:\Users\sagi1` home). Branch from updated `main`. Conventional Commits. **No commit without explicit human approval** (show `git status`, `git diff`, message; wait). Never `--no-verify`, never push `main`.
+- Do **not** globally unmask cone gain, revive the Occupied-AABB execution gate, or start unrelated mapping-algorithm work. VAR-01 currently PASSes via corner-anchored `sphereIntersectsCellBox` (2026-09-06); a MissionControl change must not regress `HOST_ILLEGAL_MOVE_ATTEMPTS=0`.
+- Git: confirm toplevel is this project (never `C:\Users\sagi1` home). **Do not branch from stale `main` @ 2026-09-03** if Approach A lives on `known-issues-fixes` (or whichever branch has `2732aca` / `a254810`). Create `optional-common-issues-recovery` from that algorithm tip (merge/rebase onto updated `origin/main` only if that does not drop the 2026-09-06 landing). Conventional Commits. **No commit without explicit human approval**. Never `--no-verify`, never push `main`.
 - Docker-only build/test on this Windows host. No `&&` / bash heredocs in PowerShell — one `docker run ... bash -lc '...'`.
-- After **each** of the four issue groups: unit tests, then `verify-cell-runtime` (full 24, scores vs 2026-09-03 baseline), then `verify-independent-component-variants` (VAR-01..03; VAR-04 only in the final gate).
-- Cell-runtime success: 24/24 COMPLETED, `mission_score >= 0`, scores match `docs/benchmarks/2026-09-03-branch-after-score-fix-per-cell-wall.csv`; expected WARNs only `large_out` × short lidar (~45–46s). Overall FAIL if any FAIL/HANG or score drift.
-- Out of scope: Known Issues excel export, zip packaging, lazy `.so` load, `ISimulation` impl.
+- After **each** of the four issue groups: unit tests, then `verify-cell-runtime` (full 24, scores vs **2026-09-06** baseline), then `verify-independent-component-variants` (VAR-01..03; VAR-04 only in the final gate).
+- Cell-runtime success: 24/24 COMPLETED, `mission_score >= 0`, scores match `.cursor/skills/verify-cell-runtime/SKILL.md` **Documented baseline (2026-09-06)** / `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (score_sum **1832.747**, wall_max **~3s**, **WARN=0**). Overall FAIL if any FAIL/HANG, any new ≥45s WARN, or score drift. Do not treat old `large_out` short ~46s WARNs as expected.
+- Out of scope: Known Issues excel export, zip packaging, lazy `.so` load. `ISimulation` / `SimulationImpl` is **already done** — do not re-list it as remaining work.
 
 ## File map
 
@@ -88,7 +90,7 @@ docker run --rm -e PYTHONUNBUFFERED=1 -e VCPKG_ROOT=/usr/local/vcpkg \
 '
 ```
 
-Then diff scores against `docs/benchmarks/2026-09-03-branch-after-score-fix-per-cell-wall.csv`. Stop on any score change.
+Then diff scores against `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (skill table: `.cursor/skills/verify-cell-runtime/SKILL.md` 2026-09-06). Stop on any score change. Do **not** use the 2026-09-03 CSV.
 
 `verify-independent-component-variants` (VAR-01..03). Using verify-independent-component-variants.
 
@@ -142,15 +144,19 @@ git status
 
 Expected: toplevel is `.../Drone-Mapper-ex3` or `.../DroneMapper` — **not** `C:\Users\sagi1`. Working tree either clean or only files you intend to keep off this branch. If toplevel is the home directory, **stop**.
 
-- [ ] **Step 2: Branch from updated main**
+- [ ] **Step 2: Branch from the algorithm tip, not historical main**
+
+If the 2026-09-06 VAR-01 Approach A landing is on `known-issues-fixes` (or another feature branch) and is **not** on `origin/main`, branch from **that tip**:
 
 ```bash
-git checkout main
+git checkout known-issues-fixes
 git pull
 git checkout -b optional-common-issues-recovery
 ```
 
-Expected: on `optional-common-issues-recovery` built from current `origin/main`. No workplan codes in the branch name.
+If Approach A is already on `origin/main`, then `git checkout main && git pull && git checkout -b optional-common-issues-recovery` is correct.
+
+Expected: on `optional-common-issues-recovery` containing the 2026-09-06 algorithm (corner-anchored clearance + local search cap). Confirm `Algorithm/src/MappingAlgorithmFrontier.cpp` still has corner-anchored `sphereIntersectsCellBox`. No workplan codes in the branch name.
 
 ---
 
@@ -378,7 +384,7 @@ CI9 — Drone step Error: log and continue the max_steps loop
 **Files:** none (run only)
 
 - [ ] **Step 1: Unit tests** — shared Docker ctest helper. Expected: PASS.
-- [ ] **Step 2: verify-cell-runtime** — shared Release 24-cell command. Fill the skill report table. Scores **must** match the 2026-09-03 baseline (our algorithm should never return `Error`). WARNs only `large_out` short lidar. If any score differs, **stop** and investigate; do not continue to CI2.
+- [ ] **Step 2: verify-cell-runtime** — shared Release 24-cell command. Fill the skill report table. Scores **must** match the **2026-09-06** baseline (our algorithm should never return `Error`). Expected WARNs: **none**. If any score differs or a cell is ≥45s, **stop** and investigate; do not continue to CI2.
 - [ ] **Step 3: verify-independent-component-variants** — VAR-01, VAR-02, VAR-03. Skip VAR-04. `bad_scan` must finish inside timeout. Fill:
 
 ```markdown
@@ -803,7 +809,7 @@ CI10 — amend movement to stay inside mission bounds
 
 ### Task 7: CI2/CI10 verification gates
 
-Same three steps as Task 3 (unit tests, full 24-cell runtime, VAR-01..03). Scores must still match 2026-09-03. Our algorithm should not command world-OOB or mission-OOB moves; if a score changes, **stop** — likely a false-positive ignore/clamp on a legal outdoor step.
+Same three steps as Task 3 (unit tests, full 24-cell runtime, VAR-01..03). Scores must still match **2026-09-06**. Our algorithm should not command world-OOB or mission-OOB moves; if a score changes, **stop** — likely a false-positive ignore/clamp on a legal outdoor step.
 
 ---
 
@@ -950,7 +956,7 @@ Delete the CI3 Known Issues row; compact `#`. Explained + matrix “Implemented 
 
 ### Task 11: CI3 verification gates
 
-Same as Task 3. Scores must match baseline. VAR-03 `throw_algo` already throws — still no crash. Invalid-command throw is a new path; `test_mission_control` throw is the unit proof. If VAR-03 hangs or crashes, **stop**.
+Same as Task 3. Scores must match the **2026-09-06** baseline. VAR-01 must still PASS (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`). VAR-03 `throw_algo` already throws — still no crash. Invalid-command throw is a new path; `test_mission_control` throw is the unit proof. If VAR-03 hangs or crashes, **stop**.
 
 ---
 
@@ -1168,7 +1174,7 @@ Quantity subtraction must compile under `-Werror`. If `sign * drone.max_elevate`
 
 ### Task 14: CI8 docs + HLD.pdf
 
-- [ ] **Step 1:** Delete the CI8 Known Issues row; compact `#`. Remaining KI rows should be skipped optionals (CI4, CI6, CI7, CI11, CI12), lazy `.so`, `ISimulation`, Unmapped-passable, plan-batching bug.
+- [ ] **Step 1:** Delete the CI8 Known Issues row; compact `#`. Remaining KI rows should be skipped optionals (CI4, CI6, CI7, CI11, CI12), lazy `.so` (#11), Unmapped-passable (#12), mapping-track band gaps (#13). **Not** `ISimulation` (already implemented).
 - [ ] **Step 2:** Explained doc: CI8 implemented via `pending_movements_`; one `nextStep` per original oversize command; fragment steps skip `nextStep`. Note that this is an intentional exception to “one `nextStep` per `step()`” and only runs when the algorithm exceeded drone max.
 - [ ] **Step 3:** Matrix implemented list + `bonus.txt` file:line for `splitWithinLimits` / `pending_movements_`.
 - [ ] **Step 4:** HLD: replace “Each step invokes `nextStep` once” with: each step invokes `nextStep` once **unless** draining a split-oversize queue. Update mermaid with an `alt pending fragment` (no `nextStep`).
@@ -1186,7 +1192,7 @@ If the script needs extra tools that the image lacks, stop and report; do not co
 ### Task 15: CI8 verification gates (include VAR-04)
 
 - [ ] **Step 1: Unit tests** — shared ctest helper. PASS.
-- [ ] **Step 2: verify-cell-runtime** — full 24. Scores must match 2026-09-03. If our algorithm ever emitted oversize, scores *could* change — treat that as unexpected; inspect `advance` sizes before accepting drift. No cell ≥ 60s; `large_out` short lidar WARN only.
+- [ ] **Step 2: verify-cell-runtime** — full 24. Scores must match **2026-09-06**. If our algorithm ever emitted oversize, scores *could* change — treat that as unexpected; inspect `advance` sizes before accepting drift. No cell ≥ 60s; **WARN=0** (do not expect the old `large_out` short ~46s pair).
 - [ ] **Step 3: VAR-01..03** as before.
 - [ ] **Step 4: VAR-04 once** (skill `--with-baseline`):
 
