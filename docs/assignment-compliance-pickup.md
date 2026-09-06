@@ -186,7 +186,9 @@ is explicitly allowed.
 ## Known Issues (working file, not the excel)
 
 `docs/known-issues.md` — staff example-table columns. Resolved/stale rows removed and
-renumbered `1..n` (2026-09-01). CI9 (drone step `Error`: log and continue) is
+renumbered `1..n` (2026-09-01). CI9 (drone step `Error`: log and continue), CI2
+(ignore world/map OOB via `output_map_.isInBounds`), and CI10 (clamp
+Advance/Elevate to `mission_bounds` when set; clamp then ignore) are
 implemented and claimed in `bonus.txt`; remaining optional skips listed in
 `docs/known-issues.md`. Also remaining: lazy `.so` load, Unmapped-as-passable,
 mapping-track band gaps, deferred AdvCpp leftovers. English only. At zip time,

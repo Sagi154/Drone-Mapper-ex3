@@ -45,6 +45,8 @@ competitive mode our `MissionControl` runs other teams' algorithms, and in compa
 ## Implemented optional rows
 
 - **Drone returns `Error` status on a step (CI9):** `runMissionSteps` logs `DRONE_STEP_FAILED` and continues until `Completed` or `max_steps`. See `MissionControl/src/MissionControlImpl.cpp`.
+- **Faulty algorithm sends a movement that would go out of bounds (CI2):** `applyMovement` ignores Advance/Elevate whose predicted center fails `output_map_.isInBounds` (`predictedDestination`); Movement is not called. Hover/Rotate skip this check. See `MissionControl/src/DroneControlImpl.cpp`.
+- **Algorithm returns a movement that leaves the mission bounds (CI10):** when `mission_bounds` is set (not all-zero), `clampMovementToMissionBounds` shortens Advance/Elevate so the predicted center stays inside that AABB. Zero leftover distance skips Movement. **Order:** clamp first, then CI2 ignore if still world-OOB. See `MissionControl/src/DroneControlImpl.cpp`.
 
 ## How this interacts with the ex3 simulator
 

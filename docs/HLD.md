@@ -455,7 +455,10 @@ Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration ca
 scan; over-limit or unsupported commands return `Error`. Otherwise an optional
 movement runs, then at most one scan if the command carries `scan_orientation`
 (including after a recoverable `Continue`), matching the published movement →
-scan → fuse contract. A step `Error` is pushed as `DRONE_STEP_FAILED` and the
+scan → fuse contract. Advance/Elevate are clamped to `mission_bounds` when those
+bounds are set; if the predicted center is still outside the world/map
+(`output_map_.isInBounds`), the command is ignored and Movement is not called
+(clamp then ignore). A step `Error` is pushed as `DRONE_STEP_FAILED` and the
 loop continues; it does not set `MissionRunStatus::Error` by itself.
 
 ![Drone step sequence](hld/seq-drone-step.png)
@@ -484,11 +487,14 @@ sequenceDiagram
             Note over DC: no move/scan
             DC-->>MC: Error
         else Continue
-            alt recoverable wall throw from Move
+            alt world-OOB after mission-bounds clamp
+                Note over DC: CI2 ignore — no Movement call
+            else recoverable wall throw from Move
                 DC->>Move: advance/elevate
                 Move-->>DC: throw std::runtime_error
                 DC-->>DC: Continue
             else normal movement
+                Note over DC: CI10 clamp Advance/Elevate to mission_bounds when set
                 DC->>Move: rotate/advance/elevate
             end
             opt command has scan_orientation

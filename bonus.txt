@@ -3,3 +3,7 @@ Optional Common-issues recoveries (context/Common issues and handling.pdf)
 CI9 — Drone step Error: log and continue the max_steps loop
   MissionControl/src/MissionControlImpl.cpp  (runMissionSteps)
   MissionControl/include/MissionControl/MissionRunLoop.h
+CI2 — ignore movement that would leave the world/map
+  MissionControl/src/DroneControlImpl.cpp  (applyMovement + predictedDestination)
+CI10 — amend movement to stay inside mission bounds
+  MissionControl/src/DroneControlImpl.cpp  (clampMovementToMissionBounds)
