@@ -9,3 +9,6 @@ CI10 — amend movement to stay inside mission bounds
   MissionControl/src/DroneControlImpl.cpp  (clampMovementToMissionBounds)
 CI3 — retry invalid algorithm commands then throw
   MissionControl/src/DroneControlImpl.cpp  (kMaxInvalidCommandRetries)
+CI8 — split oversize movement into legal steps
+  MissionControl/src/DroneControlImpl.cpp:73  (splitWithinLimits)
+  MissionControl/include/MissionControl/DroneControlImpl.h:48  (pending_movements_)

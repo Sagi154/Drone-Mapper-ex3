@@ -113,10 +113,13 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   mission finishes or hits max steps, returns `MissionRunResult`.
 
 - **`DroneControlImpl`** — Implements `mission_control::IDroneControl`. Each step
-  carves the drone footprint (`markDroneFootprintEmpty`) before `nextStep`, then
-  executes movement. `applyScanIfRequested` still runs after a recoverable
-  `Continue` when the command carries `scan_orientation`. Finished algorithm
-  status skips move/scan; over-limit or unsupported commands return `Error`.
+  carves the drone footprint (`markDroneFootprintEmpty`), then invokes `nextStep`
+  once unless draining a split-oversize queue (`pending_movements_`). Fragment
+  steps skip `nextStep` and skip an extra scan. `applyScanIfRequested` still
+  runs after a recoverable `Continue` when the original command carries
+  `scan_orientation`. Finished algorithm status skips move/scan. Oversize
+  Advance/Elevate/Rotate is split into in-limit fragments. Unsupported types
+  are retried then thrown (CI3), not returned as `Error`.
 
 - **`MappingAlgorithmImpl_207190406_209543255`** — Plugin entry point implementing
   `common::IMappingAlgorithm`. Reads the world through `const common::IMap3D&` only.
@@ -451,11 +454,15 @@ applies (`writeCompetitiveReport` instead of `writeComparativeReport`).
 
 Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration calls
 `DroneControlImpl::step()`. Each step carves the drone footprint, then invokes
-`nextStep`. An unsupported movement type is retried inside `step()` up to
-`kMaxInvalidCommandRetries` before any Movement call; after N failures `step()`
-throws (`SimulationRunImpl` maps that to `MISSION_EXCEPTION`).
-`AlgorithmStatus::Finished` returns `Completed` with no move or scan; over-limit
-commands still return `Error`. Otherwise an optional movement runs, then at most
+`nextStep` once unless draining a split-oversize queue. An unsupported movement
+type is retried inside `step()` up to `kMaxInvalidCommandRetries` before any
+Movement call; after N failures `step()` throws (`SimulationRunImpl` maps that
+to `MISSION_EXCEPTION`). `AlgorithmStatus::Finished` returns `Completed` with no
+move or scan. Oversize Advance/Elevate/Rotate is split into in-limit fragments
+(`splitWithinLimits`); the first fragment runs on the `nextStep` step and the
+rest drain from `pending_movements_` with no further `nextStep` and no extra
+scan — an intentional exception to “one `nextStep` per `step()`”, only when the
+algorithm exceeded drone max. Otherwise an optional movement runs, then at most
 one scan if the command carries `scan_orientation` (including after a recoverable
 `Continue`), matching the published movement → scan → fuse contract.
 Advance/Elevate are clamped to `mission_bounds` when those bounds are set; if the
@@ -481,32 +488,36 @@ sequenceDiagram
         MC->>DC: step()
         DC->>GPS: position() / heading()
         DC->>Map: markDroneFootprintEmpty
-        DC->>Algo: nextStep(state, latest_scan)
-        Algo-->>DC: MappingStepCommand
-        Note over DC: CI3 retry nextStep up to kMaxInvalidCommandRetries if type invalid; then throw
-        alt AlgorithmStatus::Finished
-            Note over DC: no further move/scan
-            DC-->>MC: Completed
-        else over-limit / Error
-            Note over DC: no move/scan
-            DC-->>MC: Error
-        else Continue
-            alt world-OOB after mission-bounds clamp
-                Note over DC: CI2 ignore — no Movement call
-            else recoverable wall throw from Move
-                DC->>Move: advance/elevate
-                Move-->>DC: throw std::runtime_error
-                DC-->>DC: Continue
-            else normal movement
-                Note over DC: CI10 clamp Advance/Elevate to mission_bounds when set
-                DC->>Move: rotate/advance/elevate
-            end
-            opt command has scan_orientation
-                DC->>Lidar: scan(orientations)
-                DC->>SR: applyScanToMap
-                SR->>Map: set voxels
-            end
+        alt pending fragment
+            Note over DC: drain pending_movements_ - no nextStep, no extra scan
+            DC->>Move: rotate/advance/elevate
             DC-->>MC: Continue
+        else new command
+            DC->>Algo: nextStep(state, latest_scan)
+            Algo-->>DC: MappingStepCommand
+            Note over DC: CI3 retry nextStep up to kMaxInvalidCommandRetries if type invalid, then throw
+            alt AlgorithmStatus::Finished
+                Note over DC: no further move/scan
+                DC-->>MC: Completed
+            else Continue
+                Note over DC: CI8 split oversize into pending_movements_, first fragment this step
+                alt world-OOB after mission-bounds clamp
+                    Note over DC: CI2 ignore - no Movement call
+                else recoverable wall throw from Move
+                    DC->>Move: advance/elevate
+                    Move-->>DC: throw std::runtime_error
+                    DC-->>DC: Continue
+                else normal movement
+                    Note over DC: CI10 clamp Advance/Elevate to mission_bounds when set
+                    DC->>Move: rotate/advance/elevate
+                end
+                opt command has scan_orientation
+                    DC->>Lidar: scan(orientations)
+                    DC->>SR: applyScanToMap
+                    SR->>Map: set voxels
+                end
+                DC-->>MC: Continue
+            end
         end
     end
 ```

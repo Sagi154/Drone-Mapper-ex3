@@ -188,12 +188,13 @@ is explicitly allowed.
 `docs/known-issues.md` — staff example-table columns. Resolved/stale rows removed and
 renumbered `1..n` (2026-09-01). CI9 (drone step `Error`: log and continue), CI2
 (ignore world/map OOB via `output_map_.isInBounds`), CI10 (clamp
-Advance/Elevate to `mission_bounds` when set; clamp then ignore), and CI3
+Advance/Elevate to `mission_bounds` when set; clamp then ignore), CI3
 (retry invalid `nextStep` up to `kMaxInvalidCommandRetries` then throw;
-`SimulationRun` maps to `MISSION_EXCEPTION`) are implemented and claimed in
-`bonus.txt`; remaining optional skips listed in `docs/known-issues.md`. Also
-remaining: lazy `.so` load, Unmapped-as-passable, mapping-track band gaps,
-deferred AdvCpp leftovers. English only. At zip time,
+`SimulationRun` maps to `MISSION_EXCEPTION`), and CI8 (split oversize
+Advance/Elevate/Rotate via `splitWithinLimits` / `pending_movements_`) are
+implemented and claimed in `bonus.txt`; remaining optional skips listed in
+`docs/known-issues.md`. Also remaining: lazy `.so` load, Unmapped-as-passable,
+mapping-track band gaps, deferred AdvCpp leftovers. English only. At zip time,
 copy into the Google Sheet and export `.xlsx` to the zip root — do not submit
 the markdown.
 
