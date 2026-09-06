@@ -11,38 +11,18 @@
 
 #include <mp-units/systems/si/math.h>
 
-#include <cmath>
-
 namespace simulator {
 
 namespace {
 
 namespace si = common::si;
+namespace bm = user_common_207190406_209543255::beam_math;
 using common::cm;
 using common::deg;
 using common::PhysicalLength;
 using common::HorizontalAngle;
 using common::AltitudeAngle;
 using common::Orientation;
-
-// Adversarial plugins may pass absurd angles (e.g. 1e12 deg). mp-units / libm
-// sin/cos on those values can hang; reduce to (-180, 180] in plain double first.
-[[nodiscard]] double wrap_deg(double degrees) {
-    double x = std::fmod(degrees, 360.0);
-    if (x <= -180.0) {
-        x += 360.0;
-    } else if (x > 180.0) {
-        x -= 360.0;
-    }
-    return x;
-}
-
-[[nodiscard]] Orientation normalize_orientation(Orientation orientation) {
-    return Orientation{
-        HorizontalAngle{wrap_deg(orientation.horizontal.numerical_value_in(deg)) * deg},
-        AltitudeAngle{wrap_deg(orientation.altitude.numerical_value_in(deg)) * deg},
-    };
-}
 
 [[nodiscard]] std::size_t beams_on_circle(std::size_t circle_index) {
     std::size_t count = 1;
@@ -78,8 +58,10 @@ common::types::LidarScanResult MockLidar::scan(common::Orientation scan_orientat
     }
 
     // Normalize before any trig and before publishing hit angles (fusion also uses them).
-    const Orientation scan = normalize_orientation(scan_orientation);
-    const Orientation sensor_heading = normalize_orientation(gps_.heading());
+    // Adversarial plugins may pass absurd angles (e.g. 1e12 deg); wrap first so
+    // mp-units / libm sin/cos cannot hang.
+    const Orientation scan = bm::normalizeOrientation(scan_orientation);
+    const Orientation sensor_heading = bm::normalizeOrientation(gps_.heading());
     const Orientation center_beam_abs{
         scan.horizontal + sensor_heading.horizontal,
         scan.altitude   + sensor_heading.altitude,
@@ -102,7 +84,7 @@ common::types::LidarScanResult MockLidar::scan(common::Orientation scan_orientat
                 horizontal_delta(horizontal_offset, config_.z_min),
                 altitude_delta(altitude_offset, config_.z_min),
             };
-            const Orientation relative_beam = normalize_orientation(Orientation{
+            const Orientation relative_beam = bm::normalizeOrientation(Orientation{
                 scan.horizontal + offset.horizontal,
                 scan.altitude   + offset.altitude,
             });
