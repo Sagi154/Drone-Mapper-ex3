@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -308,6 +309,43 @@ TEST(MissionControl, FailedOversizeStepLogsAndContinuesUntilFinished) {
     ASSERT_FALSE(result.errors.empty());
     EXPECT_EQ(result.errors.front().code, "DRONE_STEP_FAILED");
     EXPECT_EQ(result.errors.front().message, "Drone step failed.");
+
+    std::error_code ec;
+    std::filesystem::remove(output_file, ec);
+}
+
+TEST(MissionControl, InvalidCommandsThrowAfterRetries) {
+    FakeMap3D stand_in{makeMapConfig()};
+    FakeMap3D output{makeMapConfig()};
+    FakeGPS gps;
+    FakeLidar lidar{defaultLidar()};
+    FakeMovement movement;
+
+    const auto mission = makeMission(5);
+    const auto drone = defaultDrone();
+    const auto lidar_cfg = defaultLidar();
+    const auto bad = common::types::MovementCommand{
+        .type = static_cast<common::types::MovementCommandType>(99),
+    };
+    ScriptedAlgorithm algorithm{
+        {mission, lidar_cfg, drone, stand_in},
+        {
+            {.movement = bad, .status = common::types::AlgorithmStatus::Working},
+            {.movement = bad, .status = common::types::AlgorithmStatus::Working},
+            {.movement = bad, .status = common::types::AlgorithmStatus::Working},
+        },
+    };
+
+    const auto output_file =
+        std::filesystem::temp_directory_path() / "mc_invalid_command_output.npy";
+    mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
+        common::MissionControlDependencies{
+            mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
+    };
+
+    EXPECT_THROW(
+        { (void)control.runMission(); },
+        std::runtime_error);
 
     std::error_code ec;
     std::filesystem::remove(output_file, ec);

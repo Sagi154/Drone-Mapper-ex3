@@ -15,6 +15,7 @@
 #include <cmath>
 #include <exception>
 #include <numbers>
+#include <stdexcept>
 
 namespace mission_control_207190406_209543255 {
 
@@ -34,6 +35,8 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
     });
 }
 
+constexpr int kMaxInvalidCommandRetries = 3;
+
 [[nodiscard]] bool isSupportedMovementType(common::types::MovementCommandType type) {
     switch (type) {
     case common::types::MovementCommandType::Hover:
@@ -43,6 +46,11 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
         return true;
     }
     return false;
+}
+
+[[nodiscard]] bool isInvalidMovementCommand(const common::types::MappingStepCommand& command) {
+    return command.movement.has_value() &&
+           !isSupportedMovementType(command.movement->type);
 }
 
 [[nodiscard]] bool movementWithinLimits(const common::types::MovementCommand& command,
@@ -257,12 +265,21 @@ common::types::DroneStepResult DroneControlImpl::step() {
 
     const common::types::LidarScanResult* latest_scan_ptr =
         has_latest_scan_ ? &latest_scan_ : nullptr;
-    const common::types::MappingStepCommand command =
-        mapping_algorithm_.nextStep(current_state, latest_scan_ptr);
-
-    if (command.status == common::types::AlgorithmStatus::Finished ||
-        command.status == common::types::AlgorithmStatus::FinishedWithUnmappableVoxels) {
-        return {common::types::DroneStepStatus::Completed, {}};
+    common::types::MappingStepCommand command{};
+    int invalid_tries = 0;
+    while (true) {
+        command = mapping_algorithm_.nextStep(current_state, latest_scan_ptr);
+        if (command.status == common::types::AlgorithmStatus::Finished ||
+            command.status == common::types::AlgorithmStatus::FinishedWithUnmappableVoxels) {
+            return {common::types::DroneStepStatus::Completed, {}};
+        }
+        if (!isInvalidMovementCommand(command)) {
+            break;
+        }
+        ++invalid_tries;
+        if (invalid_tries >= kMaxInvalidCommandRetries) {
+            throw std::runtime_error("Invalid movement command after retries.");
+        }
     }
 
     const auto move_result = applyMovement(command);
