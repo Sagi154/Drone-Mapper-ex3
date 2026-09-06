@@ -10,6 +10,14 @@
 #include <Simulator/MapsComparison.h>
 #include <Simulator/io/SimulatorPaths.h>
 
+#include <Common/IDroneMovement.h>
+#include <Common/IGPS.h>
+#include <Common/ILidar.h>
+#include <Common/IMap3D.h>
+#include <Common/IMappingAlgorithm.h>
+#include <Common/IMissionControl.h>
+#include <Common/IMutableMap3D.h>
+
 #include <user_common_207190406_209543255/RunErrorLog.h>
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
@@ -71,6 +79,8 @@ SimulationRunImpl::SimulationRunImpl(
         throw std::invalid_argument("SimulationRunImpl: all dependencies must be non-null.");
     }
 }
+
+SimulationRunImpl::~SimulationRunImpl() = default;
 
 types::SimulationResult SimulationRunImpl::run() {
     types::SimulationResult result{};

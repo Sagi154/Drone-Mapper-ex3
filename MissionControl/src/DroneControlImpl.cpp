@@ -2,6 +2,12 @@
 
 #include <MissionControl/ScanResultToVoxels.h>
 
+#include <Common/IDroneMovement.h>
+#include <Common/IGPS.h>
+#include <Common/ILidar.h>
+#include <Common/IMappingAlgorithm.h>
+#include <Common/IMutableMap3D.h>
+
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
 #include <mp-units/math.h>

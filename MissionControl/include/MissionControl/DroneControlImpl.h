@@ -2,11 +2,13 @@
 
 #include <MissionControl/IDroneControl.h>
 
-#include <Common/IDroneMovement.h>
-#include <Common/IGPS.h>
-#include <Common/ILidar.h>
-#include <Common/IMappingAlgorithm.h>
-#include <Common/IMutableMap3D.h>
+namespace common {
+class ILidar;
+class IGPS;
+class IDroneMovement;
+class IMutableMap3D;
+class IMappingAlgorithm;
+} // namespace common
 
 namespace mission_control_207190406_209543255 {
 

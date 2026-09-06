@@ -1,5 +1,11 @@
 #include <MissionControl/DroneControlImpl.h>
 
+#include <Common/IDroneMovement.h>
+#include <Common/IGPS.h>
+#include <Common/ILidar.h>
+#include <Common/IMappingAlgorithm.h>
+#include <Common/IMutableMap3D.h>
+
 #include <gtest/gtest.h>
 
 #include <filesystem>

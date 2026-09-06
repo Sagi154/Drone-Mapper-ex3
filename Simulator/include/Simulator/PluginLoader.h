@@ -5,8 +5,6 @@
 
 #include <Simulator/PluginLoadTypes.h>
 
-#include <dlfcn.h>
-
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -17,11 +15,7 @@
 namespace simulator {
 
 struct DlCloser {
-    void operator()(void* handle) const noexcept {
-        if (handle != nullptr) {
-            ::dlclose(handle);
-        }
-    }
+    void operator()(void* handle) const noexcept;
 };
 using DlHandle = std::unique_ptr<void, DlCloser>;
 

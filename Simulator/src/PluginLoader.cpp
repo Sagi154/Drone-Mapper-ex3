@@ -73,6 +73,12 @@ template <typename Loaded, typename TryOpenFn, typename ClearOwnFn, typename Tak
 
 } // namespace
 
+void DlCloser::operator()(void* handle) const noexcept {
+    if (handle != nullptr) {
+        ::dlclose(handle);
+    }
+}
+
 PluginLoader::~PluginLoader() { unloadAll(); }
 
 void PluginLoader::unloadAll() {
