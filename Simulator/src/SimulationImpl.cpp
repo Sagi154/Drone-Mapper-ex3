@@ -15,7 +15,6 @@ namespace {
 constexpr const char* kMapsComparisonMetric = "maps_comparison_score_0_100";
 constexpr double kScoreMin = 0.0;
 constexpr double kScoreMax = 100.0;
-constexpr int kErrorScore = -1;
 
 } // namespace
 

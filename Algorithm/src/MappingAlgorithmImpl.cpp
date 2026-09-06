@@ -32,6 +32,7 @@ namespace {
 constexpr double kHalfStepTolerance = 0.5;
 constexpr std::size_t kMaxArrivalScans = 4;
 constexpr double kPositionEpsilon = 1e-6;
+constexpr double kHeadingEpsilonDeg = 1e-6;
 
 bool samePosition(const Position3D& a, const Position3D& b) {
     const double dx = std::abs(a.x.force_numerical_value_in(cm) - b.x.force_numerical_value_in(cm));
@@ -161,7 +162,7 @@ MappingAlgorithmImpl_207190406_209543255::Impl::movementToward(const types::Dron
                                                                const Position3D& target) const {
     const double dh =
         target.z.force_numerical_value_in(cm) - state.position.z.force_numerical_value_in(cm);
-    if (std::abs(dh) > 1e-6) {
+    if (std::abs(dh) > kPositionEpsilon) {
         const double limit = drone_config_.max_elevate.force_numerical_value_in(cm);
         types::MovementCommand cmd{};
         cmd.type = types::MovementCommandType::Elevate;
@@ -173,7 +174,7 @@ MappingAlgorithmImpl_207190406_209543255::Impl::movementToward(const types::Dron
         target.x.force_numerical_value_in(cm) - state.position.x.force_numerical_value_in(cm);
     const double dy =
         target.y.force_numerical_value_in(cm) - state.position.y.force_numerical_value_in(cm);
-    if (std::abs(dx) < 1e-6 && std::abs(dy) < 1e-6) {
+    if (std::abs(dx) < kPositionEpsilon && std::abs(dy) < kPositionEpsilon) {
         types::MovementCommand cmd{};
         cmd.type = types::MovementCommandType::Hover;
         return cmd;
@@ -190,7 +191,7 @@ MappingAlgorithmImpl_207190406_209543255::Impl::movementToward(const types::Dron
     }
 
     const double rot_limit = drone_config_.max_rotate.force_numerical_value_in(deg);
-    if (std::abs(delta) > 1e-6) {
+    if (std::abs(delta) > kHeadingEpsilonDeg) {
         types::MovementCommand cmd{};
         cmd.type = types::MovementCommandType::Rotate;
         cmd.rotation =

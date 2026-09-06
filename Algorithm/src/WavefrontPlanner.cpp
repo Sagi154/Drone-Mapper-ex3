@@ -24,6 +24,8 @@ using user_common_207190406_209543255::kShortRangeLidarMax;
 namespace {
 
 constexpr std::size_t kMaxSweepReserve = 8;
+constexpr double kHeightEpsilonCm = 1e-6;
+constexpr double kForcedEscapeExpectedRate = 1.0;
 
 [[nodiscard]] MovementLimits limitsFrom(const types::DroneConfigData& drone) {
     return MovementLimits{drone.max_advance, drone.max_elevate, drone.max_rotate};
@@ -50,7 +52,7 @@ constexpr std::size_t kMaxSweepReserve = 8;
             return false;
         }
         z -= step;
-        if (z < min_z - 1e-6) {
+        if (z < min_z - kHeightEpsilonCm) {
             return false;
         }
         const Position3D below{start.x, start.y, z * z_extent[cm]};
@@ -153,7 +155,7 @@ constexpr std::size_t kMaxSweepReserve = 8;
             const double step = config.resolution.force_numerical_value_in(cm);
             const bool column_unmapped = unmappedInColumnBelow(
                 in.map, config, in.state.position, reach.parent_of, reach.start_key);
-            const bool near_ceiling = max_z - z <= z_min + 1e-6;
+            const bool near_ceiling = max_z - z <= z_min + kHeightEpsilonCm;
             const bool house_layer_done =
                 house_volume && !hasHorizontalUnmapped(in.map, in.state.position, step);
             if ((near_ceiling || house_layer_done) && column_unmapped &&
@@ -244,7 +246,7 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
         escape.valid = true;
         escape.waypoints = unstick.path;
         escape.target_cluster_cells = 1;
-        escape.expected_rate = 1.0;
+        escape.expected_rate = kForcedEscapeExpectedRate;
         return escape;
     }
     if (reach.clusters.empty()) {
@@ -268,7 +270,7 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
             forced.valid = true;
             forced.waypoints = stringPullConstantAltitude(in.map, drop.path, in.drone.radius);
             forced.target_cluster_cells = 1;
-            forced.expected_rate = 1.0;
+            forced.expected_rate = kForcedEscapeExpectedRate;
             forced.internals.frontier_cells = reach.frontier_cells;
             return forced;
         }

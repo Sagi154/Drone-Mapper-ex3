@@ -10,6 +10,10 @@
 
 namespace simulator {
 
+/// Score assigned to a run that failed before or during mission execution
+/// (startup error, uncaught exception, or an ErrorRef-producing scenario).
+inline constexpr double kErrorScore = -1.0;
+
 struct MatrixCell {
     std::size_t group_index = 0;
     std::size_t mission_index = 0;

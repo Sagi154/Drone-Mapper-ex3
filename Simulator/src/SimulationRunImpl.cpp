@@ -8,6 +8,7 @@
 #include <Simulator/SimulationRunImpl.h>
 
 #include <Simulator/MapsComparison.h>
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/io/SimulatorPaths.h>
 
 #include <Common/IDroneMovement.h>
@@ -98,7 +99,7 @@ types::SimulationResult SimulationRunImpl::run() {
 
     if (!startup_errors_.empty()) {
         logErrors(error_log.get(), startup_errors_);
-        result.mission_score = -1.0;
+        result.mission_score = kErrorScore;
         result.mission_results.push_back(common::types::MissionRunResult{
             common::types::MissionRunStatus::Error,
             0,
@@ -142,7 +143,7 @@ types::SimulationResult SimulationRunImpl::run() {
                 0,
                 {save_error},
             });
-            result.mission_score = -1.0;
+            result.mission_score = kErrorScore;
             return result;
         }
     }
@@ -150,7 +151,7 @@ types::SimulationResult SimulationRunImpl::run() {
     // Score only when the mission reached a real terminal state; Error (incl.
     // the caught runMission()/save exceptions above) stays at -1.
     if (mission_result.status == common::types::MissionRunStatus::Error) {
-        result.mission_score = -1.0;
+        result.mission_score = kErrorScore;
     } else {
         const common::Position3D spawn =
             user_common_207190406_209543255::worldInitialDronePosition(

@@ -23,7 +23,7 @@ namespace {
         result.mission_config = *cell.mission;
     }
     result.output_map_file = output_path;
-    result.mission_score   = -1.0;
+    result.mission_score   = kErrorScore;
     return result;
 }
 

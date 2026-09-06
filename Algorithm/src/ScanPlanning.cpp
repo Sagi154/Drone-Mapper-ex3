@@ -33,6 +33,10 @@ using user_common_207190406_209543255::kSmallOutdoorMaxSpan;
 
 namespace {
 
+constexpr common::AltitudeAngle kZenith = 90.0 * deg;
+constexpr common::AltitudeAngle kNadir = -90.0 * deg;
+constexpr double kHeightEpsilonCm = 1e-6;
+
 struct Offset {
     int dx;
     int dy;
@@ -81,7 +85,7 @@ struct ScoredDirection {
     const double z = origin.z.force_numerical_value_in(cm);
     const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
     const double z_min = lidar.z_min.force_numerical_value_in(cm);
-    return max_z - z <= z_min + 1e-6;
+    return max_z - z <= z_min + kHeightEpsilonCm;
 }
 
 [[nodiscard]] bool volumeGainAllowed(const types::MapConfig& config,
@@ -279,8 +283,8 @@ std::optional<Orientation> bestTravelScan(
     } else {
         probes.emplace_back(predicted.heading.horizontal, 0.0 * deg);
     }
-    probes.emplace_back(0.0 * deg, 90.0 * deg);
-    probes.emplace_back(0.0 * deg, -90.0 * deg);
+    probes.emplace_back(0.0 * deg, kZenith);
+    probes.emplace_back(0.0 * deg, kNadir);
 
     const types::MapConfig config = map.getMapConfig();
     for (const Orientation& probe : probes) {
