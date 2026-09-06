@@ -455,7 +455,8 @@ Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration ca
 scan; over-limit or unsupported commands return `Error`. Otherwise an optional
 movement runs, then at most one scan if the command carries `scan_orientation`
 (including after a recoverable `Continue`), matching the published movement →
-scan → fuse contract.
+scan → fuse contract. A step `Error` is pushed as `DRONE_STEP_FAILED` and the
+loop continues; it does not set `MissionRunStatus::Error` by itself.
 
 ![Drone step sequence](hld/seq-drone-step.png)
 
@@ -470,7 +471,7 @@ sequenceDiagram
     participant SR as applyScanToMap
     participant Map as output Map3DImpl
 
-    loop until Finished / MaxSteps / Error
+    loop until Finished / MaxSteps
         MC->>DC: step()
         DC->>GPS: position() / heading()
         DC->>Map: markDroneFootprintEmpty

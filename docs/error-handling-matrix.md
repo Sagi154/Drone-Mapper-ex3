@@ -42,6 +42,10 @@ competitive mode our `MissionControl` runs other teams' algorithms, and in compa
 | GPS returns out-of-bound coordinates | `DroneControl` | Compare with internal coordinates; throw if those are also OOB, otherwise ignore | `DroneControl`, `SimulationRun` |
 | Movement executed but GPS reports impossible coordinates | `DroneControl` | Try again to read GPS; return `Error` after N tries | `DroneControl` |
 
+## Implemented optional rows
+
+- **Drone returns `Error` status on a step (CI9):** `runMissionSteps` logs `DRONE_STEP_FAILED` and continues until `Completed` or `max_steps`. See `MissionControl/src/MissionControlImpl.cpp`.
+
 ## How this interacts with the ex3 simulator
 
 The matrix stops at `SimulationRun`. Above it, assignment 3 adds:

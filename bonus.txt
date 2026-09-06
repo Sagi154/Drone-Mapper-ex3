@@ -1,0 +1,5 @@
+Optional Common-issues recoveries (context/Common issues and handling.pdf)
+
+CI9 — Drone step Error: log and continue the max_steps loop
+  MissionControl/src/MissionControlImpl.cpp  (runMissionSteps)
+  MissionControl/include/MissionControl/MissionRunLoop.h

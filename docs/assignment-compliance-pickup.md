@@ -186,10 +186,12 @@ is explicitly allowed.
 ## Known Issues (working file, not the excel)
 
 `docs/known-issues.md` — staff example-table columns. Resolved/stale rows removed and
-renumbered `1..n` (2026-09-01). Remaining: optional Common-issues PDF skips, lazy `.so`
-load, Unmapped-as-passable, plan-batching short-lidar score drop.
-English only. At zip time, copy into the Google Sheet and export `.xlsx` to the zip root —
-do not submit the markdown.
+renumbered `1..n` (2026-09-01). CI9 (drone step `Error`: log and continue) is
+implemented and claimed in `bonus.txt`; remaining optional skips listed in
+`docs/known-issues.md`. Also remaining: lazy `.so` load, Unmapped-as-passable,
+mapping-track band gaps, deferred AdvCpp leftovers. English only. At zip time,
+copy into the Google Sheet and export `.xlsx` to the zip root — do not submit
+the markdown.
 
 ---
 
