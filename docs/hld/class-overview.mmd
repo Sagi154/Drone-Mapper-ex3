@@ -3,7 +3,6 @@ classDiagram
 
     class main {
       +writeModeReport()
-      +unloadAll()
     }
 
     class SimulationCli {
@@ -83,6 +82,20 @@ classDiagram
     class LoadedAlgorithmPlugin
     class LoadedMissionControlPlugin
 
+    class PluginMatrixBinding {
+      +plugin_filename
+      +factory
+    }
+
+    class PluginMatrixResult {
+      +plugin_filename
+      +results
+    }
+
+    class IRunErrorLog {
+      +log(ErrorRef)
+    }
+
     class RunErrorLog {
       +log(ErrorRef)
     }
@@ -95,6 +108,13 @@ classDiagram
 
     class WavefrontPlanner
     class MappingAlgorithmFrontier
+    class PathShaping {
+      <<module>>
+    }
+    class ScanPlanning {
+      <<module>>
+    }
+    class ExplorationPlan
     class ConeTemplateCache
     class VoxelStamp
 
@@ -149,9 +169,14 @@ classDiagram
     runPluginMatrix --> distributeWork
     runPluginMatrix --> SimulationRunFactoryImpl
     runPluginMatrix --> MatrixCell : expandRunMatrix
+    runPluginMatrix --> PluginMatrixBinding
+    runPluginMatrix --> PluginMatrixResult
+    PluginMatrixBinding --> ISimulationRunFactory
     distributeWork --> SimulationRunFactoryImpl
     SimulationRunFactoryImpl ..|> ISimulationRunFactory
     SimulationRunFactoryImpl --> SimulationRunImpl
+    SimulationRunFactoryImpl --> MappingAlgorithmFactory
+    SimulationRunFactoryImpl --> MissionControlFactory
     SimulationRunFactoryImpl --> MappingAlgorithmDependencies
     SimulationRunFactoryImpl --> MissionControlDependencies
     SimulationRunImpl ..|> ISimulationRun
@@ -188,13 +213,20 @@ classDiagram
     MappingAlgorithmImpl_207190406_209543255 ..|> IMappingAlgorithm
     MappingAlgorithmImpl_207190406_209543255 --> IMap3D
     MappingAlgorithmImpl_207190406_209543255 --> WavefrontPlanner
-    MappingAlgorithmImpl_207190406_209543255 --> MappingAlgorithmFrontier
+    MappingAlgorithmImpl_207190406_209543255 --> ExplorationPlan
+    MappingAlgorithmImpl_207190406_209543255 --> ScanPlanning
     MappingAlgorithmImpl_207190406_209543255 --> ConeTemplateCache
     MappingAlgorithmImpl_207190406_209543255 --> VoxelStamp
+    WavefrontPlanner *-- MappingAlgorithmFrontier : frontier_
+    WavefrontPlanner --> PathShaping
+    WavefrontPlanner --> ScanPlanning
+    WavefrontPlanner --> ExplorationPlan
     Map3DImpl ..|> IMutableMap3D
     IMutableMap3D --|> IMap3D
     MockLidar ..|> ILidar
     MockGPS ..|> IGPS
     MockMovement ..|> IDroneMovement
+    RunErrorLog ..|> IRunErrorLog
     SimulationCoordUtil ..> Map3DImpl : world spawn
     SimulatorPaths ..> RunErrorLog : errorLogPathFromOutputMap
+    YamlConfigParsers ..> IRunErrorLog

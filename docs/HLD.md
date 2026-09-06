@@ -100,7 +100,7 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   `compareMaps(hidden, output, spawn)` against the hidden map, and returns
   `SimulationResult`. Per-run `RunErrorLog` path comes from
   `errorLogPathFromOutputMap`. Contains exceptions from `runMission()` so a single
-  bad run scores `-1` without aborting the matrix.
+  bad run scores `kErrorScore` (`-1`) without aborting the matrix.
 
 - **Mocks + maps + scoring (`Simulator/src/`)** — `Map3DImpl` (hidden + output),
   `MockGPS`, `MockLidar`, `MockMovement` (holds the hidden map; throws on wall/boundary
@@ -111,14 +111,17 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   mission finishes or hits max steps, returns `MissionRunResult`.
 
 - **`DroneControlImpl`** — Implements `mission_control::IDroneControl`. Each step
-  queries GPS, asks the algorithm for a `MappingStepCommand`, executes movement or lidar
-  scan, and writes scan results into the output map via `applyScanToMap`.
+  carves the drone footprint (`markDroneFootprintEmpty`) before `nextStep`, then
+  executes movement. `applyScanIfRequested` still runs after a recoverable
+  `Continue` when the command carries `scan_orientation`. Finished algorithm
+  status skips move/scan; over-limit or unsupported commands return `Error`.
 
 - **`MappingAlgorithmImpl_207190406_209543255`** — Plugin entry point implementing
   `common::IMappingAlgorithm`. Reads the world through `const common::IMap3D&` only.
-  Uses `WavefrontPlanner` over a reachability substrate (`MappingAlgorithmFrontier`)
-  to pick a cluster, then emits movement plus a score-aware scan toward that cluster.
-  Scan templates are `ConeTemplateCache` / `VoxelStamp`.
+  Uses `WavefrontPlanner`, which composes `MappingAlgorithmFrontier` and calls
+  `PathShaping` / `ScanPlanning` to produce an `ExplorationPlan`, then emits
+  movement plus a score-aware scan toward that cluster. Scan templates are
+  `ConeTemplateCache` / `VoxelStamp`.
 
 - **`SimulationCoordUtil`** — Shared world/voxel helpers:
   `worldInitialDronePosition`, `forEachSphereSample`.
@@ -141,7 +144,6 @@ classDiagram
 
     class main {
       +writeModeReport()
-      +unloadAll()
     }
 
     class SimulationCli {
@@ -221,6 +223,20 @@ classDiagram
     class LoadedAlgorithmPlugin
     class LoadedMissionControlPlugin
 
+    class PluginMatrixBinding {
+      +plugin_filename
+      +factory
+    }
+
+    class PluginMatrixResult {
+      +plugin_filename
+      +results
+    }
+
+    class IRunErrorLog {
+      +log(ErrorRef)
+    }
+
     class RunErrorLog {
       +log(ErrorRef)
     }
@@ -233,6 +249,13 @@ classDiagram
 
     class WavefrontPlanner
     class MappingAlgorithmFrontier
+    class PathShaping {
+      <<module>>
+    }
+    class ScanPlanning {
+      <<module>>
+    }
+    class ExplorationPlan
     class ConeTemplateCache
     class VoxelStamp
 
@@ -287,9 +310,14 @@ classDiagram
     runPluginMatrix --> distributeWork
     runPluginMatrix --> SimulationRunFactoryImpl
     runPluginMatrix --> MatrixCell : expandRunMatrix
+    runPluginMatrix --> PluginMatrixBinding
+    runPluginMatrix --> PluginMatrixResult
+    PluginMatrixBinding --> ISimulationRunFactory
     distributeWork --> SimulationRunFactoryImpl
     SimulationRunFactoryImpl ..|> ISimulationRunFactory
     SimulationRunFactoryImpl --> SimulationRunImpl
+    SimulationRunFactoryImpl --> MappingAlgorithmFactory
+    SimulationRunFactoryImpl --> MissionControlFactory
     SimulationRunFactoryImpl --> MappingAlgorithmDependencies
     SimulationRunFactoryImpl --> MissionControlDependencies
     SimulationRunImpl ..|> ISimulationRun
@@ -326,25 +354,38 @@ classDiagram
     MappingAlgorithmImpl_207190406_209543255 ..|> IMappingAlgorithm
     MappingAlgorithmImpl_207190406_209543255 --> IMap3D
     MappingAlgorithmImpl_207190406_209543255 --> WavefrontPlanner
-    MappingAlgorithmImpl_207190406_209543255 --> MappingAlgorithmFrontier
+    MappingAlgorithmImpl_207190406_209543255 --> ExplorationPlan
+    MappingAlgorithmImpl_207190406_209543255 --> ScanPlanning
     MappingAlgorithmImpl_207190406_209543255 --> ConeTemplateCache
     MappingAlgorithmImpl_207190406_209543255 --> VoxelStamp
+    WavefrontPlanner *-- MappingAlgorithmFrontier : frontier_
+    WavefrontPlanner --> PathShaping
+    WavefrontPlanner --> ScanPlanning
+    WavefrontPlanner --> ExplorationPlan
     Map3DImpl ..|> IMutableMap3D
     IMutableMap3D --|> IMap3D
     MockLidar ..|> ILidar
     MockGPS ..|> IGPS
     MockMovement ..|> IDroneMovement
+    RunErrorLog ..|> IRunErrorLog
     SimulationCoordUtil ..> Map3DImpl : world spawn
     SimulatorPaths ..> RunErrorLog : errorLogPathFromOutputMap
+    YamlConfigParsers ..> IRunErrorLog
 ```
 
 ## Sequence: one comparative cell
 
 Comparative mode fixes one algorithm `.so` and varies every `MissionControl` `.so` in a
-folder. `main` parses CLI, creates the output dir, parses the composition, loads
-plugins, then `runPluginMatrix` expands cells and `distributeWork` creates a fresh run
-per `(plugin binding × matrix cell)`. After `runMission()` the output map is saved
-**before** `compareMaps`.
+folder. `main` parses CLI, creates the output dir, parses the composition (nested
+`parseSimulationConfig` / `parseMissionConfig` / `parseDroneConfig` /
+`parseLidarConfig`), loads plugins, takes pending factories, and builds one
+`SimulationRunFactoryImpl` / `PluginMatrixBinding` per plugin. `runPluginMatrix`
+expands the full cell list once, then one `distributeWork` call covers the whole
+plugin × cell matrix. Per-run `RunErrorLog` is opened from
+`errorLogPathFromOutputMap` before `runMission()`; startup errors skip the mission
+and score `kErrorScore`. After `runMission()` the output map is saved **before**
+`compareMaps`. Reports are `writeSimulationOutputYaml` per plugin, then
+`writeModeReport` / `writeComparativeReport`.
 
 ![Comparative cell sequence](hld/seq-comparative-cell.png)
 
@@ -362,27 +403,41 @@ sequenceDiagram
     participant Run as SimulationRunImpl
     participant MC as MissionControlImpl_207190406_209543255
     participant Score as compareMaps
-    participant Rep as writeComparativeReport
+    participant Yaml as writeSimulationOutputYaml
+    participant Rep as writeModeReport
 
     User->>Main: -comparative simulation=... mission_control_folder=... algorithm=...
     Main->>Cli: parseSimulationCliArgs
     Main->>Out: createOutputDir
     Main->>Comp: parseCompositionFile
+    Comp->>Comp: parseSimulationConfig
+    Comp->>Comp: parseMissionConfig
+    Comp->>Comp: parseDroneConfig
+    Comp->>Comp: parseLidarConfig
     Main->>Loader: loadAlgorithmSo + loadMissionControlsFromDirectory
     Loader->>Reg: REGISTER_* static ctors fill pending factories
-    Main->>Main: expandRunMatrix inside runPluginMatrix
-    loop each cell x each MissionControl binding
-        Main->>Dist: distributeWork
+    Loader->>Reg: takePending*Factory
+    Main->>Factory: ctor(algo factory, mc factory)
+    Main->>Main: PluginMatrixBinding filename + factory
+    Main->>Main: expandRunMatrix full cell list
+    Main->>Dist: distributeWork once over plugin x cell matrix
+    loop each flat index
         Dist->>Factory: create(...)
         Factory->>Run: wire maps, mocks, plugins
         Dist->>Run: run()
-        Run->>MC: runMission()
-        MC-->>Run: MissionRunResult
-        Run->>Run: output_map.save
-        Run->>Score: compareMaps(hidden, output, spawn)
-        Run-->>Dist: SimulationResult
+        Run->>Run: errorLogPathFromOutputMap
+        alt startup errors
+            Run-->>Dist: SimulationResult score kErrorScore skip mission
+        else
+            Run->>MC: runMission()
+            MC-->>Run: MissionRunResult
+            Run->>Run: output_map.save
+            Run->>Score: compareMaps(hidden, output, spawn)
+            Run-->>Dist: SimulationResult
+        end
     end
-    Main->>Rep: writeComparativeReport + per-plugin YAML
+    Main->>Yaml: writeSimulationOutputYaml per plugin
+    Main->>Rep: writeModeReport / writeComparativeReport
     Main->>Loader: destroy plugin objects then unloadAll / dlclose
 ```
 
@@ -393,9 +448,12 @@ applies (`writeCompetitiveReport` instead of `writeComparativeReport`).
 ## Sequence: DroneControl step loop
 
 Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration calls
-`DroneControlImpl::step()`. Each step invokes `nextStep` once and may execute an optional
-movement followed by at most one scan (then voxel fusion), matching the published
-movement → scan → fuse contract.
+`DroneControlImpl::step()`. Each step carves the drone footprint, then invokes
+`nextStep` once. `AlgorithmStatus::Finished` returns `Completed` with no move or
+scan; over-limit or unsupported commands return `Error`. Otherwise an optional
+movement runs, then at most one scan if the command carries `scan_orientation`
+(including after a recoverable `Continue`), matching the published movement →
+scan → fuse contract.
 
 ![Drone step sequence](hld/seq-drone-step.png)
 
@@ -413,33 +471,46 @@ sequenceDiagram
     loop until Finished / MaxSteps / Error
         MC->>DC: step()
         DC->>GPS: position() / heading()
+        DC->>Map: markDroneFootprintEmpty
         DC->>Algo: nextStep(state, latest_scan)
         Algo-->>DC: MappingStepCommand
-        alt recoverable wall throw from Move
-            DC->>Move: advance/elevate
-            Move-->>DC: throw blocked/boundary
-            DC-->>DC: Continue (no scan write)
-        else normal movement
-            DC->>Move: rotate/advance/elevate
-            DC->>Lidar: scan(orientations)
-            DC->>SR: applyScanToMap
-            SR->>Map: set voxels
+        alt AlgorithmStatus::Finished
+            Note over DC: no further move/scan
+            DC-->>MC: Completed
+        else over-limit / Error
+            Note over DC: no move/scan
+            DC-->>MC: Error
+        else Continue
+            alt recoverable wall throw from Move
+                DC->>Move: advance/elevate
+                Move-->>DC: throw std::runtime_error
+                DC-->>DC: Continue
+            else normal movement
+                DC->>Move: rotate/advance/elevate
+            end
+            opt command has scan_orientation
+                DC->>Lidar: scan(orientations)
+                DC->>SR: applyScanToMap
+                SR->>Map: set voxels
+            end
+            DC-->>MC: Continue
         end
-        DC-->>MC: DroneStepResult
     end
 ```
 
-**Recoverable collision handling:** `MockMovement` detects wall/boundary collisions
-against the hidden map and throws (or returns a failure message containing `blocked` or
-`boundary`). `DroneControlImpl` catches these recoverable failures — both failed
-`MovementResult` and thrown `std::exception` — and returns
-`DroneStepStatus::Continue` without writing a scan for that step, allowing the algorithm
-to replan on the next iteration.
+**Recoverable collision handling:** `MockMovement::advance` / `elevate` detect
+wall/boundary collisions against the hidden map and **throw** `std::runtime_error`
+(they never return a failed `MovementResult` for that case). Pre-throw limit
+checks in `MockMovement` return `{false, message}` when a command exceeds
+`max_rotate` / `max_advance` / `max_elevate`. `DroneControlImpl` catches the
+exception and any failed `MovementResult` and returns
+`DroneStepStatus::Continue`. `applyScanIfRequested` still runs after that
+`Continue` when the command carried a `scan_orientation`.
 
 **Backstop at the run boundary:** Non-recoverable exceptions propagate out of
 `DroneControlImpl::step()` through `runMission()`. `SimulationRunImpl::run()` wraps
 the entire `runMission()` call in `try`/`catch`, logs the error, still saves the partial
-output map when possible, assigns score `-1`, and lets the run matrix continue.
+output map when possible, assigns score `kErrorScore` (`-1`), and lets the run matrix continue.
 
 ## Threading
 

@@ -11,25 +11,39 @@ sequenceDiagram
     participant Run as SimulationRunImpl
     participant MC as MissionControlImpl_207190406_209543255
     participant Score as compareMaps
-    participant Rep as writeComparativeReport
+    participant Yaml as writeSimulationOutputYaml
+    participant Rep as writeModeReport
 
     User->>Main: -comparative simulation=... mission_control_folder=... algorithm=...
     Main->>Cli: parseSimulationCliArgs
     Main->>Out: createOutputDir
     Main->>Comp: parseCompositionFile
+    Comp->>Comp: parseSimulationConfig
+    Comp->>Comp: parseMissionConfig
+    Comp->>Comp: parseDroneConfig
+    Comp->>Comp: parseLidarConfig
     Main->>Loader: loadAlgorithmSo + loadMissionControlsFromDirectory
     Loader->>Reg: REGISTER_* static ctors fill pending factories
-    Main->>Main: expandRunMatrix inside runPluginMatrix
-    loop each cell x each MissionControl binding
-        Main->>Dist: distributeWork
+    Loader->>Reg: takePending*Factory
+    Main->>Factory: ctor(algo factory, mc factory)
+    Main->>Main: PluginMatrixBinding filename + factory
+    Main->>Main: expandRunMatrix full cell list
+    Main->>Dist: distributeWork once over plugin x cell matrix
+    loop each flat index
         Dist->>Factory: create(...)
         Factory->>Run: wire maps, mocks, plugins
         Dist->>Run: run()
-        Run->>MC: runMission()
-        MC-->>Run: MissionRunResult
-        Run->>Run: output_map.save
-        Run->>Score: compareMaps(hidden, output, spawn)
-        Run-->>Dist: SimulationResult
+        Run->>Run: errorLogPathFromOutputMap
+        alt startup errors
+            Run-->>Dist: SimulationResult score kErrorScore skip mission
+        else
+            Run->>MC: runMission()
+            MC-->>Run: MissionRunResult
+            Run->>Run: output_map.save
+            Run->>Score: compareMaps(hidden, output, spawn)
+            Run-->>Dist: SimulationResult
+        end
     end
-    Main->>Rep: writeComparativeReport + per-plugin YAML
+    Main->>Yaml: writeSimulationOutputYaml per plugin
+    Main->>Rep: writeModeReport / writeComparativeReport
     Main->>Loader: destroy plugin objects then unloadAll / dlclose
