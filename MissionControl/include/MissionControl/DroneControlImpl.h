@@ -16,8 +16,8 @@ public:
     DroneControlImpl(const common::types::DroneConfigData& drone,
                      const common::types::MissionConfigData& mission,
                      const common::types::LidarConfigData& lidar,
-                     common::ILidar& lidar_sensor,
-                     common::IGPS& gps,
+                     const common::ILidar& lidar_sensor,
+                     const common::IGPS& gps,
                      common::IDroneMovement& movement,
                      common::IMutableMap3D& output_map,
                      common::IMappingAlgorithm& mapping_algorithm);
@@ -33,8 +33,8 @@ private:
     common::types::DroneConfigData drone_;
     common::types::MissionConfigData mission_;
     common::types::LidarConfigData lidar_;
-    common::ILidar& lidar_sensor_;
-    common::IGPS& gps_;
+    const common::ILidar& lidar_sensor_;
+    const common::IGPS& gps_;
     common::IDroneMovement& movement_;
     common::IMutableMap3D& output_map_;
     common::IMappingAlgorithm& mapping_algorithm_;

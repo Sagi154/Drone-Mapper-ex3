@@ -72,8 +72,8 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
 DroneControlImpl::DroneControlImpl(const common::types::DroneConfigData& drone,
                                    const common::types::MissionConfigData& mission,
                                    const common::types::LidarConfigData& lidar,
-                                   common::ILidar& lidar_sensor,
-                                   common::IGPS& gps,
+                                   const common::ILidar& lidar_sensor,
+                                   const common::IGPS& gps,
                                    common::IDroneMovement& movement,
                                    common::IMutableMap3D& output_map,
                                    common::IMappingAlgorithm& mapping_algorithm)
