@@ -63,7 +63,7 @@ std::vector<std::filesystem::path> PluginLoader::listSoFiles(
 }
 
 DlHandle PluginLoader::tryOpen(const std::filesystem::path& so_path, std::string& canonical_out,
-                               std::string& error_detail) {
+                               std::string& error_detail) const {
     canonical_out = canonicalize(so_path);
     if (loaded_canonical_paths_.contains(canonical_out)) {
         error_detail = "already loaded (reload forbidden)";
