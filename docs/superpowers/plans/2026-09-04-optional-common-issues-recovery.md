@@ -10,9 +10,11 @@
 
 **Tech Stack:** C++20, gtest, mp-units, Docker image `drone-mapper-ex3-dev`, CMake presets `default` (unit tests) and `build/opt` Release (cell timing).
 
-**Refresh (2026-09-06):** Algorithm VAR-01 Approach A landed (corner-anchored clearance + local search cap). Verification baseline is 2026-09-06, not 2026-09-03. Known Issues compacted to 13 rows (`SimulationImpl` exists; mapping bug is #13). CI9/CI2/CI10/CI3/CI8 themselves are still unimplemented — this plan’s MissionControl work is unchanged.
+**Refresh (2026-09-06 Approach A):** Algorithm VAR-01 Approach A landed (corner-anchored clearance + local search cap). Verification baseline is 2026-09-06, not 2026-09-03.
 
-**Specs:** `docs/error-handling-matrix.md` (staff PDF), `docs/known-issues.md` rows **7 (CI9), 1 (CI2), 8 (CI10), 2 (CI3), 6 (CI8)** as of 2026-09-06 (13 rows total; `ISimulation` is already implemented and **not** on the list; mapping-track bug is **#13** not old #14). `docs/known-issues-explained.md`.
+**Refresh (2026-09-06 AdvCpp):** Rubric plan Tasks 0–17 landed on `known-issues-fixes` (`c70762c`). Scores still **1832.747**; wall_sum **~29.9s**. Known Issues is **19 rows**: #1–#11 optional/bonus skips, #12 Unmapped, #13 band gaps, **#14–#19 deferred AdvCpp leftovers**. `DroneControlImpl` ctor is now `(drone, lidar, lidar_sensor, gps, movement, output_map, algorithm)` — **no `mission_` member**; lidar/GPS are `const&`. CI10 **must restore `MappingBounds`** (passed from `MissionControlImpl`, which still has `mission_`). Do not revert the AdvCpp refactors. Execute this plan from `known-issues-fixes` @ `c70762c` (or later), not from the older `fix-advcpp-rubric-findings` worktree tip if it lacks `c70762c`.
+
+**Specs:** `docs/error-handling-matrix.md` (staff PDF), `docs/known-issues.md` rows **7 (CI9), 1 (CI2), 8 (CI10), 2 (CI3), 6 (CI8)** (19 rows total). `ISimulation` is already implemented. Mapping-track bug is **#13**. Rubric leftovers **#14–#19** stay listed unless this plan implements them (it must not). `docs/known-issues-explained.md`.
 
 ## Global Constraints
 
@@ -22,11 +24,13 @@
 - Do **not** implement CI4 (NOOP retry), CI6 (empty LiDAR retry), CI7 (retry Movement `false`), CI11, CI12.
 - Do **not** add a wall-clock abort, alarm, or invented smaller `max_steps` in Algorithm or MissionControl (`verify-cell-runtime`).
 - Do **not** globally unmask cone gain, revive the Occupied-AABB execution gate, or start unrelated mapping-algorithm work. VAR-01 currently PASSes via corner-anchored `sphereIntersectsCellBox` (2026-09-06); a MissionControl change must not regress `HOST_ILLEGAL_MOVE_ATTEMPTS=0`.
-- Git: confirm toplevel is this project (never `C:\Users\sagi1` home). **Do not branch from stale `main` @ 2026-09-03** if Approach A lives on `known-issues-fixes` (or whichever branch has `2732aca` / `a254810`). Create `optional-common-issues-recovery` from that algorithm tip (merge/rebase onto updated `origin/main` only if that does not drop the 2026-09-06 landing). Conventional Commits. **No commit without explicit human approval**. Never `--no-verify`, never push `main`.
+- Do **not** “fix” Known Issues **#14–#19** in this plan (libm unwraps, `double` cone APIs, raw out-params, leaky `detail` headers, leftover e21/e10). Compact them with the optional rows; do not drop them as if implemented.
+- Git: confirm toplevel is this project (never `C:\Users\sagi1` home). Base: **`known-issues-fixes` @ `c70762c` or later** (Approach A + AdvCpp). Do not branch from skeleton `main` or from a `fix-advcpp-rubric-findings` worktree that is behind `c70762c`. Conventional Commits. **No commit without explicit human approval**. Never `--no-verify`, never push `main`.
 - Docker-only build/test on this Windows host. No `&&` / bash heredocs in PowerShell — one `docker run ... bash -lc '...'`.
-- After **each** of the four issue groups: unit tests, then `verify-cell-runtime` (full 24, scores vs **2026-09-06** baseline), then `verify-independent-component-variants` (VAR-01..03; VAR-04 only in the final gate).
-- Cell-runtime success: 24/24 COMPLETED, `mission_score >= 0`, scores match `.cursor/skills/verify-cell-runtime/SKILL.md` **Documented baseline (2026-09-06)** / `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (score_sum **1832.747**, wall_max **~3s**, **WARN=0**). Overall FAIL if any FAIL/HANG, any new ≥45s WARN, or score drift. Do not treat old `large_out` short ~46s WARNs as expected.
-- Out of scope: Known Issues excel export, zip packaging, lazy `.so` load. `ISimulation` / `SimulationImpl` is **already done** — do not re-list it as remaining work.
+- After **each** of the four issue groups: unit tests, then `verify-cell-runtime` (full 24, scores vs **2026-09-06** baseline @ `c70762c`), then `verify-independent-component-variants` (VAR-01..03; VAR-04 only in the final gate).
+- Cell-runtime success: 24/24 COMPLETED, `mission_score >= 0`, scores match `.cursor/skills/verify-cell-runtime/SKILL.md` **Documented baseline (2026-09-06)** / `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (score_sum **1832.747**, wall_sum **~29.9s**, wall_max **~3s**, **WARN=0**). Overall FAIL if any FAIL/HANG, any new ≥45s WARN, or score drift. Do not treat old `large_out` short ~46s WARNs as expected.
+- Out of scope: Known Issues excel export, zip packaging, lazy `.so` load. `ISimulation` / `SimulationImpl` is **already done**. AdvCpp leftover rows 14–19 stay documented.
+- **`DroneControlImpl` ctor (current):** `(drone, lidar, lidar_sensor, gps, movement, output_map, algorithm)`. `lidar_sensor_` / `gps_` are `const&`. There is **no** `mission_` field. Every test snippet below that still inserts `defaultMission()` as the second ctor argument is **wrong** — copy the 7-argument form from `MissionControl/tests/test_drone_control.cpp`. CI10 adds a trailing `common::types::MappingBounds mission_bounds` (default `{}` = unset / skip clamp). `MissionControlImpl` already has `mission_` and must pass `dependencies.mission_config.mission_bounds` into that new argument.
 
 ## File map
 
@@ -35,9 +39,10 @@
 - Modify: `MissionControl/src/MissionControlImpl.cpp` — call `runMissionSteps`; keep ctor/wiring.
 - Modify: `MissionControl/CMakeLists.txt` — no new TU required if `runMissionSteps` stays in `MissionControlImpl.cpp`.
 - Modify: `MissionControl/tests/test_mission_control.cpp` — FakeDroneControl + CI9 tests; later CI3 throw-through-MC.
-- Modify: `MissionControl/include/MissionControl/DroneControlImpl.h` — `pending_movements_` only in the CI8 task.
+- Modify: `MissionControl/include/MissionControl/DroneControlImpl.h` — `pending_movements_` only in the CI8 task; **CI10 also adds `MappingBounds mission_bounds_`** (ctor argument; do not restore the whole unused `MissionConfigData` member).
 - Modify: `MissionControl/src/DroneControlImpl.cpp` — helpers + CI2/CI10/CI3/CI8.
-- Modify: `MissionControl/tests/test_drone_control.cpp` — AABB `FakeMap3D`, recorded advance distance, new tests.
+- Modify: `MissionControl/src/MissionControlImpl.cpp` — `runMissionSteps`; pass `mission_.mission_bounds` into `DroneControlImpl`.
+- Modify: `MissionControl/tests/test_drone_control.cpp` — AABB `FakeMap3D`, recorded advance distance, new tests; 7-arg ctor + optional bounds.
 - Modify docs as each issue lands: `docs/known-issues.md` (delete row, compact `#`), `docs/known-issues-explained.md`, `docs/error-handling-matrix.md`, `docs/HLD.md` (e14/e15), `docs/submission-junk-audit.md`, `docs/assignment-compliance-pickup.md`.
 - Do **not** edit `AGENTS.md` as part of Known Issues updates.
 - Regenerate `HLD.pdf` once at the end of CI8 docs (`scripts/render_hld_pdf.sh`), not after every slice.
@@ -441,12 +446,16 @@ Do not add unrelated files. If a hook rejects, fix and make a **new** commit —
 ### Task 5: CI2 + CI10 — ignore world-OOB; clamp to mission bounds
 
 **Files:**
+- Modify: `MissionControl/include/MissionControl/DroneControlImpl.h`
 - Modify: `MissionControl/src/DroneControlImpl.cpp`
+- Modify: `MissionControl/src/MissionControlImpl.cpp` — pass `mission_.mission_bounds`
 - Modify: `MissionControl/tests/test_drone_control.cpp`
 
 **Interfaces:**
-- Consumes: `output_map_.isInBounds`, `mission_.mission_bounds`, `gps_.position()` / `heading()`, `drone_` limits already used by `movementWithinLimits`.
-- Produces: anonymous-namespace helpers `predictedDestination`, `isUnsetMissionBounds`, `isWithinMappingBounds`, `clampMovementToMissionBounds` in `DroneControlImpl.cpp`.
+- Consumes: `output_map_.isInBounds`, **`mission_bounds_`** (new member; **not** the removed `mission_`), `gps_.position()` / `heading()`, `drone_` limits already used by `movementWithinLimits`.
+- Produces: anonymous-namespace helpers `predictedDestination`, `isUnsetMissionBounds`, `isWithinMappingBounds`, `clampMovementToMissionBounds` in `DroneControlImpl.cpp`. Ctor gains `common::types::MappingBounds mission_bounds = {}`.
+
+**CI10 wiring:** `MissionControlImpl` still has `mission_`. Pass `dependencies.mission_config.mission_bounds` (or `mission_.mission_bounds`) into `DroneControlImpl`. Do **not** store the full `MissionConfigData` again (AdvCpp dropped it as unused). Empty/all-zero bounds keep CI10 off, matching `defaultMission()` tests.
 
 **Policy (lock this):** Hover/Rotate never translate — skip both checks. For Advance/Elevate: (1) if mission bounds are **not** all-zero, clamp the command so the predicted **center** stays inside `mission_bounds` (inclusive AABB). Zero remaining distance → do not call Movement (same as ignore). (2) Then if `!output_map_.isInBounds(predictedDestination(...))`, ignore — do not call Movement. Clamp first so a move that can be shortened to stay in both AABBs is shortened; ignore only if still world-OOB (mission AABB larger than the map). Do **not** use `sphereHitsOccupiedOrOutOfBounds` here — Occupied is mandatory CI5, not CI2. Center-only, no radius inset.
 
@@ -505,7 +514,7 @@ TEST(DroneControl, WorldOutOfBoundsAdvanceIsIgnored) {
     };
 
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), defaultMission(), defaultLidar(), fixture.lidar, fixture.gps,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm,
     };
 
@@ -531,7 +540,7 @@ TEST(DroneControl, InBoundsAdvanceStillReachesMovement) {
         }},
     };
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), defaultMission(), defaultLidar(), fixture.lidar, fixture.gps,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm,
     };
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
@@ -560,8 +569,8 @@ TEST(DroneControl, MissionBoundsAdvanceIsClamped) {
         }},
     };
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), mission, defaultLidar(), fixture.lidar, fixture.gps,
-        fixture.movement, fixture.output_map, algorithm,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
     };
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
     EXPECT_EQ(fixture.movement.advance_count_, 1);
@@ -590,8 +599,8 @@ TEST(DroneControl, MissionLargerThanMapStillIgnoresWorldOob) {
         }},
     };
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), mission, defaultLidar(), fixture.lidar, fixture.gps,
-        fixture.movement, fixture.output_map, algorithm,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
     };
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
     EXPECT_EQ(fixture.movement.advance_count_, 0);
@@ -620,8 +629,8 @@ TEST(DroneControl, ElevateIsClampedToMissionHeight) {
     };
     // Extend FakeMovement to record last_elevate_ the same way as last_advance_.
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), mission, defaultLidar(), fixture.lidar, fixture.gps,
-        fixture.movement, fixture.output_map, algorithm,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
     };
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
     EXPECT_DOUBLE_EQ(fixture.movement.last_elevate_.numerical_value_in(cm), 10.0);
@@ -763,8 +772,8 @@ In `applyMovement`, after `movementWithinLimits` and **before** `executeMovement
 common::types::MovementCommand move = *command.movement;
 const Position3D here = gps_.position();
 const common::Orientation heading = gps_.heading();
-if (!isUnsetMissionBounds(mission_.mission_bounds)) {
-    move = clampMovementToMissionBounds(move, here, heading, mission_.mission_bounds);
+if (!isUnsetMissionBounds(mission_bounds_)) {
+    move = clampMovementToMissionBounds(move, here, heading, mission_bounds_);
 }
 if (isZeroLengthMove(move)) {
     return {common::types::DroneStepStatus::Continue, {}};
@@ -865,7 +874,7 @@ TEST(DroneControl, InvalidCommandRetriesThenExecutesValid) {
         },
     };
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), defaultMission(), defaultLidar(), fixture.lidar, fixture.gps,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm,
     };
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
@@ -890,7 +899,7 @@ TEST(DroneControl, InvalidCommandThrowsAfterMaxRetries) {
         },
     };
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), defaultMission(), defaultLidar(), fixture.lidar, fixture.gps,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm,
     };
     EXPECT_THROW(
@@ -1016,7 +1025,7 @@ TEST(DroneControl, OversizeAdvanceSplitsAcrossStepsWithoutExtraNextStep) {
         }},
     };
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), defaultMission(), defaultLidar(), fixture.lidar, fixture.gps,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm,
     };
     // max_advance is 20 cm → fragments 20, 20, 10
@@ -1057,7 +1066,7 @@ TEST(DroneControl, OversizeRotateSplits) {
     };
     // FakeMovement::rotate must ++rotate_count_ and last_angle_
     mission_control_207190406_209543255::DroneControlImpl control{
-        defaultDrone(), defaultMission(), defaultLidar(), fixture.lidar, fixture.gps,
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
         fixture.movement, fixture.output_map, algorithm,
     };
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
@@ -1174,7 +1183,7 @@ Quantity subtraction must compile under `-Werror`. If `sign * drone.max_elevate`
 
 ### Task 14: CI8 docs + HLD.pdf
 
-- [ ] **Step 1:** Delete the CI8 Known Issues row; compact `#`. Remaining KI rows should be skipped optionals (CI4, CI6, CI7, CI11, CI12), lazy `.so` (#11), Unmapped-passable (#12), mapping-track band gaps (#13). **Not** `ISimulation` (already implemented).
+- [ ] **Step 1:** Delete the CI8 Known Issues row; compact `#`. Remaining KI rows should be skipped optionals (CI4, CI6, CI7, CI11, CI12), lazy `.so` (#11), Unmapped-passable (#12), mapping-track band gaps (#13), **and AdvCpp leftovers #14–#19**. **Not** `ISimulation` (already implemented). Do not delete #14–#19.
 - [ ] **Step 2:** Explained doc: CI8 implemented via `pending_movements_`; one `nextStep` per original oversize command; fragment steps skip `nextStep`. Note that this is an intentional exception to “one `nextStep` per `step()`” and only runs when the algorithm exceeded drone max.
 - [ ] **Step 3:** Matrix implemented list + `bonus.txt` file:line for `splitWithinLimits` / `pending_movements_`.
 - [ ] **Step 4:** HLD: replace “Each step invokes `nextStep` once” with: each step invokes `nextStep` once **unless** draining a split-oversize queue. Update mermaid with an `alt pending fragment` (no `nextStep`).

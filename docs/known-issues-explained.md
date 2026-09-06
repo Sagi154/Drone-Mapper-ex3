@@ -48,7 +48,7 @@ recovery does not mark them as forgotten bugs. All are **Low** except #6
 | **5 (CI7)** | Movement returns `false` (not a wall throw): retry N, then throw | Any `success==false` becomes Continue (no string match, no Error). No N-retry-then-throw. Distinct from mandatory CI5 (the throw path) |
 | **6 (CI8)** | Oversize Advance/Elevate/Rotate: **split** into several legal steps | Rejected immediately as Error (`movementWithinLimits`) |
 | **7 (CI9)** | Step `Error`: log and **keep** the `max_steps` loop | Log `DRONE_STEP_FAILED` and **stop** the mission |
-| **8 (CI10)** | Move that would leave **mission** bounds: clamp/shorten it | Not amended. Different from #1 (world OOB ignore vs mission-bounds clamp) |
+| **8 (CI10)** | Move that would leave **mission** bounds: clamp/shorten it | Not amended. `DroneControlImpl` also dropped unused `mission_` (AdvCpp e08), so bounds are not in the controller. Different from #1 (world OOB ignore vs mission-bounds clamp) |
 | **9 (CI11)** | GPS reports OOB: compare to internal pose; ignore or throw | No compare/ignore/throw path |
 | **10 (CI12)** | After a successful move, impossible GPS: re-read N times, then Error | No GPS retry loop |
 
