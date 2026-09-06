@@ -274,14 +274,14 @@ TEST(MissionControl, VerboseOffWritesNoExtraFile) {
     std::filesystem::remove(output_file, ec);
 }
 
-TEST(MissionControl, FailedOversizeStepLogsAndContinuesUntilFinished) {
+TEST(MissionControl, OversizeAdvanceCompletesWithoutErrors) {
     FakeMap3D stand_in{makeMapConfig()};
     FakeMap3D output{makeMapConfig()};
     FakeGPS gps;
     FakeLidar lidar{defaultLidar()};
     FakeMovement movement;
 
-    const auto mission = makeMission(5);
+    const auto mission = makeMission(10);
     const auto drone = defaultDrone();
     const auto lidar_cfg = defaultLidar();
     ScriptedAlgorithm algorithm{
@@ -290,14 +290,14 @@ TEST(MissionControl, FailedOversizeStepLogsAndContinuesUntilFinished) {
             .movement =
                 common::types::MovementCommand{
                     .type = common::types::MovementCommandType::Advance,
-                    .distance = 500.0 * cm,
+                    .distance = 50.0 * cm,
                 },
             .status = common::types::AlgorithmStatus::Working,
         }},
     };
 
     const auto output_file =
-        std::filesystem::temp_directory_path() / "mc_failed_step_output.npy";
+        std::filesystem::temp_directory_path() / "mc_oversize_split_output.npy";
     mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
         common::MissionControlDependencies{
             mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
@@ -305,10 +305,7 @@ TEST(MissionControl, FailedOversizeStepLogsAndContinuesUntilFinished) {
 
     const auto result = control.runMission();
     EXPECT_EQ(result.status, common::types::MissionRunStatus::Completed);
-    EXPECT_EQ(result.steps, 2U);
-    ASSERT_FALSE(result.errors.empty());
-    EXPECT_EQ(result.errors.front().code, "DRONE_STEP_FAILED");
-    EXPECT_EQ(result.errors.front().message, "Drone step failed.");
+    EXPECT_TRUE(result.errors.empty());
 
     std::error_code ec;
     std::filesystem::remove(output_file, ec);

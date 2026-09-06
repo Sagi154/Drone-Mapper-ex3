@@ -90,7 +90,9 @@ private:
 class FakeMovement final : public common::IDroneMovement {
 public:
     common::types::MovementResult rotate(common::types::RotationDirection /*direction*/,
-                                         common::HorizontalAngle /*angle*/) override {
+                                         common::HorizontalAngle angle) override {
+        ++rotate_count_;
+        last_angle_ = angle;
         return {true, {}};
     }
 
@@ -114,8 +116,10 @@ public:
     bool throw_on_advance_ = false;
     bool advance_ok_ = true;
     int advance_count_ = 0;
+    int rotate_count_ = 0;
     PhysicalLength last_advance_{};
     PhysicalLength last_elevate_{};
+    common::HorizontalAngle last_angle_{};
     std::string advance_fail_message_ = "Movement failed.";
     std::string advance_throw_message_ =
         "advance: destination blocked by obstacle or map boundary";
@@ -238,7 +242,7 @@ TEST(DroneControl, ReturnsCompletedWhenAlgorithmFinishes) {
     EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Completed);
 }
 
-TEST(DroneControl, ReturnsErrorWhenMovementExceedsDroneLimits) {
+TEST(DroneControl, OversizeAdvanceNoLongerErrorsOnFirstStep) {
     Fixture fixture;
     const auto mission = defaultMission();
     const auto lidar_cfg = defaultLidar();
@@ -266,8 +270,76 @@ TEST(DroneControl, ReturnsErrorWhenMovementExceedsDroneLimits) {
     };
 
     const auto result = control.step();
-    EXPECT_EQ(result.status, common::types::DroneStepStatus::Error);
-    EXPECT_NE(result.message.find("limits"), std::string::npos);
+    EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.advance_count_, 1);
+    EXPECT_DOUBLE_EQ(fixture.movement.last_advance_.numerical_value_in(cm), 20.0);
+}
+
+TEST(DroneControl, OversizeAdvanceSplitsAcrossStepsWithoutExtraNextStep) {
+    Fixture fixture;
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            defaultMission(), defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 50.0 * cm,
+                },
+            .scan_orientation =
+                Orientation{0.0 * horizontal_angle[deg], 0.0 * altitude_angle[deg]},
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm,
+    };
+    // max_advance is 20 cm → fragments 20, 20, 10
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(algorithm.call_index_, 1U);
+    EXPECT_EQ(fixture.movement.advance_count_, 1);
+    EXPECT_DOUBLE_EQ(fixture.movement.last_advance_.numerical_value_in(cm), 20.0);
+    EXPECT_EQ(fixture.lidar.scan_count_, 1);
+    EXPECT_EQ(control.state().step_index, 1U);
+
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(algorithm.call_index_, 1U);
+    EXPECT_EQ(fixture.movement.advance_count_, 2);
+    EXPECT_EQ(fixture.lidar.scan_count_, 1);
+    EXPECT_EQ(control.state().step_index, 2U);
+
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(algorithm.call_index_, 1U);
+    EXPECT_EQ(fixture.movement.advance_count_, 3);
+    EXPECT_DOUBLE_EQ(fixture.movement.last_advance_.numerical_value_in(cm), 10.0);
+    EXPECT_EQ(control.state().step_index, 3U);
+}
+
+TEST(DroneControl, OversizeRotateSplits) {
+    Fixture fixture;
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            defaultMission(), defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Rotate,
+                    .rotation = common::types::RotationDirection::Left,
+                    .angle = 180.0 * horizontal_angle[deg],
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+    // FakeMovement::rotate must ++rotate_count_ and last_angle_
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm,
+    };
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.rotate_count_, 2);
+    EXPECT_EQ(algorithm.call_index_, 1U);
 }
 
 TEST(DroneControl, InvalidCommandRetriesThenExecutesValid) {
@@ -343,9 +415,9 @@ TEST(DroneControl, OversizeIsNotInvalidRetry) {
         fixture.movement, fixture.output_map, algorithm,
     };
     const auto result = control.step();
-    EXPECT_EQ(result.status, common::types::DroneStepStatus::Error);
-    EXPECT_NE(result.message.find("limits"), std::string::npos);
+    EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
     EXPECT_EQ(algorithm.call_index_, 1U);
+    EXPECT_EQ(fixture.movement.advance_count_, 1);
 }
 
 TEST(DroneControl, CollisionBlockedThrowContinues) {

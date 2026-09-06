@@ -2,6 +2,8 @@
 
 #include <MissionControl/IDroneControl.h>
 
+#include <deque>
+
 namespace common {
 class ILidar;
 class IGPS;
@@ -43,6 +45,7 @@ private:
     common::types::LidarScanResult latest_scan_{};
     bool has_latest_scan_ = false;
     std::size_t step_index_ = 0;
+    std::deque<common::types::MovementCommand> pending_movements_{};
 };
 
 } // namespace mission_control_207190406_209543255

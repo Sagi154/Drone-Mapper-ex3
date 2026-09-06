@@ -13,9 +13,11 @@
 #include <mp-units/math.h>
 
 #include <cmath>
+#include <deque>
 #include <exception>
 #include <numbers>
 #include <stdexcept>
+#include <utility>
 
 namespace mission_control_207190406_209543255 {
 
@@ -66,6 +68,68 @@ constexpr int kMaxInvalidCommandRetries = 3;
         return mp_units::abs(command.distance) <= drone.max_elevate;
     }
     return false;
+}
+
+[[nodiscard]] std::deque<common::types::MovementCommand> splitWithinLimits(
+    const common::types::MovementCommand& command,
+    const common::types::DroneConfigData& drone) {
+    std::deque<common::types::MovementCommand> parts;
+    if (movementWithinLimits(command, drone)) {
+        parts.push_back(command);
+        return parts;
+    }
+    switch (command.type) {
+    case common::types::MovementCommandType::Advance: {
+        auto remaining = command.distance;
+        while (remaining > drone.max_advance) {
+            auto frag = command;
+            frag.distance = drone.max_advance;
+            parts.push_back(frag);
+            remaining = remaining - drone.max_advance;
+        }
+        if (remaining > 0.0 * common::cm) {
+            auto frag = command;
+            frag.distance = remaining;
+            parts.push_back(frag);
+        }
+        break;
+    }
+    case common::types::MovementCommandType::Elevate: {
+        const auto sign = command.distance < 0.0 * common::cm ? -1.0 : 1.0;
+        auto mag = mp_units::abs(command.distance);
+        while (mag > drone.max_elevate) {
+            auto frag = command;
+            frag.distance = PhysicalLength{sign * drone.max_elevate};
+            parts.push_back(frag);
+            mag = mag - drone.max_elevate;
+        }
+        if (mag > 0.0 * common::cm) {
+            auto frag = command;
+            frag.distance = PhysicalLength{sign * mag};
+            parts.push_back(frag);
+        }
+        break;
+    }
+    case common::types::MovementCommandType::Rotate: {
+        auto remaining = command.angle;
+        while (remaining > drone.max_rotate) {
+            auto frag = command;
+            frag.angle = drone.max_rotate;
+            parts.push_back(frag);
+            remaining = remaining - drone.max_rotate;
+        }
+        if (remaining > 0.0 * common::horizontal_angle[common::deg]) {
+            auto frag = command;
+            frag.angle = remaining;
+            parts.push_back(frag);
+        }
+        break;
+    }
+    case common::types::MovementCommandType::Hover:
+        parts.push_back(command);
+        break;
+    }
+    return parts;
 }
 
 [[nodiscard]] common::types::MovementResult executeMovement(
@@ -263,6 +327,19 @@ common::types::DroneStepResult DroneControlImpl::step() {
     const common::types::DroneState current_state = state();
     markDroneFootprintEmpty(output_map_, current_state.position, drone_.radius);
 
+    if (!pending_movements_.empty()) {
+        common::types::MappingStepCommand fragment{};
+        fragment.movement = pending_movements_.front();
+        pending_movements_.pop_front();
+        fragment.status = common::types::AlgorithmStatus::Working;
+        const auto move_result = applyMovement(fragment);
+        if (move_result.status == common::types::DroneStepStatus::Error) {
+            return move_result;
+        }
+        ++step_index_;
+        return {common::types::DroneStepStatus::Continue, {}};
+    }
+
     const common::types::LidarScanResult* latest_scan_ptr =
         has_latest_scan_ ? &latest_scan_ : nullptr;
     common::types::MappingStepCommand command{};
@@ -280,6 +357,16 @@ common::types::DroneStepResult DroneControlImpl::step() {
         if (invalid_tries >= kMaxInvalidCommandRetries) {
             throw std::runtime_error("Invalid movement command after retries.");
         }
+    }
+
+    if (command.movement.has_value() && !movementWithinLimits(*command.movement, drone_)) {
+        auto parts = splitWithinLimits(*command.movement, drone_);
+        if (parts.empty()) {
+            return {common::types::DroneStepStatus::Continue, {}};
+        }
+        command.movement = parts.front();
+        parts.pop_front();
+        pending_movements_ = std::move(parts);
     }
 
     const auto move_result = applyMovement(command);
