@@ -61,7 +61,8 @@ MissionControlImpl_207190406_209543255::MissionControlImpl_207190406_209543255(
           dependencies.gps,
           dependencies.movement,
           dependencies.output_map,
-          dependencies.mapping_algorithm)) {}
+          dependencies.mapping_algorithm,
+          mission_.mission_bounds)) {}
 
 MissionControlImpl_207190406_209543255::~MissionControlImpl_207190406_209543255() = default;
 

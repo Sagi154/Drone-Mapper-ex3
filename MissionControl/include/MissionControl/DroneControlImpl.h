@@ -21,7 +21,8 @@ public:
                      const common::IGPS& gps,
                      common::IDroneMovement& movement,
                      common::IMutableMap3D& output_map,
-                     common::IMappingAlgorithm& mapping_algorithm);
+                     common::IMappingAlgorithm& mapping_algorithm,
+                     common::types::MappingBounds mission_bounds = {});
 
     [[nodiscard]] common::types::DroneStepResult step() override;
     [[nodiscard]] common::types::DroneState state() const override;
@@ -38,6 +39,7 @@ private:
     common::IDroneMovement& movement_;
     common::IMutableMap3D& output_map_;
     common::IMappingAlgorithm& mapping_algorithm_;
+    common::types::MappingBounds mission_bounds_{};
     common::types::LidarScanResult latest_scan_{};
     bool has_latest_scan_ = false;
     std::size_t step_index_ = 0;

@@ -36,7 +36,11 @@ public:
 
     [[nodiscard]] common::types::MapConfig getMapConfig() const override { return config_; }
 
-    [[nodiscard]] bool isInBounds(const Position3D& /*pos*/) const override { return in_bounds_; }
+    [[nodiscard]] bool isInBounds(const Position3D& pos) const override {
+        const auto& b = config_.boundaries;
+        return pos.x >= b.min_x && pos.x <= b.max_x && pos.y >= b.min_y &&
+               pos.y <= b.max_y && pos.z >= b.min_height && pos.z <= b.max_height;
+    }
 
     void set(const Position3D& /*pos*/, common::types::VoxelOccupancy value) override {
         occupancy_ = value;
@@ -45,14 +49,11 @@ public:
 
     void save(const std::filesystem::path& /*path*/) const override {}
 
-    void setInBounds(bool value) { in_bounds_ = value; }
-
     int set_count_ = 0;
 
 private:
     common::types::MapConfig config_;
     common::types::VoxelOccupancy occupancy_ = common::types::VoxelOccupancy::Unmapped;
-    bool in_bounds_ = true;
 };
 
 class FakeGPS final : public common::IGPS {
@@ -93,8 +94,9 @@ public:
         return {true, {}};
     }
 
-    common::types::MovementResult advance(PhysicalLength /*distance*/) override {
+    common::types::MovementResult advance(PhysicalLength distance) override {
         ++advance_count_;
+        last_advance_ = distance;
         if (throw_on_advance_) {
             throw std::runtime_error(advance_throw_message_);
         }
@@ -104,13 +106,16 @@ public:
         return {true, {}};
     }
 
-    common::types::MovementResult elevate(PhysicalLength /*distance*/) override {
+    common::types::MovementResult elevate(PhysicalLength distance) override {
+        last_elevate_ = distance;
         return {true, {}};
     }
 
     bool throw_on_advance_ = false;
     bool advance_ok_ = true;
     int advance_count_ = 0;
+    PhysicalLength last_advance_{};
+    PhysicalLength last_elevate_{};
     std::string advance_fail_message_ = "Movement failed.";
     std::string advance_throw_message_ =
         "advance: destination blocked by obstacle or map boundary";
@@ -546,4 +551,146 @@ TEST(DroneControl, AlwaysScanAlgorithmScansOncePerStep) {
     }
     EXPECT_EQ(fixture.lidar.scan_count_, 5);
     EXPECT_EQ(algorithm.call_index_, 5U);
+}
+
+TEST(DroneControl, WorldOutOfBoundsAdvanceIsIgnored) {
+    Fixture fixture;
+    fixture.gps.position_ = Position3D{
+        95.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    // heading default 0 => +X; dest 115 is outside map 0..100
+
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            defaultMission(), defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 20.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm,
+    };
+
+    const auto result = control.step();
+    EXPECT_EQ(result.status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.advance_count_, 0);
+}
+
+TEST(DroneControl, InBoundsAdvanceStillReachesMovement) {
+    Fixture fixture;
+    fixture.gps.position_ = Position3D{
+        50.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            defaultMission(), defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 10.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm,
+    };
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.advance_count_, 1);
+}
+
+TEST(DroneControl, MissionBoundsAdvanceIsClamped) {
+    Fixture fixture;
+    fixture.gps.position_ = Position3D{
+        70.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    auto mission = defaultMission();
+    mission.mission_bounds = {
+        0.0 * x_extent[cm], 80.0 * x_extent[cm], 0.0 * y_extent[cm], 100.0 * y_extent[cm],
+        0.0 * z_extent[cm], 100.0 * z_extent[cm],
+    };
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            mission, defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 20.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
+    };
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.advance_count_, 1);
+    EXPECT_DOUBLE_EQ(fixture.movement.last_advance_.numerical_value_in(cm), 10.0);
+}
+
+TEST(DroneControl, MissionLargerThanMapStillIgnoresWorldOob) {
+    Fixture fixture;
+    fixture.gps.position_ = Position3D{
+        95.0 * x_extent[cm], 50.0 * y_extent[cm], 50.0 * z_extent[cm]};
+    auto mission = defaultMission();
+    mission.mission_bounds = {
+        0.0 * x_extent[cm], 200.0 * x_extent[cm], 0.0 * y_extent[cm], 100.0 * y_extent[cm],
+        0.0 * z_extent[cm], 100.0 * z_extent[cm],
+    };
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            mission, defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 20.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
+    };
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_EQ(fixture.movement.advance_count_, 0);
+}
+
+TEST(DroneControl, ElevateIsClampedToMissionHeight) {
+    Fixture fixture;
+    fixture.gps.position_ = Position3D{
+        50.0 * x_extent[cm], 50.0 * y_extent[cm], 90.0 * z_extent[cm]};
+    auto mission = defaultMission();
+    mission.mission_bounds = {
+        0.0 * x_extent[cm], 100.0 * x_extent[cm], 0.0 * y_extent[cm], 100.0 * y_extent[cm],
+        0.0 * z_extent[cm], 100.0 * z_extent[cm],
+    };
+    ScriptedAlgorithm algorithm{
+        common::MappingAlgorithmDependencies{
+            mission, defaultLidar(), defaultDrone(), fixture.stand_in_map},
+        {common::types::MappingStepCommand{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Elevate,
+                    .distance = 20.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+    // Extend FakeMovement to record last_elevate_ the same way as last_advance_.
+    mission_control_207190406_209543255::DroneControlImpl control{
+        defaultDrone(), defaultLidar(), fixture.lidar, fixture.gps,
+        fixture.movement, fixture.output_map, algorithm, mission.mission_bounds,
+    };
+    EXPECT_EQ(control.step().status, common::types::DroneStepStatus::Continue);
+    EXPECT_DOUBLE_EQ(fixture.movement.last_elevate_.numerical_value_in(cm), 10.0);
 }
