@@ -4,6 +4,7 @@
 #include "MappingAlgorithmFrontier.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <queue>
@@ -43,10 +44,10 @@ struct Offset {
     int dz;
 };
 
-constexpr Offset kOffsets[6] = {
+constexpr std::array<Offset, 6> kOffsets = {{
     {1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
     {0, -1, 0}, {0, 0, 1},  {0, 0, -1},
-};
+}};
 
 [[nodiscard]] double gridStepCm(const types::MapConfig& config) {
     return config.resolution.force_numerical_value_in(cm);

@@ -39,10 +39,10 @@ struct Offset {
     int dz;
 };
 
-constexpr Offset kFaceOffsets[6] = {
+constexpr std::array<Offset, 6> kFaceOffsets = {{
     {1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
     {0, -1, 0}, {0, 0, 1},  {0, 0, -1},
-};
+}};
 
 struct ScoredDirection {
     std::size_t gain = 0;

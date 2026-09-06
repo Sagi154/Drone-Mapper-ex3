@@ -7,6 +7,7 @@
 #include <user_common_207190406_209543255/LidarConstants.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 
 namespace algorithm_207190406_209543255::detail {
@@ -66,8 +67,8 @@ constexpr std::size_t kMaxSweepReserve = 8;
     const double x = start.x.force_numerical_value_in(cm);
     const double y = start.y.force_numerical_value_in(cm);
     const double z = start.z.force_numerical_value_in(cm);
-    const double dx[4] = {step_cm, -step_cm, 0.0, 0.0};
-    const double dy[4] = {0.0, 0.0, step_cm, -step_cm};
+    const std::array<double, 4> dx = {step_cm, -step_cm, 0.0, 0.0};
+    const std::array<double, 4> dy = {0.0, 0.0, step_cm, -step_cm};
     for (int i = 0; i < 4; ++i) {
         const Position3D nb{(x + dx[i]) * x_extent[cm], (y + dy[i]) * y_extent[cm],
                             z * z_extent[cm]};

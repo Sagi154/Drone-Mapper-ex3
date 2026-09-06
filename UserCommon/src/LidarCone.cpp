@@ -1,6 +1,7 @@
 #include <user_common_207190406_209543255/LidarCone.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numbers>
 
@@ -48,7 +49,7 @@ std::vector<Orientation> fibonacciSphereOrientations(std::size_t count) {
     std::vector<Orientation> out;
     // Always include the six axis-aligned directions first so thin corridors and
     // legacy scan-pass expectations still get ±X/±Y/±Z coverage.
-    const Orientation axes[] = {
+    constexpr std::array<Orientation, 6> axes = {
         Orientation{0.0 * deg, 0.0 * deg},
         Orientation{180.0 * deg, 0.0 * deg},
         Orientation{90.0 * deg, 0.0 * deg},
