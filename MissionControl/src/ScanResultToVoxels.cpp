@@ -13,21 +13,26 @@ using common::cm;
 using user_common_207190406_209543255::kLidarTraceResolutionFactor;
 namespace bm = user_common_207190406_209543255::beam_math;
 
+constexpr int kOccupiedRank = 3;
+constexpr int kEmptyRank = 2;
+constexpr int kPotentiallyOccupiedRank = 1;
+constexpr int kUnmappedOrOutOfBoundsRank = 0;
+
 // Evidence strength for conflicting writes to the same voxel.
 [[nodiscard]] int occupancyPriority(common::types::VoxelOccupancy occupancy) {
     switch (occupancy) {
     case common::types::VoxelOccupancy::Occupied:
-        return 3;
+        return kOccupiedRank;
     case common::types::VoxelOccupancy::Empty:
-        return 2;
+        return kEmptyRank;
     case common::types::VoxelOccupancy::PotentiallyOccupied:
-        return 1;
+        return kPotentiallyOccupiedRank;
     case common::types::VoxelOccupancy::Unmapped:
     case common::types::VoxelOccupancy::OutOfBounds:
-        return 0;
+        return kUnmappedOrOutOfBoundsRank;
     }
 
-    return 0;
+    return kUnmappedOrOutOfBoundsRank;
 }
 
 void setIfStronger(common::IMutableMap3D& output_map,
@@ -75,40 +80,36 @@ void markBeamSegment(common::IMutableMap3D& output_map,
     }
 }
 
-// Grid-centre extra so voxel centres along each beam are marked even when the
+// Grid-centre extra so voxel centres along one beam are marked even when the
 // sub-voxel trace does not land exactly on a centre.
 void supplementGridAlignedFusion(common::IMutableMap3D& map,
                                  const Position3D& scan_origin,
-                                 const Orientation& drone_heading,
-                                 const common::types::LidarScanResult& scan,
-                                 PhysicalLength fusion_max) {
-    const PhysicalLength step = map.getMapConfig().resolution;
+                                 const Orientation& beam_orientation,
+                                 const common::types::LidarHit& hit,
+                                 PhysicalLength fusion_max,
+                                 PhysicalLength step) {
     if (step <= 0.0 * cm) {
         return;
     }
 
-    for (const common::types::LidarHit& hit : scan) {
-        if (bm::isZeroDistance(hit.distance)) {
-            continue;
-        }
+    if (bm::isZeroDistance(hit.distance)) {
+        return;
+    }
 
-        const Orientation beam_orientation = bm::absoluteBeamOrientation(drone_heading, hit.angle);
-
-        if (bm::isMissDistance(hit.distance)) {
-            for (PhysicalLength t = step; t <= fusion_max; t += step) {
-                setEmptyIfNotOccupied(map, bm::pointAlongBeam(scan_origin, beam_orientation, t));
-            }
-            continue;
-        }
-
-        if (hit.distance > fusion_max) {
-            continue;
-        }
-        for (PhysicalLength t = step; t < hit.distance; t += step) {
+    if (bm::isMissDistance(hit.distance)) {
+        for (PhysicalLength t = step; t <= fusion_max; t += step) {
             setEmptyIfNotOccupied(map, bm::pointAlongBeam(scan_origin, beam_orientation, t));
         }
-        setOccupied(map, bm::pointAlongBeam(scan_origin, beam_orientation, hit.distance));
+        return;
     }
+
+    if (hit.distance > fusion_max) {
+        return;
+    }
+    for (PhysicalLength t = step; t < hit.distance; t += step) {
+        setEmptyIfNotOccupied(map, bm::pointAlongBeam(scan_origin, beam_orientation, t));
+    }
+    setOccupied(map, bm::pointAlongBeam(scan_origin, beam_orientation, hit.distance));
 }
 
 } // namespace
@@ -127,6 +128,9 @@ void applyScanToMap(common::IMutableMap3D& output_map,
         return;
     }
 
+    const PhysicalLength fusion_step = output_map.getMapConfig().resolution;
+    const PhysicalLength fusion_max = lidar_config.z_max;
+
     for (const common::types::LidarHit& hit : scan) {
         const Orientation beam_orientation = bm::absoluteBeamOrientation(drone_heading, hit.angle);
 
@@ -138,10 +142,7 @@ void applyScanToMap(common::IMutableMap3D& output_map,
                             lidar_config.z_min,
                             step,
                             common::types::VoxelOccupancy::PotentiallyOccupied);
-            continue;
-        }
-
-        if (bm::isMissDistance(hit.distance)) {
+        } else if (bm::isMissDistance(hit.distance)) {
             markBeamSegment(output_map,
                             scan_origin,
                             beam_orientation,
@@ -149,10 +150,7 @@ void applyScanToMap(common::IMutableMap3D& output_map,
                             lidar_config.z_max,
                             step,
                             common::types::VoxelOccupancy::Empty);
-            continue;
-        }
-
-        if (hit.distance > 0.0 * cm) {
+        } else if (hit.distance > 0.0 * cm) {
             markBeamSegment(output_map,
                             scan_origin,
                             beam_orientation,
@@ -164,9 +162,14 @@ void applyScanToMap(common::IMutableMap3D& output_map,
                           bm::pointAlongBeam(scan_origin, beam_orientation, hit.distance),
                           common::types::VoxelOccupancy::Occupied);
         }
-    }
 
-    supplementGridAlignedFusion(output_map, scan_origin, drone_heading, scan, lidar_config.z_max);
+        supplementGridAlignedFusion(output_map,
+                                    scan_origin,
+                                    beam_orientation,
+                                    hit,
+                                    fusion_max,
+                                    fusion_step);
+    }
 }
 
 } // namespace mission_control_207190406_209543255
