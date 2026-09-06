@@ -1,6 +1,7 @@
 #include <MissionControl/MissionControlImpl.h>
 
 #include <MissionControl/DroneControlImpl.h>
+#include <MissionControl/MissionRunLoop.h>
 
 #include <fstream>
 #include <utility>
@@ -64,40 +65,42 @@ MissionControlImpl_207190406_209543255::MissionControlImpl_207190406_209543255(
 
 MissionControlImpl_207190406_209543255::~MissionControlImpl_207190406_209543255() = default;
 
-common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMission() {
+common::types::MissionRunResult runMissionSteps(
+    mission_control::IDroneControl& drone_control, std::size_t max_steps,
+    const std::filesystem::path& output_map_file, bool verbose) {
     std::size_t steps = 0;
     common::types::MissionRunStatus status = common::types::MissionRunStatus::MaxSteps;
     std::vector<common::types::ErrorRef> errors;
 
-    while (steps < mission_.max_steps) {
-        const common::types::DroneStepResult step_result = drone_control_->step();
+    while (steps < max_steps) {
+        const common::types::DroneStepResult step_result = drone_control.step();
         ++steps;
 
         if (step_result.status == common::types::DroneStepStatus::Error) {
-            status = common::types::MissionRunStatus::Error;
-            errors.push_back(common::types::ErrorRef{"DRONE_STEP_FAILED", "Drone step failed."});
-            auto result = finalizeMission(status, steps, std::move(errors));
-            if (verbose_ && !output_map_file_.empty()) {
-                writeVerboseLog(output_map_file_, result.status, result.steps);
-            }
-            return result;
+            errors.push_back(
+                common::types::ErrorRef{"DRONE_STEP_FAILED", "Drone step failed."});
+            continue;
         }
 
         if (step_result.status == common::types::DroneStepStatus::Completed) {
             status = common::types::MissionRunStatus::Completed;
             auto result = finalizeMission(status, steps, std::move(errors));
-            if (verbose_ && !output_map_file_.empty()) {
-                writeVerboseLog(output_map_file_, result.status, result.steps);
+            if (verbose && !output_map_file.empty()) {
+                writeVerboseLog(output_map_file, result.status, result.steps);
             }
             return result;
         }
     }
 
     auto result = finalizeMission(status, steps, std::move(errors));
-    if (verbose_ && !output_map_file_.empty()) {
-        writeVerboseLog(output_map_file_, result.status, result.steps);
+    if (verbose && !output_map_file.empty()) {
+        writeVerboseLog(output_map_file, result.status, result.steps);
     }
     return result;
+}
+
+common::types::MissionRunResult MissionControlImpl_207190406_209543255::runMission() {
+    return runMissionSteps(*drone_control_, mission_.max_steps, output_map_file_, verbose_);
 }
 
 } // namespace mission_control_207190406_209543255
