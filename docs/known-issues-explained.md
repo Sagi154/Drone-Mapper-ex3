@@ -76,42 +76,32 @@ Reproducibility is **Rare** because it only shows up when the planned path goes
 through Unmapped that turns out to be a wall. Reason here is “lack of
 knowledge” (of the right policy), not lack of time.
 
-A 2026-09 attempt to pass independence VAR-01 (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`)
-with an Occupied-AABB execution gate plus shrink / floor-support / attic-first
-was reverted: it zeroed illegal moves and unstuck `house_full`, then cliffed
-`large_out` scores and put one cell over 60 s. The tree is parked at
-`backup/var01-2026-09-05` (tag `backup-var01-2026-09-05`). Write-up:
-`docs/archive/2026-09-05-var01-attempt.md`.
+A 2026-09 Occupied-AABB execution gate plus shrink / floor-support / attic-first
+was reverted (`backup/var01-2026-09-05`; `docs/archive/2026-09-05-var01-attempt.md`).
+Independence VAR-01 (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`) now PASSes via **corner-anchored**
+`sphereIntersectsCellBox` plus a 3000-node local replan cap (2026-09-06, Approach A).
+Do not revive the Occupied-AABB gate. Write-up:
+`docs/benchmarks/2026-09-06-var01-approach-a.md`.
 
 ---
 
-## The actual bug (#13)
+## The remaining mapping-track gaps (#13)
 
-**`large_out` short-lidar scores got worse after plan-batching.** Medium
-severity, always reproducible on Release serial timing of the `large_out`
-group.
+**Some cells still sit below the ex2 score bands** after the 2026-09-06 landing.
+This is no longer the 2026-09-03 `large_out` short-lidar cliff (44.56 / 32.00 at
+~46s WARN). Current serial Release baseline: score_sum **1832.7**, wall_max **3.0s**,
+`cells_ge_60s=0`. `large_out` shorts are **74.95 / 72.02**.
 
-What happened:
+Still short of the bands:
 
-- The mapper queues several “runner-up” plans and pops them later.
-- Those queued plans still assume the **old start pose**. After the drone has
-  moved, the plan is stale.
-- An observed-progress stall then fires, so missions **end early** (4100 /
-  2200 steps instead of ~10k).
-- Short-lidar cells are hit hard: small+short **44.56** (was 63.59),
-  large+short **32.00** (was 85.58).
-- Long-lidar held or improved (small+long 82.27, large+long 74.01).
-- Wall times for all four `large_out` cells stay ≤41s, so this is a **score**
-  problem, not a timeout.
+- `house_full` mean **25.86** (47.46 / 21.00 / 20.08 / 14.89) vs ex2 ~56–62.
+- `small_out` large+long **45.38**.
+- `small_room` large+short **67.65**.
 
-A fix that repath’d on every queue pop restored some large+short score
-(32→56) but wrecked small+long (82→34) and pushed small+short wall to 102s
-(grader-risk). That was reverted. Shipped behavior: popping a queued plan does
-**not** count as a low-rate replan, and there is no Dijkstra per pop.
-
-This is the only row that is a real remaining defect you might still want to
-fix for the mapping-algorithm track. The rest are documentation of skipped
-optional work and intentional design.
+Queued runner-up plans can still assume a stale start pose; the clearance +
+search-cap change mostly changed *which* frontier is picked and how expensive
+each replan is. Fixing remaining band gaps is mapping-track work, not
+`bonus.txt`.
 
 ---
 
@@ -123,6 +113,7 @@ optional work and intentional design.
   workaround that does not match the PDF (e.g. Continue on Movement `false` is
   not CI7).
 - **#12:** Unmapped (different design, not `bonus.txt`).
-- **#13:** “Short-lidar `large_out` (and small+short) still underperform
-  because batched plans go stale.” Fixing it helps the algorithm contest; it
-  is not an extra-credit line in `bonus.txt`.
+- **#13:** “`house_full` / `small_out` large+long / `small_room` large+short still
+  underperform vs ex2 bands.” Fixing it helps the algorithm contest; it
+  is not an extra-credit line in `bonus.txt`. The 2026-09-03 `large_out` short
+  cliff is no longer the measured baseline.

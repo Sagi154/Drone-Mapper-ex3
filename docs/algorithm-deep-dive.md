@@ -116,11 +116,13 @@ it, blacklists that cell, and forces a replan.
 ### 1.6 How a plan is made (`WavefrontPlanner::plan`)
 
 Given the map, drone pose, lidar/drone limits, remaining step budget, and the blocklist,
-`WavefrontPlanner::plan` ([`WavefrontPlanner.cpp:80-242`](../Algorithm/src/WavefrontPlanner.cpp)) does:
+`WavefrontPlanner::plan` ([`WavefrontPlanner.cpp:210-235`](../Algorithm/src/WavefrontPlanner.cpp)) does:
 
 **A. Explore what's reachable.** `MappingAlgorithmFrontier::exploreReachable` runs a
-bounded Dijkstra from the drone's cell, collecting every frontier cell it touches and
-BFS-clustering them into `FrontierCluster`s (§2.3). If the drone's own sphere is blocked
+bounded Dijkstra from the drone's cell. Ordinary replans cap expansions at
+`kLocalSearchExpansionCap` (3000) so stall-triggered replans on `large_out` stay
+milliseconds, not tens of seconds; if that local search finds no cluster at all,
+`plan()` retries **once** at `maxExpansionsForMap`. If the drone's own sphere is blocked
 (boxed in by a wall), planning skips straight to `findUnstickPath` — a one-step escape to
 the nearest passable face-neighbor.
 
@@ -285,34 +287,40 @@ relative to the map's offset and resolution (`quantizePosition`,
 `keyToPoint` converts back to world coordinates for movement commands.
 
 **Sphere passability — the core walkability test.** `isSpherePassable`
-([`MappingAlgorithmFrontier.cpp:116-172`](../Algorithm/src/MappingAlgorithmFrontier.cpp)) is not a simple "is this voxel occupied" check —
+([`MappingAlgorithmFrontier.cpp:115-172`](../Algorithm/src/MappingAlgorithmFrontier.cpp)) is not a simple "is this voxel occupied" check —
 it samples every grid cell whose box intersects the drone's collision sphere:
 
-[`MappingAlgorithmFrontier.cpp`](../Algorithm/src/MappingAlgorithmFrontier.cpp) (88–114)
+[`MappingAlgorithmFrontier.cpp`](../Algorithm/src/MappingAlgorithmFrontier.cpp) (85–113)
 
 ```cpp
-// True iff the axis-aligned voxel box centered at (dx,dy,dz)*step_cm with half-extent
-// step_cm/2 intersects the closed sphere of radius radius_cm at the origin. Using cell
-// centres for the distance gate (the old ox²+oy²+oz² > r² test) is a no-op when
-// radius_cm < step_cm: every non-zero offset is ≥ step_cm and is skipped. Nearest-point
-// in the box restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
-[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz,
-                                           double step_cm,
+// True iff neighbour voxel (dx,dy,dz) intersects the closed sphere of the given radius
+// centred at a lattice point. A lattice point is the LOW CORNER of its own voxel
+// (Map3DImpl indexes floor((pos - offset) / resolution), matched by skeleton_host's
+// HostMap3D), so neighbour d spans [d*step, (d+1)*step) relative to that point.
+[[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz, double step_cm,
                                            double radius_cm) {
-    if (dx == 0 && dy == 0 && dz == 0) {
-        return true;
-    }
-    const double half = step_cm * 0.5;
-    const double ox = static_cast<double>(dx) * step_cm;
     ...
+    const auto nearest1d = [step_cm](int d) {
+        const double lo = static_cast<double>(d) * step_cm;
+        const double hi = lo + step_cm;
+        ...
+    };
+    return (nx * nx + ny * ny + nz * nz) <= (radius_cm * radius_cm);
+}
 ```
 
-This box-nearest-point test (rather than a naive cell-*center* distance test) matters
-specifically when `radius_cm < step_cm` (e.g. a 7.5 cm drone on a 10 cm grid) — a
-center-distance test would never flag any non-zero offset as a collision, silently
-disabling footprint checking exactly when it's needed. Two tests exist specifically for
-this edge case (`FrontierRejectsOccupiedFaceNeighbourOnCm10Grid` /
-`FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall`, §3.2).
+Voxels are **corner-anchored**, not centered on the lattice point. A face neighbour
+on the “behind” side (any nonzero offset with all axes in `{-1,0}`) shares the
+corner and touches at distance 0; a neighbour a full step “ahead” (any axis `== +1`)
+only intersects once `radius >= step_cm`. That is the VAR-01 fix: the old
+centered-box model (`half = step/2` around the lattice point) treated a
+corner-sharing Occupied neighbour as 5 cm away on a 10 cm grid, so a 7.5 cm
+sphere grazed it while the planner thought it was clear. See
+[`docs/superpowers/specs/2026-09-05-var01-sphere-clearance-fix-design.md`](superpowers/specs/2026-09-05-var01-sphere-clearance-fix-design.md)
+§2.1 / §5.1. Tests: `FrontierRejectsOccupiedFaceNeighbourOnCm10Grid`,
+`FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall`,
+`FrontierRejectsStandingExactlyOnOccupiedFloor`,
+`FrontierAllowsFlyingOneStepAboveOccupiedFloor` (§3.2).
 
 Inside the loop, only `Occupied` blocks (`OutOfBounds` at the mission AABB boundary is
 tolerated when the *center* is in-bounds — this is the house-scenario spawn-on-max-height
@@ -329,9 +337,12 @@ each cell it:
    voxel as one cluster instead of six disconnected face cells — comment at
    [`MappingAlgorithmFrontier.cpp:507-509`](../Algorithm/src/MappingAlgorithmFrontier.cpp)).
 2. Pushes sphere-passable neighbors with cost `+1` (Empty) or `+4` (Unmapped).
-3. Caps total expansions at `max_expansions` (from `maxExpansionsForMap` — the mission's
-   full voxel volume) so a passability bug can never hang the mission (this closes the
-   ex2 "ALG28" unbounded-BFS bug referenced in [`docs/ex2-grading-handoff.md`](ex2-grading-handoff.md)).
+3. Caps total expansions at `max_expansions`. `maxExpansionsForMap` is the mission's
+   full voxel volume (ALG28 hang guard — [`docs/ex2-grading-handoff.md`](ex2-grading-handoff.md)).
+   `WavefrontPlanner::plan` does **not** pass that full volume on every replan: it uses
+   `kLocalSearchExpansionCap` (3000) first, and escalates **once** to `maxExpansionsForMap`
+   only if the local search found no frontier cluster
+   ([`WavefrontPlanner.cpp:221-235`](../Algorithm/src/WavefrontPlanner.cpp)).
 
 After the Dijkstra terminates, a second BFS glues face-adjacent frontier cells into
 `FrontierCluster`s. Each cluster's `keys`/`cell_count` is the **Empty surface only**
@@ -346,7 +357,7 @@ past a wall).
 
 ### 2.4 `WavefrontPlanner` — cluster ranking
 
-`plan()` ([`WavefrontPlanner.cpp:80-242`](../Algorithm/src/WavefrontPlanner.cpp)) walks through §1.6's four steps. Two details
+`plan()` ([`WavefrontPlanner.cpp:210-282`](../Algorithm/src/WavefrontPlanner.cpp)) walks through §1.6's four steps. Two details
 worth calling out beyond the summary:
 
 **Mission-shape classifiers drive score choice.** `rank_volume` is true only for open
@@ -488,8 +499,10 @@ Calls `detail::MappingAlgorithmFrontier` directly — bypasses the tick loop ent
 | `FrontierFindExplorePathMovesTowardUnknown` | Reachability from a corridor points toward the unknown end, not backward | same Dijkstra, sanity on cost ordering |
 | `FrontierDetectsUnmappedCellsInBounds` / `FrontierNoUnmappedWhenFullyMappedEmpty` | `hasAnyNotMappedInBounds` correctness | `countUnmappedInBounds` |
 | `FrontierPrefersEmptyOverUnmappedPath` | `findPathTo` chooses a longer **Empty** detour over a shorter **Unmapped** shortcut | `kEmptyTraversalCost`/`kUnmappedTraversalCost` weighting |
-| `FrontierRejectsOccupiedFaceNeighbourOnCm10Grid` | Occupied face-neighbor at nearest-box-distance 5 cm blocks a 7.5 cm-radius sphere on a 10 cm grid | `sphereIntersectsCellBox`'s nearest-point-in-box math (the fix described in §2.3) |
-| `FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall` | Same geometry, 4 cm radius → sphere doesn't reach it, still passable | same function, negative case |
+| `FrontierRejectsOccupiedFaceNeighbourOnCm10Grid` | Occupied face-neighbor that shares the lattice corner (distance 0) blocks a 7.5 cm-radius sphere on a 10 cm grid | `sphereIntersectsCellBox` corner-anchored nearest-point math (§2.3) |
+| `FrontierAllowsOccupiedFaceNeighbourWhenRadiusTooSmall` | Same geometry, 4 cm radius → sphere doesn't reach a +axis neighbour, still passable | same function, negative case |
+| `FrontierRejectsStandingExactlyOnOccupiedFloor` | Lattice point on an Occupied floor voxel is not passable | same corner-anchored box (floor voxel is the cell the point sits on) |
+| `FrontierAllowsFlyingOneStepAboveOccupiedFloor` | One step above that floor is passable for the small radius | same function, +Z neighbour does not share the corner |
 | `FrontierHasUnmappedFaceNeighbourOnCm10Grid` | `hasNotMappedInSphere` uses the same box-distance geometry as passability | `sphereContainsNotMapped` sharing the geometry helper |
 | `ExploreReachableFindsFrontierAdjacentCandidates` | Every returned cluster has `cell_count > 0` and `approach_cost > 0` | cluster construction in `exploreReachable`'s second BFS pass |
 | `ExploreReachableRespectsExpansionCap` / `ExploreReachableTerminatesWithoutOccupancyBound` | A tiny/huge cap actually stops the Dijkstra and sets `truncated=true` | the `expansions > max_expansions` check — this is the ALG28 unbounded-BFS regression guard |
@@ -528,6 +541,7 @@ Calls `detail::MappingAlgorithmFrontier` directly — bypasses the tick loop ent
 | `AlternatesExcludeBestAndAreSortedByRate` | `alternates` never contains the winning plan and is itself rate-sorted descending | the `candidates.begin() + 1` slice after sorting |
 | `AlternatesEmptyWithOnlyOneCluster` | Single-cluster map → `alternates` is empty | same slice, degenerate case |
 | `AlternatesOmitClustersTheRemainingBudgetCannotAfford` | Alternates never include an unaffordable cluster even under a tight budget | the same budget filter applied before alternates are populated (candidates are filtered, then sorted, then sliced) |
+| `PlanFallsBackToFullMapSearchWhenLocalCapFindsNoFrontier` | A map larger than `kLocalSearchExpansionCap` with the only Unmapped pocket far from start still yields a valid plan | the one-shot full-map `exploreReachable` fallback in `plan()` |
 
 ### 3.4 [`test_path_shaping.cpp`](../Algorithm/tests/test_path_shaping.cpp) — `PathShaping`
 

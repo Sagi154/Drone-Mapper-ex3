@@ -47,11 +47,13 @@ Highest-leverage next work is below.
 3. **Optional before zip:** run `.cursor/skills/verify-instructor-test-catalog/SKILL.md` for a
    catalog-ID PASS/FAIL/AMBIGUOUS report (Docker `ctest` + `run_all.sh` + pre-submission + AdvCpp
    rubric). Also run `.cursor/skills/verify-independent-component-variants/SKILL.md` (default
-   VAR-01…03; add `--with-baseline` for VAR-04) after merging
-   `independent-component-variants`.
-4. **VAR-01 algorithm gate (parked 2026-09-05):** do not resume Option A / shrink /
-   floor-support from this branch. The attempt is on `backup/var01-2026-09-05`
-   (tag `backup-var01-2026-09-05`). See `docs/archive/2026-09-05-var01-attempt.md`.
+   VAR-01…03; add `--with-baseline` for VAR-04). VAR-01 is green on `known-issues-fixes` after
+   Approach A (corner-anchored clearance + local replan cap); re-verify after further algorithm
+   changes.
+4. **VAR-01 (landed 2026-09-06):** corner-anchored `sphereIntersectsCellBox` plus
+   `kLocalSearchExpansionCap = 3000`. Do **not** resume the reverted Occupied-AABB /
+   shrink / floor-support tree (`backup/var01-2026-09-05`; `docs/archive/2026-09-05-var01-attempt.md`).
+   Voxel-center lattice (Approach B) did **not** recover `house_full`; leave it on its worktree.
 
 ---
 

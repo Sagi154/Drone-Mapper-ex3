@@ -114,7 +114,9 @@ public:
                                        const common::Position3D& to,
                                        common::PhysicalLength drone_radius);
 
-/// Voxel count of the mission bounds — the expansion cap for every search.
+/// Voxel count of the mission bounds. Used as the full-map fallback cap in
+/// `WavefrontPlanner::plan` (ordinary replans use `kLocalSearchExpansionCap` first)
+/// and as the expansion bound for other `exploreReachable` callers.
 [[nodiscard]] std::size_t maxExpansionsForMap(const common::IMap3D& map);
 
 // Reachability search bound for an ordinary replan. Chosen so a single replan's bounded BFS

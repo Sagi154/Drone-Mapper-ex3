@@ -4,7 +4,7 @@ description: >-
   Measures wall-clock time and score for each of the 24 inputs/sim_compose.yaml
   cells serially on Release, then compares them to the per-cell runtime bar
   (~10s small maps, ~60s grader-risk, no cell routinely near 60s) and the
-  documented 2026-09-03 baseline (scores + walls in this skill). Use when
+  documented 2026-09-06 baseline (scores + walls in this skill). Use when
   changing the mapping algorithm, after a 24-cell score column, when checking
   b05 timeout risk, or when asked whether cells are too slow / how long each
   run takes. Do not treat num_threads=8 matrix wall-clock as per-cell time.
@@ -20,7 +20,7 @@ Announce: “Using verify-cell-runtime.”
 
 When reporting a full 24-cell run, compare **scores** (must match or explain
 regressions) and **walls** (noise OK; watch WARN→FAIL) against the
-[Documented baseline (2026-09-03)](#documented-baseline-2026-09-03) below.
+[Documented baseline (2026-09-06)](#documented-baseline-2026-09-06) below.
 
 ## Time caps for algorithm work — follow these, do not invent others.
 
@@ -134,56 +134,58 @@ Overall: FAIL if any FAIL/HANG. Otherwise PASS with WARNs listed.
 
 Overall **FAIL** does not mean “add a timer.” It means profile `nextStep` / `exploreReachable` on the slow cells (usually `house_full` / `large_out`).
 
-After a full 24-cell run, also diff scores against the [Documented baseline (2026-09-03)](#documented-baseline-2026-09-03). Score drift on outdoor cells is a regression until explained (see libm / quantity-path notes in `docs/benchmarks/2026-09-03-main-score-parity.md`).
+After a full 24-cell run, also diff scores against the [Documented baseline (2026-09-06)](#documented-baseline-2026-09-06). Score drift on outdoor cells is a regression until explained. The older libm-parity table is `docs/benchmarks/2026-09-03-main-score-parity.md` (historical only).
 
-## Documented baseline (2026-09-03)
+## Documented baseline (2026-09-06)
 
-**Canonical per-cell Release baseline** after libm score-parity restore (merged via PR #16). Use this table when judging later runs — do not treat noisy Sep-3 HANG runs or older 8-thread compose walls as the per-cell reference.
+**Canonical per-cell Release baseline** after VAR-01 Approach A landed on `known-issues-fixes`: corner-anchored `sphereIntersectsCellBox` plus `kLocalSearchExpansionCap = 3000` (one full-map fallback). Use this table when judging later runs. Do not treat the 2026-09-03 `large_out` short-lidar WARNs (~45–46s) as expected anymore.
 
 | Field | Value |
 |-------|--------|
-| Date | 2026-09-03 |
-| Tree | `fix-advcpp-rubric-findings` post score-fix (scores identical to `main` @ `9374aea`) |
-| Build | Release `build/opt`, Docker `drone-mapper-ex3-dev` |
-| Method | `time_each_cell.py --hang-timeout 200`, `num_threads=1`, one process per cell |
-| Overall | **PASS** — FAIL=0, WARN=2, wall_sum≈176s, wall_max≈46.2s, cells_ge_60s=0 |
-| CSV (skill) | `.cursor/skills/verify-cell-runtime/baseline-2026-09-03-per-cell-wall.csv` |
-| CSV / write-up (docs) | `docs/benchmarks/2026-09-03-branch-after-score-fix-per-cell-wall.csv`, `docs/benchmarks/2026-09-03-main-score-parity.md` |
+| Date | 2026-09-06 |
+| Tree | `known-issues-fixes` @ `a254810` (algorithm `2732aca`) |
+| Build | Release `build/opt`, Docker `drone-mapper-ex3-dev`, wiped `build/opt` + `tmp/bench-out` |
+| Method | `time_each_cell.py`, `num_threads=1`, one process per cell |
+| Overall | **PASS** — FAIL=0, WARN=0, wall_sum=30.4s, wall_max=3.0s, cells_ge_60s=0 |
+| score_sum | **1832.747** |
+| CSV (skill) | `.cursor/skills/verify-cell-runtime/baseline-2026-09-06-per-cell-wall.csv` |
+| CSV / write-up (docs) | `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv`, `docs/benchmarks/2026-09-06-var01-approach-a.md` |
+| Historical (2026-09-03) | `.cursor/skills/verify-cell-runtime/baseline-2026-09-03-per-cell-wall.csv` |
 
-Fair `main` @ `9374aea` re-time the same day: same **scores**, wall_sum **170.6s**, wall_max **45.4s** (noise only).
+Fair `main` @ `9374aea` (2026-09-03) is historical only: score_sum 1769.8, wall_sum ~176s, two `large_out` short-lidar WARNs.
 
 ### Per-cell baseline (score + wall)
 
 | Cell | Group | Score | Steps | Status | wall_s | Verdict |
 |------|-------|------:|------:|--------|-------:|---------|
-| house_simulation+house_mission_lower\|drone_small\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.10 | PASS |
+| house_simulation+house_mission_lower\|drone_small\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.11 | PASS |
 | house_simulation+house_mission_lower\|drone_small\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.08 | PASS |
 | house_simulation+house_mission_lower\|drone_large\|lidar_long | house_lower | 100.00 | 3 | COMPLETED | 0.07 | PASS |
-| house_simulation+house_mission_lower\|drone_large\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.11 | PASS |
-| house_simulation+house_mission_full\|drone_small\|lidar_long | house_full | 37.19 | 2100 | COMPLETED | 10.69 | PASS |
-| house_simulation+house_mission_full\|drone_small\|lidar_short | house_full | 48.33 | 2500 | COMPLETED | 13.78 | PASS |
-| house_simulation+house_mission_full\|drone_large\|lidar_long | house_full | 20.99 | 700 | COMPLETED | 8.05 | PASS |
-| house_simulation+house_mission_full\|drone_large\|lidar_short | house_full | 15.34 | 700 | COMPLETED | 9.14 | PASS |
-| large_simulation_out+large_mission_out\|drone_small\|lidar_long | large_out | 82.27 | 3200 | COMPLETED | 7.26 | PASS |
-| large_simulation_out+large_mission_out\|drone_small\|lidar_short | large_out | 44.56 | 4100 | COMPLETED | 46.11 | WARN |
-| large_simulation_out+large_mission_out\|drone_large\|lidar_long | large_out | 74.01 | 3700 | COMPLETED | 14.52 | PASS |
-| large_simulation_out+large_mission_out\|drone_large\|lidar_short | large_out | 32.00 | 2200 | COMPLETED | 46.24 | WARN |
-| large_simulation_room+large_mission_room\|drone_small\|lidar_long | large_room | 95.04 | 351 | COMPLETED | 0.22 | PASS |
-| large_simulation_room+large_mission_room\|drone_small\|lidar_short | large_room | 95.10 | 289 | COMPLETED | 0.28 | PASS |
-| large_simulation_room+large_mission_room\|drone_large\|lidar_long | large_room | 94.74 | 187 | COMPLETED | 0.14 | PASS |
-| large_simulation_room+large_mission_room\|drone_large\|lidar_short | large_room | 96.47 | 156 | COMPLETED | 0.23 | PASS |
-| small_simulation_out+small_mission_out\|drone_small\|lidar_long | small_out | 77.05 | 1500 | COMPLETED | 3.51 | PASS |
-| small_simulation_out+small_mission_out\|drone_small\|lidar_short | small_out | 78.69 | 1500 | COMPLETED | 4.66 | PASS |
-| small_simulation_out+small_mission_out\|drone_large\|lidar_long | small_out | 50.55 | 800 | COMPLETED | 1.73 | PASS |
-| small_simulation_out+small_mission_out\|drone_large\|lidar_short | small_out | 93.43 | 1500 | COMPLETED | 5.61 | PASS |
-| small_simulation_room+small_mission_room\|drone_small\|lidar_long | small_room | 86.47 | 996 | COMPLETED | 0.89 | PASS |
-| small_simulation_room+small_mission_room\|drone_small\|lidar_short | small_room | 72.76 | 996 | COMPLETED | 1.32 | PASS |
-| small_simulation_room+small_mission_room\|drone_large\|lidar_long | small_room | 87.04 | 994 | COMPLETED | 0.54 | PASS |
-| small_simulation_room+small_mission_room\|drone_large\|lidar_short | small_room | 87.83 | 993 | COMPLETED | 0.82 | PASS |
+| house_simulation+house_mission_lower\|drone_large\|lidar_short | house_lower | 100.00 | 3 | COMPLETED | 0.07 | PASS |
+| house_simulation+house_mission_full\|drone_small\|lidar_long | house_full | 47.46 | 2700 | COMPLETED | 2.80 | PASS |
+| house_simulation+house_mission_full\|drone_small\|lidar_short | house_full | 21.00 | 1100 | COMPLETED | 2.10 | PASS |
+| house_simulation+house_mission_full\|drone_large\|lidar_long | house_full | 20.08 | 800 | COMPLETED | 1.71 | PASS |
+| house_simulation+house_mission_full\|drone_large\|lidar_short | house_full | 14.89 | 600 | COMPLETED | 1.42 | PASS |
+| large_simulation_out+large_mission_out\|drone_small\|lidar_long | large_out | 73.50 | 1700 | COMPLETED | 0.89 | PASS |
+| large_simulation_out+large_mission_out\|drone_small\|lidar_short | large_out | 74.95 | 4100 | COMPLETED | 2.73 | PASS |
+| large_simulation_out+large_mission_out\|drone_large\|lidar_long | large_out | 75.59 | 3400 | COMPLETED | 1.47 | PASS |
+| large_simulation_out+large_mission_out\|drone_large\|lidar_short | large_out | 72.02 | 3500 | COMPLETED | 2.76 | PASS |
+| large_simulation_room+large_mission_room\|drone_small\|lidar_long | large_room | 97.68 | 187 | COMPLETED | 0.15 | PASS |
+| large_simulation_room+large_mission_room\|drone_small\|lidar_short | large_room | 97.26 | 193 | COMPLETED | 0.24 | PASS |
+| large_simulation_room+large_mission_room\|drone_large\|lidar_long | large_room | 97.31 | 198 | COMPLETED | 0.14 | PASS |
+| large_simulation_room+large_mission_room\|drone_large\|lidar_short | large_room | 97.52 | 198 | COMPLETED | 0.29 | PASS |
+| small_simulation_out+small_mission_out\|drone_small\|lidar_long | small_out | 93.87 | 1993 | COMPLETED | 1.07 | PASS |
+| small_simulation_out+small_mission_out\|drone_small\|lidar_short | small_out | 94.14 | 1993 | COMPLETED | 2.37 | PASS |
+| small_simulation_out+small_mission_out\|drone_large\|lidar_long | small_out | 45.38 | 1600 | COMPLETED | 2.97 | PASS |
+| small_simulation_out+small_mission_out\|drone_large\|lidar_short | small_out | 83.86 | 1994 | COMPLETED | 2.45 | PASS |
+| small_simulation_room+small_mission_room\|drone_small\|lidar_long | small_room | 85.96 | 990 | COMPLETED | 0.90 | PASS |
+| small_simulation_room+small_mission_room\|drone_small\|lidar_short | small_room | 87.31 | 993 | COMPLETED | 1.13 | PASS |
+| small_simulation_room+small_mission_room\|drone_large\|lidar_long | small_room | 85.30 | 996 | COMPLETED | 0.93 | PASS |
+| small_simulation_room+small_mission_room\|drone_large\|lidar_short | small_room | 67.65 | 993 | COMPLETED | 1.53 | PASS |
 
-**Expected WARNs (baseline):** `large_out` × short lidar only (~45–46s). Do not treat those as new regressions unless they cross 60s or scores change.
+**Expected WARNs (baseline):** none. Do not treat a new ≥45s cell as “the old large_out WARN.”
 
-**Score check:** later runs should match the Score column bit-for-bit (or to reported CSV precision). Wall times may vary a few percent; wall_sum ~170–180s on a clean machine is normal.
+**Score check:** later runs should match the Score column bit-for-bit (or to reported CSV precision). Wall times may vary a few percent; wall_sum ~30s on a clean machine is normal after the replan search cap.
 
 ## Focused first (iteration order)
 
@@ -206,4 +208,5 @@ python3 .cursor/skills/verify-cell-runtime/scripts/time_each_cell.py \
 - Killing a cell at 60 s inside the algorithm
 - Lowering YAML `max_steps` to “make it faster”
 - Skipping long missions because they are “allowed 10000 steps”
-- Treating machine-load HANG/timeouts (or Debug builds) as the baseline instead of the 2026-09-03 table above
+- Treating machine-load HANG/timeouts (or Debug builds) as the baseline instead of the 2026-09-06 table above
+- Treating the 2026-09-03 `large_out` short-lidar WARNs as still expected
