@@ -29,9 +29,10 @@ readPathList(const YAML::Node& node, const char* key) {
 [[nodiscard]] bool parseOneSimulationGroup(
     const YAML::Node& entry, const std::filesystem::path& base_dir,
     UC::IRunErrorLog& log, types::SimulationCompositionData& composition) {
-    if (!entry["simulation_config"]) {
+    if (!entry["simulation_config"] || !entry["simulation_config"].IsScalar()) {
         detail::logRecoverable(log, "COMPOSITION_INVALID",
-                               "[simulation_compositions] entry missing simulation_config — skipped");
+                               "[simulation_compositions] entry missing or non-scalar "
+                               "simulation_config — skipped");
         return false;
     }
 
@@ -123,12 +124,24 @@ parseCompositionFile(const std::filesystem::path& path, UC::IRunErrorLog& log) {
     }
 
     for (const auto& p : drone_paths) {
-        composition.drone_configs.push_back(
-            parseDroneConfig(resolveConfigPath(base_dir, p), log).value);
+        const auto drone_result = parseDroneConfig(resolveConfigPath(base_dir, p), log);
+        if (!drone_result.ok) {
+            result.errors.push_back({"COMPOSITION_INVALID",
+                                      "Failed to parse drone_config \"" +
+                                          resolveConfigPath(base_dir, p).string() + "\""});
+            return result;
+        }
+        composition.drone_configs.push_back(drone_result.value);
     }
     for (const auto& p : lidar_paths) {
-        composition.lidar_configs.push_back(
-            parseLidarConfig(resolveConfigPath(base_dir, p), log).value);
+        const auto lidar_result = parseLidarConfig(resolveConfigPath(base_dir, p), log);
+        if (!lidar_result.ok) {
+            result.errors.push_back({"COMPOSITION_INVALID",
+                                      "Failed to parse lidar_config \"" +
+                                          resolveConfigPath(base_dir, p).string() + "\""});
+            return result;
+        }
+        composition.lidar_configs.push_back(lidar_result.value);
     }
 
     result.ok    = true;
