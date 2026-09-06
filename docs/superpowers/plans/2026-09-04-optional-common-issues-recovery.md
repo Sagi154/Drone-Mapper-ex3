@@ -4,15 +4,17 @@
 >
 > **Do not** use superpowers:subagent-driven-development. **Do not** dispatch Task/subagents. **Do not** select opus, gpt-5, or other expensive subagent models. Run this plan **inline** in the current session with the same model (`inherit`).
 
-**Goal:** Implement four optional Common-issues recoveries in MissionControl — CI9 (continue after step `Error`), CI2+CI10 (ignore world-OOB moves; clamp to mission bounds), CI3 (retry invalid commands then throw), CI8 (split oversize moves into legal steps) — claim them in `bonus.txt`, drop the Known Issues rows, and prove each slice does not regress 24-cell scores or independence harnesses.
+**Goal:** Implement four optional Common-issues recoveries in MissionControl — CI9 (continue after step `Error`), CI2+CI10 (ignore world-OOB moves; clamp to mission bounds), CI3 (retry invalid commands then throw), CI8 (split oversize moves into legal steps) — claim them in `bonus.txt`, drop the Known Issues rows, and prove **each** slice against the verify-cell-runtime **Documented baseline (2026-09-06)** (scores bit-identical, walls still PASS/WARN=0) plus independence harnesses.
 
-**Architecture:** All behavior lives in our MissionControl plugin. `MissionControlImpl` already owns `DroneControlImpl`. CI9 is a mission-loop change (log `DRONE_STEP_FAILED` and keep `max_steps`). CI2/CI10/CI3/CI8 are `DroneControlImpl::step` / `applyMovement` recoveries around the existing one-command path. `SimulationRunImpl::run` already catches exceptions from `runMission()` (`MISSION_EXCEPTION`) — CI3 relies on that, and must not wrap the new throw in the wall-collision `catch`. Our mapping algorithm is required not to emit illegal moves, so honest 24-cell **scores must stay bit-identical** to the **2026-09-06** VAR-01 Approach A baseline (`docs/benchmarks/2026-09-06-var01-approach-a.md`, score_sum **1832.7**, wall_max **3.0s**, WARN=0). Any score change is a stop-the-line regression. Do **not** compare against the historical 2026-09-03 table (1769.8, `large_out` short WARNs).
+**Architecture:** All behavior lives in our MissionControl plugin. `MissionControlImpl` already owns `DroneControlImpl`. CI9 is a mission-loop change (log `DRONE_STEP_FAILED` and keep `max_steps`). CI2/CI10/CI3/CI8 are `DroneControlImpl::step` / `applyMovement` recoveries around the existing one-command path. `SimulationRunImpl::run` already catches exceptions from `runMission()` (`MISSION_EXCEPTION`) — CI3 relies on that, and must not wrap the new throw in the wall-collision `catch`. Our mapping algorithm is required not to emit illegal moves, so honest 24-cell **scores must stay bit-identical** to the **2026-09-06** VAR-01 Approach A baseline (skill **Documented baseline (2026-09-06)** / `docs/benchmarks/2026-09-06-var01-approach-a.md`, score_sum **1832.747**, wall_sum **~29.9s**, wall_max **~3.0s**, WARN=0). Any score change is a stop-the-line regression. Wall noise of a few percent is OK; a new WARN/FAIL is not. Do **not** compare against the historical 2026-09-03 table (1769.8, `large_out` short WARNs).
 
 **Tech Stack:** C++20, gtest, mp-units, Docker image `drone-mapper-ex3-dev`, CMake presets `default` (unit tests) and `build/opt` Release (cell timing).
 
 **Refresh (2026-09-06 Approach A):** Algorithm VAR-01 Approach A landed (corner-anchored clearance + local search cap). Verification baseline is 2026-09-06, not 2026-09-03.
 
 **Refresh (2026-09-06 AdvCpp):** Rubric plan Tasks 0–17 landed on `known-issues-fixes` (`c70762c`). Scores still **1832.747**; wall_sum **~29.9s**. Known Issues is **19 rows**: #1–#11 optional/bonus skips, #12 Unmapped, #13 band gaps, **#14–#19 deferred AdvCpp leftovers**. `DroneControlImpl` ctor is now `(drone, lidar, lidar_sensor, gps, movement, output_map, algorithm)` — **no `mission_` member**; lidar/GPS are `const&`. CI10 **must restore `MappingBounds`** (passed from `MissionControlImpl`, which still has `mission_`). Do not revert the AdvCpp refactors. Execute this plan from `known-issues-fixes` @ `c70762c` (or later), not from the older `fix-advcpp-rubric-findings` worktree tip if it lacks `c70762c`.
+
+**Refresh (baseline gate):** After **each** of CI9, CI2/CI10, CI3, and CI8, run the full 24-cell verify-cell-runtime gate vs the 2026-09-06 table. Four runs, not one at the end. VAR-04 lawnmower is a different check and does not replace it.
 
 **Specs:** `docs/error-handling-matrix.md` (staff PDF), `docs/known-issues.md` rows **7 (CI9), 1 (CI2), 8 (CI10), 2 (CI3), 6 (CI8)** (19 rows total). `ISimulation` is already implemented. Mapping-track bug is **#13**. Rubric leftovers **#14–#19** stay listed unless this plan implements them (it must not). `docs/known-issues-explained.md`.
 
@@ -27,8 +29,8 @@
 - Do **not** “fix” Known Issues **#14–#19** in this plan (libm unwraps, `double` cone APIs, raw out-params, leaky `detail` headers, leftover e21/e10). Compact them with the optional rows; do not drop them as if implemented.
 - Git: confirm toplevel is this project (never `C:\Users\sagi1` home). Base: **`known-issues-fixes` @ `c70762c` or later** (Approach A + AdvCpp). Do not branch from skeleton `main` or from a `fix-advcpp-rubric-findings` worktree that is behind `c70762c`. Conventional Commits. **No commit without explicit human approval**. Never `--no-verify`, never push `main`.
 - Docker-only build/test on this Windows host. No `&&` / bash heredocs in PowerShell — one `docker run ... bash -lc '...'`.
-- After **each** of the four issue groups: unit tests, then `verify-cell-runtime` (full 24, scores vs **2026-09-06** baseline @ `c70762c`), then `verify-independent-component-variants` (VAR-01..03; VAR-04 only in the final gate).
-- Cell-runtime success: 24/24 COMPLETED, `mission_score >= 0`, scores match `.cursor/skills/verify-cell-runtime/SKILL.md` **Documented baseline (2026-09-06)** / `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (score_sum **1832.747**, wall_sum **~29.9s**, wall_max **~3s**, **WARN=0**). Overall FAIL if any FAIL/HANG, any new ≥45s WARN, or score drift. Do not treat old `large_out` short ~46s WARNs as expected.
+- After **each** of the four issue groups: unit tests, then the **[Cell-runtime baseline gate](#cell-runtime-baseline-gate-mandatory-after-each-of-ci9-ci2ci10-ci3-ci8)** (full 24, no shortcuts), then `verify-independent-component-variants` (VAR-01..03; VAR-04 only in the final gate). A slice that skipped the 24-cell gate is not done.
+- Cell-runtime success is defined only by that gate (skill **Documented baseline (2026-09-06)**). Do not treat old `large_out` short ~46s WARNs as expected.
 - Out of scope: Known Issues excel export, zip packaging, lazy `.so` load. `ISimulation` / `SimulationImpl` is **already done**. AdvCpp leftover rows 14–19 stay documented.
 - **`DroneControlImpl` ctor (current):** `(drone, lidar, lidar_sensor, gps, movement, output_map, algorithm)`. `lidar_sensor_` / `gps_` are `const&`. There is **no** `mission_` field. Every test snippet below that still inserts `defaultMission()` as the second ctor argument is **wrong** — copy the 7-argument form from `MissionControl/tests/test_drone_control.cpp`. CI10 adds a trailing `common::types::MappingBounds mission_bounds` (default `{}` = unset / skip clamp). `MissionControlImpl` already has `mission_` and must pass `dependencies.mission_config.mission_bounds` into that new argument.
 
@@ -49,10 +51,12 @@
 
 ## Order and why
 
-1. **CI9** — mission loop only; FakeDroneControl keeps the test alive after later slices remove oversize-`Error`.
-2. **CI2+CI10 together** — they share destination prediction; clamp first, then ignore if still world-OOB.
-3. **CI3** — retry invalid **type** then throw. Oversize stays `Error` until CI8 (invalid ≠ oversize).
-4. **CI8** — pending fragment queue; update the leftover oversize-`Error` integration test.
+1. **CI9** — mission loop only; FakeDroneControl keeps the test alive after later slices remove oversize-`Error`. Then Task 3 baseline gate.
+2. **CI2+CI10 together** — they share destination prediction; clamp first, then ignore if still world-OOB. Then Task 7 baseline gate.
+3. **CI3** — retry invalid **type** then throw. Oversize stays `Error` until CI8 (invalid ≠ oversize). Then Task 11 baseline gate.
+4. **CI8** — pending fragment queue; update the leftover oversize-`Error` integration test. Then Task 15 baseline gate + VAR-04.
+
+Do not start the next numbered item until that slice’s 24-cell baseline gate PASSes.
 
 ## Shared Docker helpers (every verification task)
 
@@ -95,7 +99,59 @@ docker run --rm -e PYTHONUNBUFFERED=1 -e VCPKG_ROOT=/usr/local/vcpkg \
 '
 ```
 
-Then diff scores against `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (skill table: `.cursor/skills/verify-cell-runtime/SKILL.md` 2026-09-06). Stop on any score change. Do **not** use the 2026-09-03 CSV.
+Then run the **Cell-runtime baseline gate** below (score + wall). Stop on any score change. Do **not** use the 2026-09-03 CSV.
+
+## Cell-runtime baseline gate (mandatory after each of CI9, CI2/CI10, CI3, CI8)
+
+Using verify-cell-runtime. Follow `.cursor/skills/verify-cell-runtime/SKILL.md` — this section is the plan’s hard stop, not a reminder.
+
+**When:** after CI9 (Task 3), after CI2/CI10 (Task 7), after CI3 (Task 11), after CI8 (Task 15). That is **four** full 24-cell Release runs, not one at the end.
+
+**Not a substitute:** unit tests, `--only-group`, Debug `run_all.sh` / `run_smoke_pass.sh`, or `run_benchmark.py --num-threads 8` (clock 3). Those may be used while iterating, but they do **not** close a slice.
+
+**Do not skip because** the change is “MissionControl-only,” “our algorithm never hits this path,” or “scores cannot move.” Honest cells should not exercise the new recoveries; if a score *does* move, the recovery is firing on a legal step — that is a regression.
+
+A slice is **not done** until this gate PASSes. Do not start the next Common-issue, do not treat Known Issues / `bonus.txt` as landed, and do not ask to commit, if this gate failed or was skipped.
+
+### What must hold vs Documented baseline (2026-09-06)
+
+Source of truth: `.cursor/skills/verify-cell-runtime/SKILL.md` **Documented baseline (2026-09-06)** and `docs/benchmarks/2026-09-06-var01-approach-a-per-cell-wall.csv` (skill copy: `.cursor/skills/verify-cell-runtime/baseline-2026-09-06-per-cell-wall.csv`). Tree that produced it: `known-issues-fixes` @ `c70762c`.
+
+| Check | Pass if | Stop the line if |
+|-------|---------|------------------|
+| Completeness | 24/24 COMPLETED, `mission_score >= 0` | Crash, hang, score < 0, missing cell |
+| **Scores** | Every cell Score **bit-identical** to the skill table; `score_sum` **1832.747** | Any cell score drift. Revert or fix before the next issue. |
+| **Walls** | FAIL=0, HANG=0, **WARN=0**; `wall_sum` ~30s (few-percent noise OK); `wall_max` ~3s; no cell near 60s; small_room still ≤15s | Any FAIL/HANG; any new ≥45s WARN; small_room >15s; treating 2026-09-03 `large_out` ~46s WARNs as expected |
+| Report | Fill the skill’s required markdown table (Date UTC, SHA, Build, 24 rows, Overall) | Claiming PASS without the table |
+
+Do **not** compare scores to the historical 2026-09-03 table (1769.8). Do **not** add a wall-clock abort in Algorithm or MissionControl to “pass” this gate.
+
+### Procedure
+
+1. Announce “Using verify-cell-runtime.”
+2. Run the shared Release 24-cell Docker command above (wipe Algorithm `.o`/`.so` under `build/opt` first).
+3. Diff `tmp/bench-out/per-cell-wall.csv` **Score** (and Steps/Status) against the skill table / docs CSV.
+4. Judge walls with the skill verdicts (PASS / WARN / FAIL / HANG). Overall FAIL if any FAIL/HANG, any new WARN, or any score drift.
+5. Paste this report (required by the skill) before calling the slice verified:
+
+```markdown
+# Cell runtime verification
+
+Date (UTC): …
+SHA: …
+Build: Release `build/opt`
+Slice: CI9 | CI2/CI10 | CI3 | CI8
+
+| Cell | Group | Score | Steps | Status | wall_s | Verdict |
+|------|-------|-------|-------|--------|--------|---------|
+| … | … | … | … | … | … | PASS/WARN/FAIL |
+
+Overall: FAIL if any FAIL/HANG, any score ≠ 2026-09-06 table, or any new WARN. Otherwise PASS.
+score_sum: … (must be 1832.747)
+wall_sum / wall_max: … / … (expect ~29.9s / ~3s; noise OK)
+```
+
+6. Only after Overall **PASS**, run VAR-01..03 (VAR-04 only after CI8). VAR-04 (`check_baseline_algorithm.sh`, lawnmower plugin) is a **different** “baseline” — it does **not** replace this 24-cell gate.
 
 `verify-independent-component-variants` (VAR-01..03). Using verify-independent-component-variants.
 
@@ -389,7 +445,7 @@ CI9 — Drone step Error: log and continue the max_steps loop
 **Files:** none (run only)
 
 - [ ] **Step 1: Unit tests** — shared Docker ctest helper. Expected: PASS.
-- [ ] **Step 2: verify-cell-runtime** — shared Release 24-cell command. Fill the skill report table. Scores **must** match the **2026-09-06** baseline (our algorithm should never return `Error`). Expected WARNs: **none**. If any score differs or a cell is ≥45s, **stop** and investigate; do not continue to CI2.
+- [ ] **Step 2: Cell-runtime baseline gate** — Using verify-cell-runtime. Full 24 Release cells (shared Docker command). Fill the required report table. Scores **must** be bit-identical to the skill **Documented baseline (2026-09-06)** (`score_sum` **1832.747**); our algorithm should never return `Error`, so CI9 must not change honest cells. Walls: **WARN=0**, FAIL=0, HANG=0; `wall_sum` ~30s. If any score differs or a cell is ≥45s, **stop** — do not continue to CI2, do not ask to commit.
 - [ ] **Step 3: verify-independent-component-variants** — VAR-01, VAR-02, VAR-03. Skip VAR-04. `bad_scan` must finish inside timeout. Fill:
 
 ```markdown
@@ -406,6 +462,8 @@ CI9 — Drone step Error: log and continue the max_steps loop
 ---
 
 ### Task 4: CI9 commit (human approval)
+
+Do not ask to commit unless Task 3 Step 2 (24-cell baseline gate) PASSed.
 
 - [ ] **Step 1: Show what would be committed**
 
@@ -818,11 +876,17 @@ CI10 — amend movement to stay inside mission bounds
 
 ### Task 7: CI2/CI10 verification gates
 
-Same three steps as Task 3 (unit tests, full 24-cell runtime, VAR-01..03). Scores must still match **2026-09-06**. Our algorithm should not command world-OOB or mission-OOB moves; if a score changes, **stop** — likely a false-positive ignore/clamp on a legal outdoor step.
+**Files:** none (run only)
+
+- [ ] **Step 1: Unit tests** — shared Docker ctest helper. Expected: PASS.
+- [ ] **Step 2: Cell-runtime baseline gate** — Using verify-cell-runtime. Full 24; do **not** close this slice with `--only-group`. Scores **must** still match **2026-09-06** (`1832.747`, WARN=0). Our algorithm should not command world-OOB or mission-OOB moves; if a score changes, **stop** — likely a false-positive ignore/clamp on a legal outdoor step. Do not start CI3 until this PASSes.
+- [ ] **Step 3: VAR-01..03** as Task 3 (skip VAR-04). Fill the VAR table labeled “after CI2/CI10”.
 
 ---
 
 ### Task 8: CI2/CI10 commit (human approval)
+
+Do not ask to commit unless Task 7 Step 2 (24-cell baseline gate) PASSed.
 
 Show status/diff. Proposed message:
 
@@ -965,11 +1029,17 @@ Delete the CI3 Known Issues row; compact `#`. Explained + matrix “Implemented 
 
 ### Task 11: CI3 verification gates
 
-Same as Task 3. Scores must match the **2026-09-06** baseline. VAR-01 must still PASS (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`). VAR-03 `throw_algo` already throws — still no crash. Invalid-command throw is a new path; `test_mission_control` throw is the unit proof. If VAR-03 hangs or crashes, **stop**.
+**Files:** none (run only)
+
+- [ ] **Step 1: Unit tests** — shared Docker ctest helper. Expected: PASS.
+- [ ] **Step 2: Cell-runtime baseline gate** — Using verify-cell-runtime. Full 24. Scores must match the **2026-09-06** baseline (`1832.747`, WARN=0). Honest cells must not throw on invalid commands. If a score changes, **stop** — do not start CI8.
+- [ ] **Step 3: VAR-01..03** as Task 3 (skip VAR-04). VAR-01 must still PASS (`HOST_ILLEGAL_MOVE_ATTEMPTS=0`). VAR-03 `throw_algo` already throws — still no crash. Invalid-command throw is a new path; `test_mission_control` throw is the unit proof. If VAR-03 hangs or crashes, **stop**.
 
 ---
 
 ### Task 12: CI3 commit (human approval)
+
+Do not ask to commit unless Task 11 Step 2 (24-cell baseline gate) PASSed.
 
 ```text
 feat: retry invalid algorithm commands then throw
@@ -1201,9 +1271,9 @@ If the script needs extra tools that the image lacks, stop and report; do not co
 ### Task 15: CI8 verification gates (include VAR-04)
 
 - [ ] **Step 1: Unit tests** — shared ctest helper. PASS.
-- [ ] **Step 2: verify-cell-runtime** — full 24. Scores must match **2026-09-06**. If our algorithm ever emitted oversize, scores *could* change — treat that as unexpected; inspect `advance` sizes before accepting drift. No cell ≥ 60s; **WARN=0** (do not expect the old `large_out` short ~46s pair).
+- [ ] **Step 2: Cell-runtime baseline gate** — Using verify-cell-runtime. Full 24. Scores must match **2026-09-06** (`1832.747`). If our algorithm ever emitted oversize, scores *could* change — treat that as unexpected; inspect `advance` sizes before accepting drift. No cell ≥ 60s; **WARN=0** (do not expect the old `large_out` short ~46s pair). This gate is still required even though VAR-04 also runs in this task.
 - [ ] **Step 3: VAR-01..03** as before.
-- [ ] **Step 4: VAR-04 once** (skill `--with-baseline`):
+- [ ] **Step 4: VAR-04 once** (skill `--with-baseline`; lawnmower plugin — **not** a substitute for Step 2):
 
 ```bash
 # same docker, extra target baseline_lawnmower_algorithm_plugin
@@ -1215,6 +1285,8 @@ Overall PASS only if VAR-01..04 are PASS. Baseline lawnmower is ~5 minutes.
 ---
 
 ### Task 16: CI8 commit (human approval)
+
+Do not ask to commit unless Task 15 Step 2 (24-cell baseline gate) PASSed.
 
 ```text
 feat: split oversize movements into legal drone steps
@@ -1238,8 +1310,8 @@ Include `HLD.pdf` only if Step 5 regenerated it.
 | CI10 clamp mission bounds | Tasks 5–8 |
 | CI3 invalid retry then throw | Tasks 9–12 |
 | CI8 split oversize | Tasks 13–16 |
-| Cell runtime after each | Tasks 3, 7, 11, 15 |
-| VAR harness after each | Tasks 3, 7, 11, 15 (VAR-04 in 15) |
+| Cell-runtime baseline gate after each (full 24 vs 2026-09-06) | Tasks 3, 7, 11, 15 — not skippable |
+| VAR harness after each | Tasks 3, 7, 11, 15 (VAR-04 in 15 only; does not replace the 24-cell gate) |
 | bonus.txt + KI compact + HLD | Tasks 2, 6, 10, 14 |
 | Frozen headers / no Algorithm change / no CI4–CI7/CI11/CI12 | Global Constraints |
 
