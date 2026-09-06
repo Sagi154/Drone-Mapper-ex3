@@ -4,14 +4,15 @@ Plain-language walkthrough of the remaining rows in `docs/known-issues.md`.
 That file is the working list for the optional staff Known Issues excel; this
 doc is for us, not for the zip.
 
-Resolved items were already pruned. Rows **#1–#8** are **skipped optional
-recovery** (or bonus) from the Common-issues PDF, not mandatory bugs. **#9**
-is Unmapped policy. The one remaining mapping-score problem is **#10**.
-Rows **#11–#16** are deferred AdvCpp rubric nits from the 2026-09-06 findings
+Resolved items were already pruned. Rows **#1–#7** are **skipped optional
+recovery** (or bonus) from the Common-issues PDF, not mandatory bugs. **#8**
+is Unmapped policy. The one remaining mapping-score problem is **#9**.
+Rows **#10–#15** are deferred AdvCpp rubric nits from the 2026-09-06 findings
 plan (`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`); they
 are code-quality leftovers, not runtime failures. CI9 (step `Error`: log and
-continue), CI2 (ignore world/map OOB), and CI10 (clamp to mission bounds)
-are implemented and claimed in `bonus.txt`; they are not remaining rows.
+continue), CI2 (ignore world/map OOB), CI10 (clamp to mission bounds), and
+CI3 (retry invalid `nextStep` then throw) are implemented and claimed in
+`bonus.txt`; they are not remaining rows.
 
 ## What the list is for
 
@@ -21,12 +22,12 @@ implemented differently, and remaining bugs so graders do not treat them as
 surprises. The markdown table is the working copy; it is **not** submitted
 as-is. At zip time it gets copied into the staff sheet and exported as `.xlsx`.
 
-If you later **implement** an optional / bonus row (#1–#8), do not leave it
+If you later **implement** an optional / bonus row (#1–#7), do not leave it
 here. Remove it from `docs/known-issues.md` and **claim it in `bonus.txt`**
 (what you did, plus file:line). Staff will not infer extra credit from the
-code alone. Skip `bonus.txt` for #9 (Unmapped, different design), #10 (bug), and
-#11–#16 (deferred rubric nits); those are not bonuses. CI9, CI2, and CI10 are
-already claimed in `bonus.txt`. If nothing optional was implemented, do not
+code alone. Skip `bonus.txt` for #8 (Unmapped, different design), #9 (bug), and
+#10–#15 (deferred rubric nits); those are not bonuses. CI9, CI2, CI10, and CI3
+are already claimed in `bonus.txt`. If nothing optional was implemented, do not
 add `bonus.txt`.
 
 ---
@@ -44,49 +45,54 @@ add `bonus.txt`.
   predicted center stays inside that AABB. Zero leftover distance is treated
   as ignore. **Order:** clamp first, then CI2 ignore if the center is still
   world-OOB (mission AABB larger than the map).
+- **CI3 — invalid command retry then throw:** `step()` re-calls `nextStep` up
+  to `kMaxInvalidCommandRetries` when the movement type is unsupported.
+  After N failures it throws out of `DroneControlImpl` (propagates; not caught
+  on the wall-collision path). `SimulationRunImpl::run` maps that to
+  `MISSION_EXCEPTION`. Oversize is still `Error` until CI8 (invalid ≠ oversize).
 
 ---
 
-## Optional Common-issues rows (#1–#7)
+## Optional Common-issues rows (#1–#6)
 
 The staff PDF lists recovery behaviors for bad algorithm/sensor/movement cases.
 Two rows are **mandatory** (your own algorithm never emits a move it knew was
 illegal; `MockMovement` throws on a wall and `DroneControl`/`SimulationRun`
-catch it). Those are done. CI9, CI2, and CI10 are implemented (see above).
+catch it). Those are done. CI9, CI2, CI10, and CI3 are implemented (see above).
 
-These seven are **optional** and still skipped. You log them so a grader who
+These six are **optional** and still skipped. You log them so a grader who
 expects the PDF’s extra recovery does not mark them as forgotten bugs. All are
-**Low** except #5 (**Medium**). All are **Always** reproducible. Reason: lack
-of time. Numbers match `docs/known-issues.md` after the CI2/CI10 compact.
+**Low** except #4 (**Medium**). All are **Always** reproducible. Reason: lack
+of time. Numbers match `docs/known-issues.md` after the CI3 compact.
 
 | # | What the PDF wanted | What you actually do |
 |---|---------------------|----------------------|
-| **1 (CI3)** | Invalid command: retry `nextStep` N times, then throw | First bad command → `DroneStepStatus::Error`, no retry |
-| **2 (CI4)** | Empty move **and** empty scan (NOOP): retry N times, then throw | No NOOP retry; the mission just continues or ends |
-| **3 (CI6)** | Empty LiDAR result: re-scan N times, then throw | No empty-scan retry |
-| **4 (CI7)** | Movement returns `false` (not a wall throw): retry N, then throw | Any `success==false` becomes Continue (no string match, no Error). No N-retry-then-throw. Distinct from mandatory CI5 (the throw path) |
-| **5 (CI8)** | Oversize Advance/Elevate/Rotate: **split** into several legal steps | Rejected immediately as Error (`movementWithinLimits`) |
-| **6 (CI11)** | GPS reports OOB: compare to internal pose; ignore or throw | No compare/ignore/throw path |
-| **7 (CI12)** | After a successful move, impossible GPS: re-read N times, then Error | No GPS retry loop |
+| **1 (CI4)** | Empty move **and** empty scan (NOOP): retry N times, then throw | No NOOP retry; the mission just continues or ends |
+| **2 (CI6)** | Empty LiDAR result: re-scan N times, then throw | No empty-scan retry |
+| **3 (CI7)** | Movement returns `false` (not a wall throw): retry N, then throw | Any `success==false` becomes Continue (no string match, no Error). No N-retry-then-throw. Distinct from mandatory CI5 (the throw path) |
+| **4 (CI8)** | Oversize Advance/Elevate/Rotate: **split** into several legal steps | Rejected immediately as Error (`movementWithinLimits`) |
+| **5 (CI11)** | GPS reports OOB: compare to internal pose; ignore or throw | No compare/ignore/throw path |
+| **6 (CI12)** | After a successful move, impossible GPS: re-read N times, then Error | No GPS retry loop |
 
 In short: `DroneControlImpl` still skips the PDF’s retry/split machinery for
 the remaining optional rows. That is a conscious skip, not a mystery failure.
 MissionControl implements CI9 continue-on-`Error`. `applyMovement` implements
 CI10 clamp then CI2 ignore (no Movement call) for world-OOB Advance/Elevate.
+`step()` implements CI3 invalid-type retry then throw before movement.
 
-#5 is Medium because oversize commands are a realistic algorithm mistake, and
+#4 is Medium because oversize commands are a realistic algorithm mistake, and
 splitting them would have been the most useful remaining optional recovery.
 
 ---
 
-## Bonus / different design (#8–#9)
+## Bonus / different design (#7–#8)
 
-**#8 — eager plugin load (Low, Feature/Missing)**  
+**#7 — eager plugin load (Low, Feature/Missing)**  
 Lazy load/unload of `.so` files is an explicit **bonus**. You load every
 required plugin on the main thread before the run matrix, and `dlclose` at
 shutdown. The assignment allows that. Do not claim the bonus in `bonus.txt`.
 
-**#9 — Unmapped cells are walkable (Low, developed differently)**  
+**#8 — Unmapped cells are walkable (Low, developed differently)**  
 Unknown voxels are **not** treated as walls. Dijkstra prefers Empty (cost 1)
 over Unmapped (cost 4). If a “path through unknown” hits a hidden wall, you
 recover with Continue + replan (soft stall, a couple of ticks), not
@@ -106,7 +112,7 @@ Do not revive the Occupied-AABB gate. Write-up:
 
 ---
 
-## The remaining mapping-track gaps (#10)
+## The remaining mapping-track gaps (#9)
 
 **Some cells still sit below the ex2 score bands** after the 2026-09-06 landing.
 This is no longer the 2026-09-03 `large_out` short-lidar cliff (44.56 / 32.00 at
@@ -133,24 +139,27 @@ each replan is. Fixing remaining band gaps is mapping-track work, not
 - **CI2 / CI10:** Implemented. Clamp Advance/Elevate to `mission_bounds` when
   set, then ignore if the predicted center is still world-OOB
   (`output_map_.isInBounds`). Claimed in `bonus.txt`.
-- **#1–#8:** “We did the mandatory path; we did not implement the remaining
+- **CI3:** Implemented. Retry `nextStep` up to `kMaxInvalidCommandRetries`, then
+  throw. `DroneControl` propagates; `SimulationRun` logs `MISSION_EXCEPTION`.
+  Claimed in `bonus.txt`.
+- **#1–#7:** “We did the mandatory path; we did not implement the remaining
   optional/bonus recovery or lazy `.so` loading.” If one of these is later
   implemented, drop the row and list it in `bonus.txt` with file:line. Do not
   claim a nearby workaround that does not match the PDF (e.g. Continue on
   Movement `false` is not CI7).
-- **#9:** Unmapped (different design, not `bonus.txt`).
-- **#10:** “`house_full` / `small_out` large+long / `small_room` large+short still
+- **#8:** Unmapped (different design, not `bonus.txt`).
+- **#9:** “`house_full` / `small_out` large+long / `small_room` large+short still
   underperform vs ex2 bands.” Fixing it helps the algorithm contest; it
   is not an extra-credit line in `bonus.txt`. The 2026-09-03 `large_out` short
   cliff is no longer the measured baseline.
-- **#11–#16:** Deferred AdvCpp rubric leftovers (libm unwraps, `double` APIs,
+- **#10–#15:** Deferred AdvCpp rubric leftovers (libm unwraps, `double` APIs,
   raw pointers, leaky `detail` types, remaining e21 walks, remaining e10
   duplication). Listed so graders see we looked and chose not to touch the
   hot path. Not `bonus.txt`.
 
 ---
 
-## Deferred AdvCpp rubric leftovers (#11–#16)
+## Deferred AdvCpp rubric leftovers (#10–#15)
 
 These came from `docs/advcpp-rubric-review.md` and were **consciously skipped**
 by the 2026-09-06 fix plan (Tasks 1–16 landed the cheap, gated sites). Type is
@@ -158,9 +167,9 @@ by the 2026-09-06 fix plan (Tasks 1–16 landed the cheap, gated sites). Type is
 
 | # | Rubric | What is still true |
 |---|--------|--------------------|
-| **11 (e03)** | Hot-path `std::sin`/`std::cos`/`sqrt` unwraps | Tasks 9–10 only converted MockMovement limit checks and output-map resolution. Remaining trig stays libm so the 24-cell scores do not drift. |
-| **12 (e16)** | `double` cm/radian APIs on cone/frontier/planner | Cosmetic type-safety; blast radius is the score table. |
-| **13 (e13)** | Raw `const T*` / out-params (`MatrixCell`, `WavefrontPlanner::plan`, …) | Structural API change, not a mechanical rename. |
-| **14 (e22)** | `ConeTemplateCache::get` returns `const vector&`; `detail` types in ScanPlanning/ExplorationPlan headers | Same class of invasive header change. |
-| **15 (e21)** | String-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` without the `runBoundedSearch` memo | Task 13 only fused the scan-supplement walk in `ScanResultToVoxels`. |
-| **16 (e10)** | LidarCone/ConeTemplate walk overlap, MockLidar ring rebuild, PluginLoader directory loops | Tasks 6–8 shared load-one, `wrapDeg`, and `keyToPoint` only. |
+| **10 (e03)** | Hot-path `std::sin`/`std::cos`/`sqrt` unwraps | Tasks 9–10 only converted MockMovement limit checks and output-map resolution. Remaining trig stays libm so the 24-cell scores do not drift. |
+| **11 (e16)** | `double` cm/radian APIs on cone/frontier/planner | Cosmetic type-safety; blast radius is the score table. |
+| **12 (e13)** | Raw `const T*` / out-params (`MatrixCell`, `WavefrontPlanner::plan`, …) | Structural API change, not a mechanical rename. |
+| **13 (e22)** | `ConeTemplateCache::get` returns `const vector&`; `detail` types in ScanPlanning/ExplorationPlan headers | Same class of invasive header change. |
+| **14 (e21)** | String-pull re-walk, `VoxelStamp::mark` re-quantize, `findPathTo` without the `runBoundedSearch` memo | Task 13 only fused the scan-supplement walk in `ScanResultToVoxels`. |
+| **15 (e10)** | LidarCone/ConeTemplate walk overlap, MockLidar ring rebuild, PluginLoader directory loops | Tasks 6–8 shared load-one, `wrapDeg`, and `keyToPoint` only. |

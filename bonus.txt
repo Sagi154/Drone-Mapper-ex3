@@ -7,3 +7,5 @@ CI2 — ignore movement that would leave the world/map
   MissionControl/src/DroneControlImpl.cpp  (applyMovement + predictedDestination)
 CI10 — amend movement to stay inside mission bounds
   MissionControl/src/DroneControlImpl.cpp  (clampMovementToMissionBounds)
+CI3 — retry invalid algorithm commands then throw
+  MissionControl/src/DroneControlImpl.cpp  (kMaxInvalidCommandRetries)

@@ -451,15 +451,18 @@ applies (`writeCompetitiveReport` instead of `writeComparativeReport`).
 
 Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration calls
 `DroneControlImpl::step()`. Each step carves the drone footprint, then invokes
-`nextStep` once. `AlgorithmStatus::Finished` returns `Completed` with no move or
-scan; over-limit or unsupported commands return `Error`. Otherwise an optional
-movement runs, then at most one scan if the command carries `scan_orientation`
-(including after a recoverable `Continue`), matching the published movement →
-scan → fuse contract. Advance/Elevate are clamped to `mission_bounds` when those
-bounds are set; if the predicted center is still outside the world/map
-(`output_map_.isInBounds`), the command is ignored and Movement is not called
-(clamp then ignore). A step `Error` is pushed as `DRONE_STEP_FAILED` and the
-loop continues; it does not set `MissionRunStatus::Error` by itself.
+`nextStep`. An unsupported movement type is retried inside `step()` up to
+`kMaxInvalidCommandRetries` before any Movement call; after N failures `step()`
+throws (`SimulationRunImpl` maps that to `MISSION_EXCEPTION`).
+`AlgorithmStatus::Finished` returns `Completed` with no move or scan; over-limit
+commands still return `Error`. Otherwise an optional movement runs, then at most
+one scan if the command carries `scan_orientation` (including after a recoverable
+`Continue`), matching the published movement → scan → fuse contract.
+Advance/Elevate are clamped to `mission_bounds` when those bounds are set; if the
+predicted center is still outside the world/map (`output_map_.isInBounds`), the
+command is ignored and Movement is not called (clamp then ignore). A step `Error`
+is pushed as `DRONE_STEP_FAILED` and the loop continues; it does not set
+`MissionRunStatus::Error` by itself.
 
 ![Drone step sequence](hld/seq-drone-step.png)
 
@@ -480,6 +483,7 @@ sequenceDiagram
         DC->>Map: markDroneFootprintEmpty
         DC->>Algo: nextStep(state, latest_scan)
         Algo-->>DC: MappingStepCommand
+        Note over DC: CI3 retry nextStep up to kMaxInvalidCommandRetries if type invalid; then throw
         alt AlgorithmStatus::Finished
             Note over DC: no further move/scan
             DC-->>MC: Completed
