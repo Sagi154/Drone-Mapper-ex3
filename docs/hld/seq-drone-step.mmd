@@ -1,5 +1,6 @@
 sequenceDiagram
     participant MC as MissionControlImpl_207190406_209543255
+    participant Steps as runMissionSteps
     participant DC as DroneControlImpl
     participant Algo as MappingAlgorithmImpl_207190406_209543255
     participant GPS as MockGPS
@@ -8,21 +9,22 @@ sequenceDiagram
     participant SR as applyScanToMap
     participant Map as output Map3DImpl
 
+    MC->>Steps: runMissionSteps
     loop until Finished / MaxSteps
-        MC->>DC: step()
+        Steps->>DC: step()
         DC->>GPS: position() / heading()
         DC->>Map: markDroneFootprintEmpty
         alt pending fragment
             Note over DC: drain pending_movements_ - no nextStep, no extra scan
             DC->>Move: rotate/advance/elevate
-            DC-->>MC: Continue
+            DC-->>Steps: Continue
         else new command
             DC->>Algo: nextStep(state, latest_scan)
             Algo-->>DC: MappingStepCommand
             Note over DC: CI3 retry nextStep up to kMaxInvalidCommandRetries if type invalid, then throw
             alt AlgorithmStatus::Finished
                 Note over DC: no further move/scan
-                DC-->>MC: Completed
+                DC-->>Steps: Completed
             else Continue
                 Note over DC: CI8 split oversize into pending_movements_, first fragment this step
                 alt world-OOB after mission-bounds clamp
@@ -40,7 +42,8 @@ sequenceDiagram
                     DC->>SR: applyScanToMap
                     SR->>Map: set voxels
                 end
-                DC-->>MC: Continue
+                DC-->>Steps: Continue
             end
         end
     end
+    Steps-->>MC: MissionRunResult

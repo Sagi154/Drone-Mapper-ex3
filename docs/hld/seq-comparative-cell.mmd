@@ -6,6 +6,7 @@ sequenceDiagram
     participant Comp as parseCompositionFile
     participant Loader as PluginLoader
     participant Reg as PluginRegistrar
+    participant RPM as runPluginMatrix
     participant Dist as distributeWork
     participant Factory as SimulationRunFactoryImpl
     participant Run as SimulationRunImpl
@@ -27,8 +28,9 @@ sequenceDiagram
     Loader->>Reg: takePending*Factory
     Main->>Factory: ctor(algo factory, mc factory)
     Main->>Main: PluginMatrixBinding filename + factory
-    Main->>Main: expandRunMatrix full cell list
-    Main->>Dist: distributeWork once over plugin x cell matrix
+    Main->>RPM: runPluginMatrix(bindings, composition, output_root, num_threads)
+    RPM->>RPM: expandRunMatrix full cell list
+    RPM->>Dist: distributeWork once over plugin x cell matrix
     loop each flat index
         Dist->>Factory: create(...)
         Factory->>Run: wire maps, mocks, plugins
@@ -44,6 +46,7 @@ sequenceDiagram
             Run-->>Dist: SimulationResult
         end
     end
+    RPM-->>Main: PluginMatrixResult table
     Main->>Yaml: writeSimulationOutputYaml per plugin
     Main->>Rep: writeModeReport / writeComparativeReport
     Main->>Loader: destroy plugin objects then unloadAll / dlclose

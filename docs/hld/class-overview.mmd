@@ -106,6 +106,31 @@ classDiagram
       +forEachSphereSample()
     }
 
+    class TimeFormat {
+      <<module>>
+      +currentUtcTimestamp()
+    }
+
+    class ConfigParseResult {
+      +ok
+      +value
+      +errors
+    }
+
+    class runMissionSteps {
+      <<module>>
+      +runMissionSteps()
+    }
+
+    class BeamMath {
+      <<module>>
+      +pointAlongBeam()
+    }
+
+    class LidarCone {
+      <<module>>
+    }
+
     class WavefrontPlanner
     class MappingAlgorithmFrontier
     class PathShaping {
@@ -203,6 +228,8 @@ classDiagram
     MissionControlFactory --> MissionControlDependencies
     MissionControlImpl_207190406_209543255 ..|> IMissionControl
     MissionControlImpl_207190406_209543255 --> DroneControlImpl
+    MissionControlImpl_207190406_209543255 --> runMissionSteps
+    runMissionSteps --> DroneControlImpl
     DroneControlImpl ..|> IDroneControl
     DroneControlImpl --> IMappingAlgorithm
     DroneControlImpl --> ILidar
@@ -221,6 +248,11 @@ classDiagram
     WavefrontPlanner --> PathShaping
     WavefrontPlanner --> ScanPlanning
     WavefrontPlanner --> ExplorationPlan
+    WavefrontPlanner --> LidarCone
+    LidarCone --> BeamMath
+    PathShaping --> BeamMath
+    ScanPlanning --> BeamMath
+    applyScanToMap --> BeamMath
     Map3DImpl ..|> IMutableMap3D
     IMutableMap3D --|> IMap3D
     MockLidar ..|> ILidar
@@ -229,4 +261,6 @@ classDiagram
     RunErrorLog ..|> IRunErrorLog
     SimulationCoordUtil ..> Map3DImpl : world spawn
     SimulatorPaths ..> RunErrorLog : errorLogPathFromOutputMap
+    SimulatorPaths --> TimeFormat
     YamlConfigParsers ..> IRunErrorLog
+    YamlConfigParsers --> ConfigParseResult

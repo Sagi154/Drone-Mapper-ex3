@@ -48,16 +48,17 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 
 - **`SimulationCli` / `SimulatorPaths` (`Simulator/io/SimulatorPaths.h`)** —
   `parseSimulationCliArgs` returns `SimulationCliArgs`. Path helpers:
-  `createOutputDir` (fresh `comparative_results_<UTC>` / `competition_<UTC>` folder)
-  and `errorLogPathFromOutputMap` (derive `<plugin>_run_NNNN_error.log`).
+  `createOutputDir` (fresh `comparative_results_<UTC>` / `competition_<UTC>` folder
+  via `currentUtcTimestamp()` in `TimeFormat.h`) and `errorLogPathFromOutputMap` (derive
+  `<plugin>_run_NNNN_error.log`).
 
 - **`YamlConfigParsers` (`Simulator/io/YamlConfigParsers.h`)** — Five parsers:
   `parseCompositionFile`, `parseSimulationConfig`, `parseMissionConfig`,
-  `parseDroneConfig`, `parseLidarConfig`. Parse failures are logged immediately
-  through `RunErrorLog` / `IRunErrorLog`. A non-scalar `simulation_config` or a
-  failed nested drone/lidar parse makes `parseCompositionFile` return
-  `ok = false` (`COMPOSITION_INVALID`) instead of throwing or keeping a
-  default-constructed config.
+  `parseDroneConfig`, `parseLidarConfig`. Each returns `ConfigParseResult<T>`.
+  Parse failures are logged immediately through `RunErrorLog` / `IRunErrorLog`.
+  A non-scalar `simulation_config` or a failed nested drone/lidar parse makes
+  `parseCompositionFile` return `ok = false` (`COMPOSITION_INVALID`) instead of
+  throwing or keeping a default-constructed config.
 
 - **`SimulatorReports` (`Simulator/io/SimulatorReports.h`)** —
   `writeComparativeReport`, `writeCompetitiveReport`, `writeSimulationOutputYaml`.
@@ -109,8 +110,9 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   collision), `compareMaps`. `makeMap3D` is src-only (`Map3DNpy.h`).
 
 - **`MissionControlImpl_207190406_209543255`** — Plugin entry point implementing
-  `common::IMissionControl`. Creates `DroneControlImpl`, loops `step()` until the
-  mission finishes or hits max steps, returns `MissionRunResult`.
+  `common::IMissionControl`. Creates `DroneControlImpl`; `runMission()` delegates
+  to `runMissionSteps`, which loops `step()` until the mission finishes or hits
+  max steps, then returns `MissionRunResult`.
 
 - **`DroneControlImpl`** — Implements `mission_control::IDroneControl`. Each step
   carves the drone footprint (`markDroneFootprintEmpty`), then invokes `nextStep`
@@ -126,10 +128,23 @@ interfaces stay in `common/`; simulator-only interfaces stay in
   Uses `WavefrontPlanner`, which composes `MappingAlgorithmFrontier` and calls
   `PathShaping` / `ScanPlanning` to produce an `ExplorationPlan`, then emits
   movement plus a score-aware scan toward that cluster. Scan templates are
-  `ConeTemplateCache` / `VoxelStamp`.
+  `ConeTemplateCache` / `VoxelStamp`. `WavefrontPlanner` uses `LidarCone`;
+  `PathShaping` / `ScanPlanning` / scan fusion use `BeamMath`.
 
 - **`SimulationCoordUtil`** — Shared world/voxel helpers:
   `worldInitialDronePosition`, `forEachSphereSample`.
+
+- **`TimeFormat`** — ISO-8601 UTC helpers (`currentUtcTimestamp`) for output
+  directory names, report `generated_at_utc`, and error-log lines.
+
+- **`ConfigParseResult<T>`** — `{ok, value, errors}` wrapper returned by every
+  YAML parser.
+
+- **`runMissionSteps`** — Free-function mission loop (`MissionRunLoop.h`).
+  `MissionControlImpl::runMission()` forwards here.
+
+- **`BeamMath` / `LidarCone`** — Shared beam geometry and cone FOV helpers in
+  UserCommon. Compiled into each consumer; no cross-`.so` symbol dependency.
 
 - **`SimulationImpl`** — Implements published `simulator::ISimulation`.
   Constructor takes one `ISimulationRunFactory&`, the plugin filename used
@@ -252,6 +267,31 @@ classDiagram
       +forEachSphereSample()
     }
 
+    class TimeFormat {
+      <<module>>
+      +currentUtcTimestamp()
+    }
+
+    class ConfigParseResult {
+      +ok
+      +value
+      +errors
+    }
+
+    class runMissionSteps {
+      <<module>>
+      +runMissionSteps()
+    }
+
+    class BeamMath {
+      <<module>>
+      +pointAlongBeam()
+    }
+
+    class LidarCone {
+      <<module>>
+    }
+
     class WavefrontPlanner
     class MappingAlgorithmFrontier
     class PathShaping {
@@ -349,6 +389,8 @@ classDiagram
     MissionControlFactory --> MissionControlDependencies
     MissionControlImpl_207190406_209543255 ..|> IMissionControl
     MissionControlImpl_207190406_209543255 --> DroneControlImpl
+    MissionControlImpl_207190406_209543255 --> runMissionSteps
+    runMissionSteps --> DroneControlImpl
     DroneControlImpl ..|> IDroneControl
     DroneControlImpl --> IMappingAlgorithm
     DroneControlImpl --> ILidar
@@ -367,6 +409,11 @@ classDiagram
     WavefrontPlanner --> PathShaping
     WavefrontPlanner --> ScanPlanning
     WavefrontPlanner --> ExplorationPlan
+    WavefrontPlanner --> LidarCone
+    LidarCone --> BeamMath
+    PathShaping --> BeamMath
+    ScanPlanning --> BeamMath
+    applyScanToMap --> BeamMath
     Map3DImpl ..|> IMutableMap3D
     IMutableMap3D --|> IMap3D
     MockLidar ..|> ILidar
@@ -375,7 +422,9 @@ classDiagram
     RunErrorLog ..|> IRunErrorLog
     SimulationCoordUtil ..> Map3DImpl : world spawn
     SimulatorPaths ..> RunErrorLog : errorLogPathFromOutputMap
+    SimulatorPaths --> TimeFormat
     YamlConfigParsers ..> IRunErrorLog
+    YamlConfigParsers --> ConfigParseResult
 ```
 
 ## Sequence: one comparative cell
@@ -403,6 +452,7 @@ sequenceDiagram
     participant Comp as parseCompositionFile
     participant Loader as PluginLoader
     participant Reg as PluginRegistrar
+    participant RPM as runPluginMatrix
     participant Dist as distributeWork
     participant Factory as SimulationRunFactoryImpl
     participant Run as SimulationRunImpl
@@ -424,8 +474,9 @@ sequenceDiagram
     Loader->>Reg: takePending*Factory
     Main->>Factory: ctor(algo factory, mc factory)
     Main->>Main: PluginMatrixBinding filename + factory
-    Main->>Main: expandRunMatrix full cell list
-    Main->>Dist: distributeWork once over plugin x cell matrix
+    Main->>RPM: runPluginMatrix(bindings, composition, output_root, num_threads)
+    RPM->>RPM: expandRunMatrix full cell list
+    RPM->>Dist: distributeWork once over plugin x cell matrix
     loop each flat index
         Dist->>Factory: create(...)
         Factory->>Run: wire maps, mocks, plugins
@@ -441,6 +492,7 @@ sequenceDiagram
             Run-->>Dist: SimulationResult
         end
     end
+    RPM-->>Main: PluginMatrixResult table
     Main->>Yaml: writeSimulationOutputYaml per plugin
     Main->>Rep: writeModeReport / writeComparativeReport
     Main->>Loader: destroy plugin objects then unloadAll / dlclose
@@ -452,8 +504,8 @@ applies (`writeCompetitiveReport` instead of `writeComparativeReport`).
 
 ## Sequence: DroneControl step loop
 
-Inside `MissionControlImpl_207190406_209543255::runMission()`, each iteration calls
-`DroneControlImpl::step()`. Each step carves the drone footprint, then invokes
+Inside `MissionControlImpl_207190406_209543255::runMission()`, `runMissionSteps`
+loops `DroneControlImpl::step()`. Each step carves the drone footprint, then invokes
 `nextStep` once unless draining a split-oversize queue. An unsupported movement
 type is retried inside `step()` up to `kMaxInvalidCommandRetries` before any
 Movement call; after N failures `step()` throws (`SimulationRunImpl` maps that
@@ -476,6 +528,7 @@ is pushed as `DRONE_STEP_FAILED` and the loop continues; it does not set
 ```mermaid
 sequenceDiagram
     participant MC as MissionControlImpl_207190406_209543255
+    participant Steps as runMissionSteps
     participant DC as DroneControlImpl
     participant Algo as MappingAlgorithmImpl_207190406_209543255
     participant GPS as MockGPS
@@ -484,21 +537,22 @@ sequenceDiagram
     participant SR as applyScanToMap
     participant Map as output Map3DImpl
 
+    MC->>Steps: runMissionSteps
     loop until Finished / MaxSteps
-        MC->>DC: step()
+        Steps->>DC: step()
         DC->>GPS: position() / heading()
         DC->>Map: markDroneFootprintEmpty
         alt pending fragment
             Note over DC: drain pending_movements_ - no nextStep, no extra scan
             DC->>Move: rotate/advance/elevate
-            DC-->>MC: Continue
+            DC-->>Steps: Continue
         else new command
             DC->>Algo: nextStep(state, latest_scan)
             Algo-->>DC: MappingStepCommand
             Note over DC: CI3 retry nextStep up to kMaxInvalidCommandRetries if type invalid, then throw
             alt AlgorithmStatus::Finished
                 Note over DC: no further move/scan
-                DC-->>MC: Completed
+                DC-->>Steps: Completed
             else Continue
                 Note over DC: CI8 split oversize into pending_movements_, first fragment this step
                 alt world-OOB after mission-bounds clamp
@@ -516,10 +570,11 @@ sequenceDiagram
                     DC->>SR: applyScanToMap
                     SR->>Map: set voxels
                 end
-                DC-->>MC: Continue
+                DC-->>Steps: Continue
             end
         end
     end
+    Steps-->>MC: MissionRunResult
 ```
 
 **Recoverable collision handling:** `MockMovement::advance` / `elevate` detect

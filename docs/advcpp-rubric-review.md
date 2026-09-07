@@ -171,13 +171,13 @@ No function in scope is still 100+ body lines. Largest remaining: `compareMaps` 
 
 ## Appendix — HLD (e14 / e15)
 
-`HLD.pdf` **is** at the repo root (**231,157** bytes after Task 16, 2026-09-06).
+`HLD.pdf` **is** at the repo root (regenerated 2026-09-07 after the e14/e15 leftover pass).
 
-**Class diagram now includes:** `IRunErrorLog` + `RunErrorLog ..|> IRunErrorLog`, `PluginMatrixBinding` / `PluginMatrixResult`, `PathShaping` / `ScanPlanning` / `ExplorationPlan`, `WavefrontPlanner *-- MappingAlgorithmFrontier`, `SimulationRunFactoryImpl` → algorithm/MC factories, `unloadAll()` on `PluginLoader`. `ConfigParseResult` is still omitted (optional appendix leftover).
+**Class diagram now includes:** `IRunErrorLog` + `RunErrorLog ..|> IRunErrorLog`, `PluginMatrixBinding` / `PluginMatrixResult`, `PathShaping` / `ScanPlanning` / `ExplorationPlan`, `WavefrontPlanner *-- MappingAlgorithmFrontier`, `SimulationRunFactoryImpl` → algorithm/MC factories, `unloadAll()` on `PluginLoader`, plus `runMissionSteps`, `ConfigParseResult`, `TimeFormat`, `BeamMath`, `LidarCone`.
 
-**Comparative sequence vs `main.cpp` / `SimulationRunImpl`:** one `expandRunMatrix` then one `distributeWork` over the plugin × cell matrix; nested YAML parse; `takePending*Factory` + `PluginMatrixBinding`; per-run `errorLogPathFromOutputMap`; startup skip scores `kErrorScore`; `writeSimulationOutputYaml` then `writeModeReport`.
+**Comparative sequence vs `main.cpp` / `SimulationRunImpl`:** `main` → `runPluginMatrix` → one `expandRunMatrix` then one `distributeWork` over the plugin × cell matrix; nested YAML parse; `takePending*Factory` + `PluginMatrixBinding`; per-run `errorLogPathFromOutputMap`; startup skip scores `kErrorScore`; `writeSimulationOutputYaml` then `writeModeReport`.
 
-**Drone-step vs `DroneControlImpl::step`:** footprint carve before `nextStep`; recoverable throw still runs `applyScanIfRequested` when `scan_orientation` is set; Finished / Error alts beside Continue. `MockMovement` collision **throws** `std::runtime_error`; limit checks return `{false, message}`.
+**Drone-step vs `DroneControlImpl::step`:** `runMission()` → `runMissionSteps` → `step()`; footprint carve before `nextStep`; recoverable throw still runs `applyScanIfRequested` when `scan_orientation` is set; Finished / Error alts beside Continue. `MockMovement` collision **throws** `std::runtime_error`; limit checks return `{false, message}`.
 
 README vs CMake: presets, `simulator_207190406_209543255`, both `.so` names, and `ctest --test-dir build/default` match. Timestamps: `currentUtcTimestamp()` lives in `TimeFormat.h`.
 

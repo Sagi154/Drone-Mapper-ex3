@@ -11,8 +11,9 @@ Resolved and stale rows are removed (verbose flag, default-composition scoring,
 README, HLD, MockMovement catch in DroneControl, UserCommon-only-in-Simulator,
 scan-batch hang, foreign-MC step inflation, CI9 continue-on-Error, CI2 world-OOB
 ignore, CI10 mission-bounds clamp, CI3 invalid-command retry then throw, CI8
-split-oversize fragments, Unmapped-as-passable, mapping-track band gaps).
-Numbers are compacted `1..n`. Rows 7–14 are deferred AdvCpp rubric leftovers
+split-oversize fragments, Unmapped-as-passable, mapping-track band gaps,
+HLD e14/e15 sequence/class leftover).
+Numbers are compacted `1..n`. Rows 7–13 are deferred AdvCpp rubric leftovers
 from `docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md` plus the
 2026-09-06 re-verify (explained in `docs/known-issues-explained.md`).
 
@@ -30,5 +31,4 @@ from `docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md` plus the
 | 10 | Code | Other | AdvCpp e22: `ConeTemplateCache::get` returns `const vector&`; `ScanPlanning.h` / `ExplorationPlan.h` still expose `detail` types. | Low | Not relevant | --- | Lack of time | Return by value or a view type; move `detail` types out of published headers. |
 | 11 | Code | Other | AdvCpp e21 leftover: string-pull re-walks in `PathShaping`, `VoxelStamp::mark` re-quantizes (`ConeTemplate.cpp:45`), `findPathTo` does not reuse the `runBoundedSearch` memo, plus extra double walks in `buildSweepDirections`, `unmappedInColumnBelow`, `compareMaps` two grid passes, and `ScanResultToVoxels` mark+supplement. | Low | Not relevant | --- | Lack of time | Each site needs its own hot-path correctness argument; bundling them risks an unattributable score regression. |
 | 12 | Code | Code duplication | AdvCpp e10 leftover: `LidarCone`/`ConeTemplate` walk overlap, `MockLidar::scan` ring rebuild, `PluginLoader` directory loops, plus similar bind/CLI-filesystem/`isUnsetBoundaries` copies. | Low | Not relevant | --- | Lack of time | Deduplicate the remaining loops after the load-flow share; keep comparative and competition error messages distinct. |
-| 13 | Code | Other | AdvCpp e15/e14: comparative sequence shows `Main` calling `expandRunMatrix`/`distributeWork`; live path is `main` → `runPluginMatrix`. Class diagram omits `runMissionSteps`, `ConfigParseResult`, `TimeFormat`, `BeamMath`, `LidarCone`. | Low | Not relevant | --- | Lack of time | Add a `runPluginMatrix` participant in `docs/hld/seq-comparative-cell.mmd`, add the missing modules to the class diagram, regenerate `HLD.pdf`. |
-| 14 | Code | Use of hard coded numbers instead of enums / constants | AdvCpp e23 leftovers after Task 14: stamp pad `+ 2.0` (`ConeTemplate.cpp:23`), LOS `step * 0.5`, PathShaping `1e-9`, LidarCone fallback `1.0` cm, MockLidar `360.0 * deg`. | Low | Not relevant | --- | Lack of time | Name each remaining literal. One row covers all leftover magic numbers. |
+| 13 | Code | Use of hard coded numbers instead of enums / constants | AdvCpp e23 leftovers after Task 14: stamp pad `+ 2.0` (`ConeTemplate.cpp:23`), LOS `step * 0.5`, PathShaping `1e-9`, LidarCone fallback `1.0` cm, MockLidar `360.0 * deg`. | Low | Not relevant | --- | Lack of time | Name each remaining literal. One row covers all leftover magic numbers. |
