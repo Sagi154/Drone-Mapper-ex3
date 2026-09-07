@@ -6,6 +6,7 @@
 // Without the offset shift, scans write outside the output map and
 // the score collapses — this is the ex2 regression that must not recur.
 
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/SimulationRunFactoryImpl.h>
 #include <Simulator/SimulationTypes.h>
 
@@ -224,16 +225,22 @@ TEST(SimulationRunFactory, OutputMapConfigReflectsOffset_HouseScenarioShape) {
 }
 
 TEST(SimulationRunFactory, MissingMapFileStillReturnsNonNullRun) {
+    // Extra-spec suite may want missing maps under errors:; we keep them as
+    // scored -1 runs in results_summary (not PluginConstructionError / never_started).
     simulator::types::SimulationConfigData sim{};
     sim.map_filename   = "/no/such/map.npy";
     sim.map_resolution = 10.0 * common::cm;
 
     simulator::SimulationRunFactoryImpl factory{makeAlgorithmFactory(), makeMissionControlFactory(),
                                                 false};
-    auto run = factory.create(sim, {}, {}, {}, "/tmp/srf_missing.npy");
-    EXPECT_NE(run, nullptr);
+    std::unique_ptr<simulator::ISimulationRun> run;
+    EXPECT_NO_THROW({
+        run = factory.create(sim, {}, {}, {}, "/tmp/srf_missing.npy");
+    });
+    ASSERT_NE(run, nullptr);
 
     simulator::types::SimulationResult result = run->run();
+    EXPECT_EQ(result.mission_score, simulator::kErrorScore);
     ASSERT_EQ(result.mission_results.size(), 1u);
     EXPECT_EQ(result.mission_results.front().status, common::types::MissionRunStatus::Error);
 }

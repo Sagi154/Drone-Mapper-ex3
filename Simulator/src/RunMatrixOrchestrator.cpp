@@ -1,6 +1,7 @@
 #include <Simulator/RunMatrixOrchestrator.h>
 
 #include <Simulator/ISimulationRun.h>
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/WorkDistributor.h>
 
 #include <iomanip>
@@ -95,6 +96,7 @@ std::vector<PluginMatrixResult> runPluginMatrix(
 
     // Disjoint flat indices — one writer per slot; no lock needed.
     std::vector<char> threw(total, 0);
+    std::vector<char> construction_failed(total, 0);
 
     (void)distributeWork(
         total, num_threads,
@@ -113,13 +115,19 @@ std::vector<PluginMatrixResult> runPluginMatrix(
                 return;
             }
 
-            auto run = binding.factory.get().create(*cell.simulation, *cell.mission, *cell.drone,
-                                                    *cell.lidar, run_out);
-            if (!run) {
+            try {
+                auto run = binding.factory.get().create(*cell.simulation, *cell.mission,
+                                                        *cell.drone, *cell.lidar, run_out);
+                if (!run) {
+                    table[plugin_index].results[cell_index] = makeFailureResult(cell, run_out);
+                    return;
+                }
+                table[plugin_index].results[cell_index] = run->run();
+            } catch (const PluginConstructionError&) {
+                construction_failed[flat_index] = 1;
                 table[plugin_index].results[cell_index] = makeFailureResult(cell, run_out);
                 return;
             }
-            table[plugin_index].results[cell_index] = run->run();
         },
         [&](std::size_t flat_index) {
             threw[flat_index] = 1;
@@ -139,6 +147,17 @@ std::vector<PluginMatrixResult> runPluginMatrix(
         const std::size_t cell_index   = flat_index % cell_count;
         std::cerr << "error: matrix cell plugin=" << plugins[plugin_index].plugin_filename
                   << " cell=" << cell_index << " threw\n";
+    }
+
+    for (std::size_t p = 0; p < plugin_count; ++p) {
+        bool all_failed = cell_count > 0;
+        for (std::size_t c = 0; c < cell_count; ++c) {
+            if (construction_failed[p * cell_count + c] == 0) {
+                all_failed = false;
+                break;
+            }
+        }
+        table[p].never_started = all_failed;
     }
 
     return table;

@@ -1,6 +1,6 @@
 #include <Simulator/io/SimulatorPaths.h>
 
-#include <user_common_207190406_209543255/TimeFormat.h>
+#include <chrono>
 
 namespace simulator::io {
 
@@ -10,23 +10,31 @@ namespace {
     return kind == OutputDirKind::Comparative ? "comparative_results_" : "competition_";
 }
 
+[[nodiscard]] long long currentEpochSeconds() {
+    return static_cast<long long>(
+        std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count());
+}
+
+constexpr int kMaxCollisionAttempts = 1000; // pathological same-second collision storm
+
 } // namespace
 
 std::filesystem::path createOutputDir(const std::filesystem::path& base_folder,
                                       OutputDirKind kind, std::error_code& ec) {
     ec.clear();
-    const std::string timestamp = user_common_207190406_209543255::currentUtcTimestamp();
     const std::string prefix = prefixFor(kind);
+    long long stamp = currentEpochSeconds();
 
-    std::filesystem::path candidate = base_folder / (prefix + timestamp);
-    int suffix = 2;
-    while (std::filesystem::exists(candidate)) {
-        candidate = base_folder / (prefix + timestamp + "_" + std::to_string(suffix));
-        ++suffix;
-        if (suffix > 1000) { // pathological same-second collision storm
+    std::filesystem::path candidate = base_folder / (prefix + std::to_string(stamp));
+    for (int attempt = 0; std::filesystem::exists(candidate); ++attempt) {
+        if (attempt >= kMaxCollisionAttempts) {
             ec = std::make_error_code(std::errc::file_exists);
             return candidate;
         }
+        ++stamp; // keep the suffix pure digits — no "_N" — so it still matches "<prefix>_<digits>"
+        candidate = base_folder / (prefix + std::to_string(stamp));
     }
 
     std::filesystem::create_directories(candidate, ec);

@@ -42,12 +42,19 @@ prose never defines the unit of "configuration") — see `docs/open-questions.md
 - Usage text and error wording are our choice; make them specific enough to name the offending argument.
 
 Parse and validate **before** loading anything or creating any output directory.
+After argv is accepted, parse the composition and `dlopen` the fixed plugin
+(`algorithm=` / `mission_control=`) **before** `createOutputDir`. Those failures
+return `1` with no results directory. Do not `dlclose` then reload the same `.so`.
+Folder-plugin failures still create a directory and go in report `errors:`.
+Factory construction throws are `errors:` (`never_started`); a missing map is a
+scored `-1` run in `results_summary`, not `errors:`.
 
 ## Output directory
 
-`<time>` must be freshly generated per run so an existing folder is never reused. A UTC timestamp with
-seconds is fine, but must be checked for collision (two runs in the same second) — append a counter if
-the directory already exists.
+`<time>` must be freshly generated per run so an existing folder is never reused. Use a digits-only
+stamp (whole UTC seconds since the Unix epoch). On a same-second collision, increment the numeric
+stamp until the name is free — do not append `_N`, so the directory always matches
+`<prefix>_<digits>`.
 
 If the directory cannot be created, write a proper error to screen and finish.
 

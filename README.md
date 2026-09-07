@@ -82,15 +82,22 @@ cp "$BUILD/MissionControl/MissionControl_207190406_209543255.so" "$SCRATCH/"
 ctest --test-dir build/default --output-on-failure
 ```
 
+Rejected CLI (missing/unsupported args, unopenable files, empty plugin folders)
+exits with status `1` and does not create a results directory. After argv is
+accepted, a composition that cannot be parsed or a fixed plugin that cannot be
+`dlopen`ed also exits `1` with no directory. Folder-plugin load failures still
+create a directory and list those `.so` names under report `errors:`.
+
 ## Output naming
 
-Each run creates a fresh output directory (never reused):
+Each successful startup creates a fresh output directory (never reused):
 
-- Comparative mode: `<mission_control_folder>/comparative_results_<UTC time>[_N]`
-- Competition mode: `<algorithms_folder>/competition_<UTC time>[_N]`
+- Comparative mode: `<mission_control_folder>/comparative_results_<epoch_seconds>`
+- Competition mode: `<algorithms_folder>/competition_<epoch_seconds>`
 
-`<UTC time>` is `currentUtcTimestamp()` (`user_common_207190406_209543255/TimeFormat.h`); `_N`
-is appended starting at `_2` if a directory with that name already exists (same-second collision).
+`<epoch_seconds>` is whole UTC seconds since the Unix epoch (digits only). On a same-second
+collision the stamp is incremented until the directory name is free, so the suffix stays
+pure digits (no `_N` append).
 
 Inside that directory:
 

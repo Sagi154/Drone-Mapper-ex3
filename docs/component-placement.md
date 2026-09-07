@@ -71,7 +71,7 @@ Only put something here once a **second** project actually needs it. Genuine can
 | Ex2 file | Note |
 |----------|------|
 | `src/SimulationCoordUtil.cpp` | world↔voxel and offset math — the algorithm, drone control, and simulator all reason about grid coordinates |
-| `src/io/TimeFormat.cpp` | ISO-8601 UTC timestamps for error logs (all three projects) and the `<time>` in output folder names |
+| `src/io/TimeFormat.cpp` | ISO-8601 UTC timestamps for error logs (all three projects). Output folder `<time>` is digits-only epoch seconds in `OutputDirHelper`, not this helper. |
 | `src/io/RunErrorLog.cpp`, `include/.../io/IRunErrorLog.h` | immediate-flush error log; mission control and algorithm may both write error logs |
 | a `ConfigParseResult<T>` type | replaces the removed `config_load_error` fields (see `docs/api-delta-ex2-to-ex3.md`) |
 | `BeamMath.h` / lidar cone helpers | beam stepping + cone FOV math shared by Algorithm (gain-gating) and MissionControl (fusion) |

@@ -3,6 +3,7 @@
 #include <Simulator/ISimulationRun.h>
 #include <Simulator/ISimulationRunFactory.h>
 #include <Simulator/RunMatrixOrchestrator.h>
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/SimulationImpl.h>
 #include <Simulator/SimulationTypes.h>
 
@@ -64,6 +65,18 @@ public:
         const common::types::LidarConfigData& /*lidar_config*/,
         const std::filesystem::path& /*output_path*/) override {
         return std::make_unique<ThrowingRun>();
+    }
+};
+
+class ConstructionThrowingFactory final : public simulator::ISimulationRunFactory {
+public:
+    [[nodiscard]] std::unique_ptr<simulator::ISimulationRun> create(
+        const simulator::types::SimulationConfigData& /*simulation_config*/,
+        const common::types::MissionConfigData& /*mission_config*/,
+        const common::types::DroneConfigData& /*drone_config*/,
+        const common::types::LidarConfigData& /*lidar_config*/,
+        const std::filesystem::path& /*output_path*/) override {
+        throw simulator::PluginConstructionError("factory refused construction");
     }
 };
 
@@ -174,7 +187,35 @@ TEST(RunMatrixOrchestrator, ThrowingRunWritesFailureSentinelWithoutAbortingMatri
     ASSERT_EQ(table[1].results.size(), 2U);
     EXPECT_EQ(table[0].results[0].mission_score, -1.0);
     EXPECT_EQ(table[0].results[1].mission_score, -1.0);
+    EXPECT_FALSE(table[0].never_started);
+    EXPECT_FALSE(table[1].never_started);
     EXPECT_EQ(ok_factory.create_calls.load(), 2);
+}
+
+TEST(RunMatrixOrchestrator, ConstructionThrowMarksPluginNeverStarted) {
+    simulator::types::SimulationCompositionData composition;
+    composition.simulation_mission_groups.push_back(
+        {simulator::types::SimulationConfigData{}, {common::types::MissionConfigData{}}});
+    composition.drone_configs.resize(1);
+    composition.lidar_configs.resize(1); // one cell
+
+    ConstructionThrowingFactory bad;
+    FakeRunFactory good;
+
+    const std::vector<simulator::PluginMatrixBinding> plugins = {
+        {"throw.so", std::ref(bad)},
+        {"good.so", std::ref(good)},
+    };
+
+    const auto table = simulator::runPluginMatrix(
+        plugins, composition, std::filesystem::path{"/tmp/orch_ctor"}, /*num_threads=*/1);
+
+    ASSERT_EQ(table.size(), 2U);
+    EXPECT_TRUE(table[0].never_started);
+    EXPECT_FALSE(table[1].never_started);
+    ASSERT_EQ(table[0].results.size(), 1U);
+    EXPECT_EQ(table[0].results[0].mission_score, -1.0);
+    EXPECT_EQ(good.create_calls.load(), 1);
 }
 
 TEST(SimulationImpl, RunViaISimulationFillsManagerReportForOneComposition) {

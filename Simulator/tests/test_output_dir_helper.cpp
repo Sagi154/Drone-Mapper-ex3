@@ -4,6 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cctype>
+#include <cstring>
 #include <filesystem>
 #include <system_error>
 
@@ -19,6 +22,13 @@ TEST(OutputDirHelper, ComparativePrefixAndNoCollisionInSameSecond) {
     ASSERT_FALSE(ec1);
     ASSERT_TRUE(std::filesystem::exists(first));
     EXPECT_EQ(first.filename().string().rfind("comparative_results_", 0), 0U);
+
+    const std::string suffix =
+        first.filename().string().substr(std::strlen("comparative_results_"));
+    EXPECT_FALSE(suffix.empty());
+    EXPECT_TRUE(std::all_of(suffix.begin(), suffix.end(),
+                            [](unsigned char c) { return std::isdigit(c); }))
+        << "the <time> part must be digits-only: " << first.filename();
 
     std::error_code ec2;
     const auto second =
@@ -42,6 +52,12 @@ TEST(OutputDirHelper, CompetitionUsesCompetitionPrefix) {
         simulator::io::createOutputDir(base, simulator::io::OutputDirKind::Competition, ec);
     ASSERT_FALSE(ec);
     EXPECT_EQ(dir.filename().string().rfind("competition_", 0), 0U);
+
+    const std::string suffix = dir.filename().string().substr(std::strlen("competition_"));
+    EXPECT_FALSE(suffix.empty());
+    EXPECT_TRUE(std::all_of(suffix.begin(), suffix.end(),
+                            [](unsigned char c) { return std::isdigit(c); }))
+        << "the <time> part must be digits-only: " << dir.filename();
 
     std::filesystem::remove_all(base);
 }

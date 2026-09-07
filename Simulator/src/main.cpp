@@ -5,6 +5,9 @@
 #include <Simulator/io/SimulatorReports.h>
 #include <Simulator/io/YamlConfigParsers.h>
 
+#include <Common/types/MissionTypes.h>
+
+#include <user_common_207190406_209543255/IRunErrorLog.h>
 #include <user_common_207190406_209543255/RunErrorLog.h>
 #include <user_common_207190406_209543255/TimeFormat.h>
 
@@ -28,17 +31,40 @@ struct PluginBootstrap {
     std::vector<std::string> failed_plugins;
 };
 
-[[nodiscard]] PluginBootstrap loadPlugins(const sim_io::SimulationCliArgs& args) {
-    PluginBootstrap boot;
-    using simulator::SimulationRunFactoryImpl;
+/// Startup log before an output directory exists (compose-parse failures).
+struct CerrRunErrorLog final : UC::IRunErrorLog {
+    void log(const common::types::ErrorRef& error) override {
+        std::cerr << UC::currentUtcTimestamp() << ' ' << error.code << ' ' << error.message
+                  << '\n';
+    }
+};
 
+/// Phase A — call BEFORE mkdir. Loads the fixed plugin and keeps the handle open.
+/// Returns false when the fixed .so is not loadable (caller returns 1, no dir).
+[[nodiscard]] bool loadFixedPlugin(PluginBootstrap& boot, const sim_io::SimulationCliArgs& args) {
     if (args.mode == sim_io::SimulatorMode::Comparative) {
         const auto algo_outcome = boot.loader.loadAlgorithmSo(args.algorithm);
         if (!algo_outcome.errors.empty()) {
             std::cerr << "error: failed to load algorithm " << args.algorithm << '\n';
             simulator::appendLoadErrors(boot.failed_plugins, algo_outcome);
-            return boot;
+            return false;
         }
+        return true;
+    }
+    const auto mc_outcome = boot.loader.loadMissionControlSo(args.mission_control);
+    if (!mc_outcome.errors.empty()) {
+        std::cerr << "error: failed to load mission control " << args.mission_control << '\n';
+        simulator::appendLoadErrors(boot.failed_plugins, mc_outcome);
+        return false;
+    }
+    return true;
+}
+
+/// Phase B — call AFTER mkdir. Loads folder plugins and fills factories/bindings.
+void loadFolderPlugins(PluginBootstrap& boot, const sim_io::SimulationCliArgs& args) {
+    using simulator::SimulationRunFactoryImpl;
+
+    if (args.mode == sim_io::SimulatorMode::Comparative) {
         const auto mc_outcome =
             boot.loader.loadMissionControlsFromDirectory(args.mission_control_folder);
         for (const auto& name : mc_outcome.errors) {
@@ -48,20 +74,13 @@ struct PluginBootstrap {
         const auto& algorithm_factory = boot.loader.algorithmAt(0).factory;
         for (std::size_t i = 0; i < boot.loader.missionControlCount(); ++i) {
             const auto& mc = boot.loader.missionControlAt(i);
-            boot.factories.push_back(
-                std::make_unique<SimulationRunFactoryImpl>(algorithm_factory, mc.factory,
-                                                           args.verbose));
+            boot.factories.push_back(std::make_unique<SimulationRunFactoryImpl>(
+                algorithm_factory, mc.factory, args.verbose));
             boot.bindings.push_back({mc.filename, std::ref(*boot.factories.back())});
         }
-        return boot;
+        return;
     }
 
-    const auto mc_outcome = boot.loader.loadMissionControlSo(args.mission_control);
-    if (!mc_outcome.errors.empty()) {
-        std::cerr << "error: failed to load mission control " << args.mission_control << '\n';
-        simulator::appendLoadErrors(boot.failed_plugins, mc_outcome);
-        return boot;
-    }
     const auto algo_outcome = boot.loader.loadAlgorithmsFromDirectory(args.algorithms_folder);
     for (const auto& name : algo_outcome.errors) {
         std::cerr << "warning: algorithm failed to load: " << name << '\n';
@@ -74,7 +93,6 @@ struct PluginBootstrap {
             algo.factory, mission_control_factory, args.verbose));
         boot.bindings.push_back({algo.filename, std::ref(*boot.factories.back())});
     }
-    return boot;
 }
 
 void writeModeReport(sim_io::SimulatorMode mode, const fs::path& output_root,
@@ -157,9 +175,27 @@ int main(int argc, char** argv) {
     const sim_io::SimulationCliParseResult cli =
         sim_io::parseSimulationCliArgs(argc, argv, &std::cerr);
     if (!cli.ok) {
-        return 0; // usage + errors already written to std::cerr; never exit()
+        return 1; // usage + errors already written to std::cerr; never exit()
     }
     const sim_io::SimulationCliArgs& args = cli.args;
+
+    // Parse composition before any dlopen or mkdir — fail closed with no results dir.
+    CerrRunErrorLog startup_log;
+    const auto composition_result = sim_io::parseCompositionFile(args.simulation, startup_log);
+    if (!composition_result.ok) {
+        std::cerr << "error: failed to parse composition file " << args.simulation << '\n';
+        for (const auto& err : composition_result.errors) {
+            std::cerr << "  " << err.code << ": " << err.message << '\n';
+        }
+        return 1;
+    }
+    const simulator::types::SimulationCompositionData& composition = composition_result.value;
+
+    PluginBootstrap plugins;
+    if (!loadFixedPlugin(plugins, args)) {
+        plugins.loader.unloadAll();
+        return 1;
+    }
 
     const sim_io::OutputDirKind dir_kind = args.mode == sim_io::SimulatorMode::Comparative
                                                ? sim_io::OutputDirKind::Comparative
@@ -173,21 +209,16 @@ int main(int argc, char** argv) {
     if (mkdir_ec) {
         std::cerr << "error: could not create output directory under " << base_folder << ": "
                   << mkdir_ec.message() << '\n';
+        plugins.loader.unloadAll();
         return 0;
     }
 
-    UC::RunErrorLog startup_log(output_root / "startup_error.log");
-    const auto composition_result = sim_io::parseCompositionFile(args.simulation, startup_log);
-    if (!composition_result.ok) {
-        std::cerr << "error: failed to parse composition file " << args.simulation << '\n';
-        for (const auto& err : composition_result.errors) {
-            std::cerr << "  " << err.code << ": " << err.message << '\n';
-        }
-        return 0;
-    }
-    const simulator::types::SimulationCompositionData& composition = composition_result.value;
+    // File-backed log for later run logs (startup already went to stderr).
+    UC::RunErrorLog run_log(output_root / "startup_error.log");
+    (void)run_log;
 
-    PluginBootstrap plugins = loadPlugins(args);
+    loadFolderPlugins(plugins, args);
+
     const std::string generated_at_utc = UC::currentUtcTimestamp();
     std::vector<simulator::PluginMatrixResult> results;
     if (plugins.bindings.empty()) {
@@ -195,9 +226,20 @@ int main(int argc, char** argv) {
     } else {
         results = simulator::runPluginMatrix(
             plugins.bindings, composition, output_root, args.num_threads.value_or(1));
+        std::vector<simulator::PluginMatrixResult> ranked;
+        ranked.reserve(results.size());
+        for (auto& row : results) {
+            if (row.never_started) {
+                plugins.failed_plugins.push_back(row.plugin_filename);
+            } else {
+                ranked.push_back(std::move(row));
+            }
+        }
+        results = std::move(ranked);
         printRunCounts(results);
         writePerPluginSimulationYaml(output_root, composition, generated_at_utc, results);
     }
+    // Folder yields zero bindings: still write the mode report with failed_plugins.
     writeModeReport(args.mode, output_root, args, composition, generated_at_utc, results,
                     plugins.failed_plugins);
     std::cout << "output written under: " << output_root << '\n';

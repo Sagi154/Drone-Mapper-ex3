@@ -38,19 +38,23 @@ interfaces stay in `common/`; simulator-only interfaces stay in
 ## Main components
 
 - **`main` (`Simulator/src/main.cpp`)** — Parses CLI via `parseSimulationCliArgs`
-  (`SimulationCliArgs`), creates the timestamped output directory with
-  `createOutputDir`, loads the composition YAML, loads plugins through `PluginLoader`,
-  builds one `SimulationRunFactoryImpl` per plugin binding, invokes
+  (`SimulationCliArgs`). Invalid argv returns `1` with no results directory.
+  Then parses the composition YAML and `dlopen`s the **fixed** plugin
+  (`algorithm=` / `mission_control=`) while keeping the handle open. Compose-parse
+  or fixed-plugin load failure returns `1` with no directory. Only then
+  `createOutputDir`, load folder plugins through `PluginLoader`, build one
+  `SimulationRunFactoryImpl` per plugin binding, invoke
   `runPluginMatrix(bindings, composition, output_root, num_threads)` (`expandRunMatrix`
-  runs inside that call), writes per-plugin `writeSimulationOutputYaml` then
+  runs inside that call), drop construction-throw plugins from `results_summary`
+  into report `errors:`, write per-plugin `writeSimulationOutputYaml` then
   `writeModeReport` → `writeComparativeReport` / `writeCompetitiveReport`, then
-  destroys plugin objects and calls `PluginLoader::unloadAll()` before return.
+  destroy plugin objects and call `PluginLoader::unloadAll()` before return.
 
 - **`SimulationCli` / `SimulatorPaths` (`Simulator/io/SimulatorPaths.h`)** —
   `parseSimulationCliArgs` returns `SimulationCliArgs`. Path helpers:
-  `createOutputDir` (fresh `comparative_results_<UTC>` / `competition_<UTC>` folder
-  via `currentUtcTimestamp()` in `TimeFormat.h`) and `errorLogPathFromOutputMap` (derive
-  `<plugin>_run_NNNN_error.log`).
+  `createOutputDir` (fresh `comparative_results_<epoch_seconds>` /
+  `competition_<epoch_seconds>` folder; digits-only stamp, incremented on collision) and
+  `errorLogPathFromOutputMap` (derive `<plugin>_run_NNNN_error.log`).
 
 - **`YamlConfigParsers` (`Simulator/io/YamlConfigParsers.h`)** — Five parsers:
   `parseCompositionFile`, `parseSimulationConfig`, `parseMissionConfig`,
@@ -463,13 +467,14 @@ sequenceDiagram
 
     User->>Main: -comparative simulation=... mission_control_folder=... algorithm=...
     Main->>Cli: parseSimulationCliArgs
-    Main->>Out: createOutputDir
     Main->>Comp: parseCompositionFile
     Comp->>Comp: parseSimulationConfig
     Comp->>Comp: parseMissionConfig
     Comp->>Comp: parseDroneConfig
     Comp->>Comp: parseLidarConfig
-    Main->>Loader: loadAlgorithmSo + loadMissionControlsFromDirectory
+    Main->>Loader: loadAlgorithmSo (keep handle)
+    Main->>Out: createOutputDir
+    Main->>Loader: loadMissionControlsFromDirectory
     Loader->>Reg: REGISTER_* static ctors fill pending factories
     Loader->>Reg: takePending*Factory
     Main->>Factory: ctor(algo factory, mc factory)

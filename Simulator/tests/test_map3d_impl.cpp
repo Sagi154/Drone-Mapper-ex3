@@ -12,8 +12,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <string>
 
 using namespace common;
 using namespace common::types;
@@ -36,10 +38,11 @@ namespace {
     return cfg;
 }
 
+constexpr char kNpyInt8TypeChar = 'i'; // NumPy descr |i1 (not TinyNPY 'b')
+
 [[nodiscard]] std::shared_ptr<NpyArray> makeInt8Map(const NpyArray::shape_t& shape,
                                                      std::int8_t fill_value) {
-    auto map = std::make_shared<NpyArray>(shape, sizeof(std::int8_t),
-                                          NpyArray::GetTypeChar(typeid(std::int8_t)));
+    auto map = std::make_shared<NpyArray>(shape, sizeof(std::int8_t), kNpyInt8TypeChar);
     map->Allocate();
     std::fill_n(map->Data<std::int8_t>(), map->NumValue(), fill_value);
     return map;
@@ -187,6 +190,24 @@ TEST(Map3DImpl, SaveLoadRoundTripPreservesOccupied) {
     const Map3DImpl reloaded_impl = makeMap3D(reloaded, MapRole::Output, makeConfig());
     EXPECT_EQ(reloaded_impl.atVoxel(target), VoxelOccupancy::Occupied);
 
+    std::error_code ec;
+    std::filesystem::remove(temp, ec);
+}
+
+TEST(Map3DImpl, SavedOutputMapHeaderUsesInt8Descr) {
+    const auto map = makeInt8Map({3, 3, 3},
+                                 static_cast<std::int8_t>(VoxelOccupancy::Unmapped));
+    Map3DImpl impl = makeMap3D(map, MapRole::Output, makeConfig());
+    const auto temp = std::filesystem::temp_directory_path() / "map3d_impl_descr.npy";
+    impl.save(temp);
+    std::ifstream in(temp, std::ios::binary);
+    std::string header(256, '\0');
+    in.read(header.data(), static_cast<std::streamsize>(header.size()));
+    header.resize(static_cast<std::size_t>(in.gcount()));
+    EXPECT_TRUE(header.find("|i1") != std::string::npos ||
+                header.find("'i1'") != std::string::npos ||
+                header.find("i1") != std::string::npos)
+        << "TinyNPY descr must be 1-byte signed int, got: " << header;
     std::error_code ec;
     std::filesystem::remove(temp, ec);
 }

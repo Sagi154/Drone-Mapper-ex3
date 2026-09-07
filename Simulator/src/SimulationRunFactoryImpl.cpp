@@ -14,6 +14,7 @@
 #include <Simulator/MockGPS.h>
 #include <Simulator/MockLidar.h>
 #include <Simulator/MockMovement.h>
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/SimulationRunImpl.h>
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
@@ -102,9 +103,10 @@ namespace UC = user_common_207190406_209543255;
     if (nx == 0 || ny == 0 || nz == 0) {
         return std::make_shared<NpyArray>();
     }
+    constexpr char kNpyInt8TypeChar = 'i'; // NumPy descr |i1
     auto map = std::make_shared<NpyArray>(NpyArray::shape_t{nx, ny, nz},
                                           sizeof(std::int8_t),
-                                          NpyArray::GetTypeChar(typeid(std::int8_t)));
+                                          kNpyInt8TypeChar);
     map->Allocate();
     std::fill_n(map->Data<std::int8_t>(), map->NumValue(),
                 static_cast<std::int8_t>(VoxelOccupancy::Unmapped));
@@ -166,25 +168,46 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData&      simulat
     auto movement  = std::make_unique<simulator::MockMovement>(*gps, *hidden_map, drone_config);
     auto lidar     = std::make_unique<simulator::MockLidar>(lidar_config, *hidden_map, *gps);
 
-    // Invoke plugin factories
-    auto mapping_algorithm = algorithm_factory_(common::MappingAlgorithmDependencies{
-        .mission_config = mission_config,
-        .lidar_config   = lidar_config,
-        .drone_config   = drone_config,
-        .output_map     = *output_map,
-    });
+    // Invoke plugin factories — construction throws become PluginConstructionError
+    // so the orchestrator can list the plugin under report errors: (never_started).
+    std::unique_ptr<common::IMappingAlgorithm> mapping_algorithm;
+    try {
+        mapping_algorithm = algorithm_factory_(common::MappingAlgorithmDependencies{
+            .mission_config = mission_config,
+            .lidar_config   = lidar_config,
+            .drone_config   = drone_config,
+            .output_map     = *output_map,
+        });
+    } catch (const std::exception& ex) {
+        throw PluginConstructionError(std::string("algorithm factory: ") + ex.what());
+    } catch (...) {
+        throw PluginConstructionError("algorithm factory threw");
+    }
+    if (!mapping_algorithm) {
+        throw PluginConstructionError("algorithm factory returned null");
+    }
 
-    auto mission_control = mission_control_factory_(common::MissionControlDependencies{
-        .mission_config    = mission_config,
-        .drone_config      = drone_config,
-        .lidar             = *lidar,
-        .gps               = *gps,
-        .movement          = *movement,
-        .output_map        = *output_map,
-        .mapping_algorithm = *mapping_algorithm,
-        .output_map_file   = output_path,
-        .verbose           = verbose_,
-    });
+    std::unique_ptr<common::IMissionControl> mission_control;
+    try {
+        mission_control = mission_control_factory_(common::MissionControlDependencies{
+            .mission_config    = mission_config,
+            .drone_config      = drone_config,
+            .lidar             = *lidar,
+            .gps               = *gps,
+            .movement          = *movement,
+            .output_map        = *output_map,
+            .mapping_algorithm = *mapping_algorithm,
+            .output_map_file   = output_path,
+            .verbose           = verbose_,
+        });
+    } catch (const std::exception& ex) {
+        throw PluginConstructionError(std::string("mission control factory: ") + ex.what());
+    } catch (...) {
+        throw PluginConstructionError("mission control factory threw");
+    }
+    if (!mission_control) {
+        throw PluginConstructionError("mission control factory returned null");
+    }
 
     return std::make_unique<SimulationRunImpl>(
         std::move(hidden_map),
