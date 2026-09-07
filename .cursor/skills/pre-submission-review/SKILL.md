@@ -9,8 +9,10 @@ Assignment 3's packaging rules are stricter and more novel than ex2's — a wron
 ID in a filename is a compliance failure (`e18`, 0/2/4) independent of whether the code works. This is
 the ex3-specific risk worth a dedicated pass; it has no ex2 equivalent because ex2 shipped one project.
 
-Full source: `docs/assignment3-checklist.md`. Run this checklist against the actual working tree, not
-from memory.
+Full source: `docs/assignment3-checklist.md`. Contents include/exclude (what to stage, what
+must not ship): `docs/submission-junk-audit.md` — follow that list; do not copy it into
+this skill. Run this checklist against the **staging tree / produced zip**, not by zipping
+the git working copy.
 
 ## 1. Five top-level folders in the zip
 
@@ -22,13 +24,14 @@ common/          (unmodified from the skeleton — see step 2)
 UserCommon/      (ours; no build file)
 ```
 
-Plus, directly in the zip root (not nested in any folder): `students.txt`, `README.md`, and the 4th
-build file that builds all three projects.
+Plus, directly in the zip root (not nested in any folder): `students.txt`, `README.md`,
+`HLD.pdf`, the 4th build file, `CMakePresets.json`, `vcpkg.json`,
+`vcpkg-configuration.json`, `bonus.txt`, and (optional) Known Issues `.xlsx`.
 
-- [ ] `find . -maxdepth 1 -type d` shows exactly these 5 project folders (plus dotfiles/`context`/`inputs`,
-      which are ours to keep for dev but should be excluded from the submission zip — check
-      `.gitignore` / the zip step against the assignment's file list, since only the 5 folders + the 3
-      root files + build files are actually required).
+- [ ] The **zip** (not the working tree) has exactly these 5 project folders at its root.
+      Working-copy extras (`.cursor/`, `AGENTS.md`, `docs/`, `context/`, `scripts/`,
+      `build/`, `tmp/`, `.cache/`, `.venv/`, `.vscode/`, `compile_commands.json`, …) must
+      not appear. Full exclude list: `docs/submission-junk-audit.md`.
 - [ ] `UserCommon/` exists and has **no** `CMakeLists.txt` of its own.
 
 ## 2. `common/` is untouched
@@ -120,31 +123,44 @@ ls inputs/
 - [ ] At least one `.npy` map file present (reachable via that YAML).
 - [ ] No instructor-provided file has been deleted or moved to a non-submission path.
 
-Note: `inputs/` is **ours to keep for dev** but should **not** itself be excluded from the zip
-if the graders' test scripts reference a relative `inputs/` path — confirm with the assignment
-docx or forum before stripping it.
+If the zip includes `inputs/` (README example uses a relative `inputs/` path): include the
+instructor maps/YAML; **drop** `inputs/profile_cell.yaml` (dev-only single cell). `.cw` /
+`npy_to_cw.py` are optional visualization extras. Details: `docs/submission-junk-audit.md`.
 
 ## 5d. Produced-zip archive check (`ZIP-01` / `ZIP-04` / `ZIP-05`)
 
-Steps §1–5c all inspect the working tree. This step builds and inspects the **actual archive** so
-nothing extra gets swept in, and the zip name / root placement are verified exactly.
+Steps §1–5c can inspect the working tree. This step **assembles a staging tree**, zips
+**that**, and inspects the **actual archive**. Do **not** zip the git working copy. Do
+**not** use `git archive` (it still ships `.cursor/`, `AGENTS.md`, `docs/`, `context/`,
+`scripts/`). Excluding only `build/`, `.git/`, and `tmp/` is **not** enough.
+
+Staging recipe (authoritative omit-list is in `docs/submission-junk-audit.md`):
+
+1. Copy the five folders, minus the audit's **safe-to-omit** items (today:
+   `Simulator/tests/manual/`, fixture `*ASSUMPTIONS.md`, `tiny_*.yaml`,
+   `skeleton_host/ASSUMPTIONS.md` + its standalone `CMakeLists.txt`, leftover `.gitkeep`).
+   Do **not** drop C++ test/fixture/`skeleton_host` **sources** unless CMake is gated —
+   the default `cmake --preset default` build still compiles them.
+2. Copy root `CMakeLists.txt`, `CMakePresets.json`, `vcpkg.json`,
+   `vcpkg-configuration.json`, `README.md`, `students.txt`, `HLD.pdf`, `bonus.txt`.
+3. Optionally copy `inputs/` minus `profile_cell.yaml`, and Known Issues `.xlsx` (export
+   from `docs/known-issues.md`; never ship the markdown).
+4. Zip the staging tree so folders sit at the **archive root** (no extra wrapper folder).
 
 ```bash
-# Build the zip (adjust path/command to match your zip step):
-cd <parent-of-submission-root>
-zip -r ex3_207190406_209543255.zip ex3_207190406_209543255/ \
-    --exclude '*/build/*' --exclude '*/.git/*' --exclude '*/tmp/*'
-
-# Inspect the zip:
-unzip -l ex3_207190406_209543255.zip | head -40
+# Inspect the produced zip (Windows: tar -tf works):
+tar -tf ex3_207190406_209543255.zip | more
 ```
 
 - [ ] **ZIP-01** — archive name is exactly `ex3_<id1>_<id2>.zip` (no extra prefix, no `.tar`).
 - [ ] **ZIP-04** — all five top-level folders (`Simulator/`, `Algorithm/`, `MissionControl/`,
       `common/`, `UserCommon/`) appear at the zip root with **no extra nesting**
       (i.e., not `ex3_207190406_209543255/Simulator/…`).
-- [ ] **ZIP-05** — `students.txt`, `README.md`, and the root `CMakeLists.txt` appear at the zip
-      root alongside the folders, not nested inside any subfolder.
+- [ ] **ZIP-05** — at the zip root alongside the folders: `students.txt`, `README.md`,
+      `HLD.pdf`, root `CMakeLists.txt`, `CMakePresets.json`, `vcpkg.json`,
+      `vcpkg-configuration.json`, `bonus.txt`. Known Issues `.xlsx` only if exporting.
+- [ ] Zip listing has **no** `.cursor/`, `AGENTS.md`, `docs/`, `context/`, `scripts/`,
+      `build/`, `tmp/`, `.cache/`, `.venv/`, `.git/`.
 - [ ] Re-run `find` for binaries inside the extracted zip to confirm §5's check holds for the
       actual archive contents (build artifacts sometimes land here if the zip step is too broad).
 
@@ -154,8 +170,13 @@ unzip -l ex3_207190406_209543255.zip | head -40
       output-map naming pattern chosen for comparative/competitive result folders.
 - [ ] `students.txt` — one line per submitter, name + id, no `TODO:` left.
 - [ ] HLD as a PDF in the submission root, matching the current class/sequence diagrams (e14/e15).
-- [ ] `bonus.txt` only if a bonus is actually being claimed, pointing at real files/line numbers.
-- [ ] Known Issues excel (optional, `docs/known-issues-guidelines.md`) if we have anything worth listing.
+      Do not ship `docs/HLD.md` or `docs/hld/*.mmd`.
+- [ ] `bonus.txt` is **required** for this submission — claims CI9, CI2, CI10, CI3, CI8
+      with real file:line. Do not list those in the Known Issues excel.
+- [ ] Known Issues `.xlsx` (optional): export from the **current** `docs/known-issues.md`
+      table via the staff Google Sheet clone (`docs/known-issues-guidelines.md`; excel
+      procedure: `populate-known-issues`). Never ship `docs/known-issues.md` or
+      `docs/known-issues-explained.md`. Do not re-add pruned/claimed rows.
 
 ## 7. Functional smoke pass (both modes)
 
@@ -185,5 +206,7 @@ Run each mode once against `inputs/` before packaging — a working build that f
 ## Reference
 
 - `docs/assignment3-checklist.md` — full mandatory requirements
+- `docs/submission-junk-audit.md` — zip include/exclude and inside-folder omit-list (do not duplicate here)
+- `docs/known-issues.md` / `docs/known-issues-guidelines.md` — excel source and staff columns
 - `docs/api-delta-ex2-to-ex3.md` — what changed vs. the ex2 skeleton
 - `docs/open-questions.md` — assumptions to double check against the forum before the deadline
