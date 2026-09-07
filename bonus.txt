@@ -3,11 +3,11 @@ Optional Common-issues recoveries (context/Common issues and handling.pdf)
 CI9 - Drone step Error: log and continue the max_steps loop
   MissionControl/src/MissionControlImpl.cpp  (runMissionSteps)
   MissionControl/include/MissionControl/MissionRunLoop.h
-CI2 - ignore movement that would leave the world/map
+CI2 - ignore Advance/Elevate whose predicted center leaves the output map
   MissionControl/src/DroneControlImpl.cpp  (applyMovement + predictedDestination)
-CI10 - amend movement to stay inside mission bounds
+CI10 - clamp Advance/Elevate to mission_bounds (then CI2 if still world-OOB)
   MissionControl/src/DroneControlImpl.cpp  (clampMovementToMissionBounds)
-CI3 - retry invalid algorithm commands then throw
+CI3 - retry unsupported movement type (not oversize) then throw
   MissionControl/src/DroneControlImpl.cpp  (kMaxInvalidCommandRetries)
 CI8 - split oversize movement into legal steps
   MissionControl/src/DroneControlImpl.cpp:73  (splitWithinLimits)

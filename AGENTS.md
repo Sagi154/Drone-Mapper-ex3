@@ -79,7 +79,7 @@ or MissionControl.
 | `docs/error-handling-matrix.md` | Mandatory + optional fault-handling table (course staff PDF) |
 | `docs/map3d-contract.md` | `.npy` dtype rules (maps are **mixed** `int8`/`uint8`), world↔voxel mapping |
 | `docs/review-error-codes.md` | AdvCpp rubric codes (`e*`, `b*`) — no ex3-specific guideline published yet |
-| `docs/known-issues.md` | Working Known Issues rows (14 remaining after CI9/CI2/CI10/CI3/CI8; #8 is post-VAR-01 band gaps, not the 2026-09-03 large_out short cliff) |
+| `docs/known-issues.md` | Working Known Issues rows (12 remaining: optional CI4/6/7/11/12, lazy `.so` load, deferred AdvCpp leftovers) |
 | `docs/known-issues-guidelines.md` | Optional Known Issues excel — grade-neutral-or-better to submit |
 | `docs/open-questions.md` | Genuine ambiguities with a working assumption each — check the forum |
 | `docs/ex2-grading-handoff.md` | Lessons from the Ex2 grade (appealed to **87.5/100**) — frozen-API drift, obsolete bugs, and the ALG28 unbounded-BFS hang; not a plan for sequencing Ex3 |

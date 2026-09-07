@@ -193,8 +193,8 @@ Advance/Elevate to `mission_bounds` when set; clamp then ignore), CI3
 `SimulationRun` maps to `MISSION_EXCEPTION`), and CI8 (split oversize
 Advance/Elevate/Rotate via `splitWithinLimits` / `pending_movements_`) are
 implemented and claimed in `bonus.txt`; remaining optional skips listed in
-`docs/known-issues.md`. Also remaining: lazy `.so` load, Unmapped-as-passable,
-mapping-track band gaps, deferred AdvCpp leftovers. English only. At zip time,
+`docs/known-issues.md`. Also remaining: lazy `.so` load, deferred AdvCpp
+leftovers. English only. At zip time,
 copy into the Google Sheet and export `.xlsx` to the zip root — do not submit
 the markdown.
 

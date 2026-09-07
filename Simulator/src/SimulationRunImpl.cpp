@@ -108,8 +108,10 @@ types::SimulationResult SimulationRunImpl::run() {
         return result;
     }
 
-    // MockMovement wall collisions throw; DroneControl lets them through so this
-    // boundary can contain them, still save the output map, and return score -1.
+    // Exceptions that escape runMission (e.g. CI3 invalid-type throw) are
+    // contained here so the output map is still saved and the run scores -1.
+    // Mandatory CI5 wall throws are caught in DroneControlImpl::applyMovement
+    // and become Continue; they do not reach this catch.
     common::types::MissionRunResult mission_result;
     try {
         mission_result = mission_control_->runMission();
