@@ -129,10 +129,14 @@ instructor maps/YAML; **drop** `inputs/profile_cell.yaml` (dev-only single cell)
 
 ## 5d. Produced-zip archive check (`ZIP-01` / `ZIP-04` / `ZIP-05`)
 
-Steps §1–5c can inspect the working tree. This step **assembles a staging tree**, zips
-**that**, and inspects the **actual archive**. Do **not** zip the git working copy. Do
-**not** use `git archive` (it still ships `.cursor/`, `AGENTS.md`, `docs/`, `context/`,
-`scripts/`). Excluding only `build/`, `.git/`, and `tmp/` is **not** enough.
+To **produce** the zip, invoke `zip-submission` (Docker stage + LF-normalize; never
+`Compress-Archive` / `git archive` / a working-tree zip). This section **inspects**
+the produced archive.
+
+Steps §1–5c can inspect the working tree. This step inspects the **actual archive**.
+Do **not** zip the git working copy. Do **not** use `git archive` (it still ships
+`.cursor/`, `AGENTS.md`, `docs/`, `context/`, `scripts/`). Excluding only `build/`,
+`.git/`, and `tmp/` is **not** enough.
 
 Staging recipe (authoritative omit-list is in `docs/submission-junk-audit.md`):
 

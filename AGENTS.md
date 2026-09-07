@@ -29,7 +29,8 @@ or MissionControl.
 ## Start here
 
 1. Read `.cursor/rules/project-context.mdc` (always applies) and `docs/assignment3-checklist.md`.
-2. Packaging / zip: `docs/assignment-compliance-pickup.md`. What not to put in the zip
+2. Packaging / zip: invoke `zip-submission` (not Compress-Archive). Pickup notes:
+   `docs/assignment-compliance-pickup.md`. What not to put in the zip
    (agent docs, `tmp/`, dead leftovers): `docs/submission-junk-audit.md`. Mapping scores vs ex2:
    `docs/mapping-algorithm-rewrite-pickup.md` — that track is not done when `mission_score >= 0`.
 3. Before claiming a mapping-algorithm change is fast enough: `verify-cell-runtime` (per-cell
@@ -51,6 +52,7 @@ or MissionControl.
 |-------|----------|
 | `port-ex2-component` | Moving a component from `../Drone-Mapper-ex2/` into the ex3 layout |
 | `plugin-loading-and-registration` | Implementing or debugging `dlopen`/registration/`dlclose` |
+| `zip-submission` | Packaging `ex3_207190406_209543255.zip`: Docker Linux stage, LF-normalize, zip from stage root. Use when creating the submission zip or checking Windows/Linux zip mismatch. Do not use Compress-Archive or zip the working tree. |
 | `pre-submission-review` | Checking the 5-folder/ID-naming submission structure before zipping; also grep checks for `new`/`delete` (`ZIP-15`), mock placement (`ZIP-13`), `inputs/` presence (`ZIP-17`), and produced-zip archive name/root-placement (`ZIP-01`/`ZIP-04`/`ZIP-05`) |
 | `verify-frozen-interfaces` | Confirming `common/` (and the other frozen folders) weren't touched |
 | `gather-instructor-context` | Extracting / re-diffing Assignment 3 from `context/` via subagents (docx/pdf win over `docs/`) |
