@@ -17,6 +17,7 @@ using common::Position3D;
 [[nodiscard]] bool isMissDistance(PhysicalLength distance);
 [[nodiscard]] Orientation absoluteBeamOrientation(const Orientation& drone_heading,
                                                   const Orientation& relative_beam);
+[[nodiscard]] double wrapDeg(double degrees);
 [[nodiscard]] Orientation normalizeOrientation(Orientation orientation);
 [[nodiscard]] Position3D pointAlongBeam(const Position3D& origin,
                                         const Orientation& beam_orientation,

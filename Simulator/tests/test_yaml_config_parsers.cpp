@@ -12,11 +12,13 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <numeric>
 #include <string>
 #include <tuple>
+#include <system_error>
 
 namespace fs = std::filesystem;
 using namespace common;
@@ -56,6 +58,57 @@ struct RecordingLog : IRunErrorLog {
     std::vector<ErrorRef> errors;
     void log(const ErrorRef& e) override { errors.push_back(e); }
 };
+
+/// Temp tree for composition-parser fixtures. This file had no existing write helper.
+class TempYamlDir {
+public:
+    TempYamlDir()
+        : root_(fs::temp_directory_path() /
+                ("comp_yaml_" + std::to_string(
+                                    std::chrono::steady_clock::now().time_since_epoch().count()))) {
+        fs::create_directories(root_);
+    }
+
+    ~TempYamlDir() {
+        std::error_code ec;
+        fs::remove_all(root_, ec);
+    }
+
+    TempYamlDir(const TempYamlDir&)            = delete;
+    TempYamlDir& operator=(const TempYamlDir&) = delete;
+
+    [[nodiscard]] const fs::path& root() const { return root_; }
+
+    fs::path writeFile(const std::string& relative, const std::string& contents) const {
+        const fs::path path = root_ / relative;
+        fs::create_directories(path.parent_path());
+        std::ofstream out{path};
+        out << contents;
+        return path;
+    }
+
+private:
+    fs::path root_;
+};
+
+[[nodiscard]] static std::string validSimulationYaml() {
+    return R"(simulation_config:
+  map_filename: "map.npy"
+  map_resolution_cm: 10
+)";
+}
+
+[[nodiscard]] static std::string validMissionYaml() {
+    return R"(mission_config:
+  max_steps: 10
+)";
+}
+
+[[nodiscard]] static std::string validLidarYaml() {
+    return R"(lidar_config:
+  z_max_cm: 80
+)";
+}
 
 // ---------------------------------------------------------------------------
 // PathResolver
@@ -192,4 +245,43 @@ TEST(CompositionParser, MissingFileReturnsError) {
     const auto result = simulator::io::parseCompositionFile("/no/such/file.yaml", log);
     EXPECT_FALSE(result.ok);
     EXPECT_FALSE(result.errors.empty());
+}
+
+TEST(CompositionYamlParserTest, NonScalarSimulationConfigIsRejectedGracefully) {
+    const TempYamlDir tmp;
+    const fs::path compose_path = tmp.writeFile("compose.yaml", R"(
+simulation_compositions:
+  simulations:
+    - simulation_config: {nested: true}
+      mission_configs: [mission.yaml]
+  drone_configs: [drone.yaml]
+  lidar_configs: [lidar.yaml]
+)");
+
+    RecordingLog log;
+    const auto result = simulator::io::parseCompositionFile(compose_path, log);
+    EXPECT_FALSE(result.ok);
+}
+
+TEST(CompositionYamlParserTest, FailedDroneConfigParseMakesCompositionNotOk) {
+    const TempYamlDir tmp;
+    tmp.writeFile("sim.yaml", validSimulationYaml());
+    tmp.writeFile("mission.yaml", validMissionYaml());
+    tmp.writeFile("lidar.yaml", validLidarYaml());
+    tmp.writeFile("drone.yaml", R"(
+drone_config:
+  max_rotate_deg: 90
+)");
+    const fs::path compose_path = tmp.writeFile("compose.yaml", R"(
+simulation_compositions:
+  simulations:
+    - simulation_config: sim.yaml
+      mission_configs: [mission.yaml]
+  drone_configs: [drone.yaml]
+  lidar_configs: [lidar.yaml]
+)");
+
+    RecordingLog log;
+    const auto result = simulator::io::parseCompositionFile(compose_path, log);
+    EXPECT_FALSE(result.ok);
 }

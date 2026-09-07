@@ -6,6 +6,7 @@
 #include <Simulator/io/YamlConfigParsers.h>
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
+#include <user_common_207190406_209543255/TimeFormat.h>
 
 #include <cstddef>
 #include <filesystem>
@@ -115,7 +116,7 @@ void writePerPluginSimulationYaml(
         report.generated_at_utc = generated_at_utc;
         report.metric = "maps_comparison_score_0_100";
         report.score_range = {0.0, 100.0};
-        report.error_score = -1;
+        report.error_score = simulator::kErrorScore;
         report.runs = plugin_result.results;
 
         std::vector<sim_io::SimulationRunYamlEntry> entries;

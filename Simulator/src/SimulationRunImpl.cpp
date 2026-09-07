@@ -8,7 +8,16 @@
 #include <Simulator/SimulationRunImpl.h>
 
 #include <Simulator/MapsComparison.h>
+#include <Simulator/RunMatrixTypes.h>
 #include <Simulator/io/SimulatorPaths.h>
+
+#include <Common/IDroneMovement.h>
+#include <Common/IGPS.h>
+#include <Common/ILidar.h>
+#include <Common/IMap3D.h>
+#include <Common/IMappingAlgorithm.h>
+#include <Common/IMissionControl.h>
+#include <Common/IMutableMap3D.h>
 
 #include <user_common_207190406_209543255/RunErrorLog.h>
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
@@ -72,6 +81,8 @@ SimulationRunImpl::SimulationRunImpl(
     }
 }
 
+SimulationRunImpl::~SimulationRunImpl() = default;
+
 types::SimulationResult SimulationRunImpl::run() {
     types::SimulationResult result{};
     result.simulation_config = simulation_config_;
@@ -88,7 +99,7 @@ types::SimulationResult SimulationRunImpl::run() {
 
     if (!startup_errors_.empty()) {
         logErrors(error_log.get(), startup_errors_);
-        result.mission_score = -1.0;
+        result.mission_score = kErrorScore;
         result.mission_results.push_back(common::types::MissionRunResult{
             common::types::MissionRunStatus::Error,
             0,
@@ -97,8 +108,10 @@ types::SimulationResult SimulationRunImpl::run() {
         return result;
     }
 
-    // MockMovement wall collisions throw; DroneControl lets them through so this
-    // boundary can contain them, still save the output map, and return score -1.
+    // Exceptions that escape runMission (e.g. CI3 invalid-type throw) are
+    // contained here so the output map is still saved and the run scores -1.
+    // Mandatory CI5 wall throws are caught in DroneControlImpl::applyMovement
+    // and become Continue; they do not reach this catch.
     common::types::MissionRunResult mission_result;
     try {
         mission_result = mission_control_->runMission();
@@ -132,7 +145,7 @@ types::SimulationResult SimulationRunImpl::run() {
                 0,
                 {save_error},
             });
-            result.mission_score = -1.0;
+            result.mission_score = kErrorScore;
             return result;
         }
     }
@@ -140,7 +153,7 @@ types::SimulationResult SimulationRunImpl::run() {
     // Score only when the mission reached a real terminal state; Error (incl.
     // the caught runMission()/save exceptions above) stays at -1.
     if (mission_result.status == common::types::MissionRunStatus::Error) {
-        result.mission_score = -1.0;
+        result.mission_score = kErrorScore;
     } else {
         const common::Position3D spawn =
             user_common_207190406_209543255::worldInitialDronePosition(

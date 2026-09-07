@@ -19,6 +19,8 @@
 
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
+#include <mp-units/math.h>
+
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -32,10 +34,7 @@ MockMovement::MockMovement(MockGPS& gps,
 
 common::types::MovementResult MockMovement::rotate(common::types::RotationDirection direction,
                                                     common::HorizontalAngle angle) {
-    using common::deg;
-    const double deg_val = angle.numerical_value_in(deg);
-    const double max_deg = drone_.max_rotate.numerical_value_in(deg);
-    if (std::abs(deg_val) > max_deg) {
+    if (mp_units::abs(angle) > drone_.max_rotate) {
         return {false, "rotate: angle exceeds max_rotate"};
     }
     const common::Orientation current = gps_.heading();
@@ -51,11 +50,11 @@ common::types::MovementResult MockMovement::advance(common::PhysicalLength dista
     using common::x_extent;
     using common::y_extent;
 
-    const double dist_cm = distance.numerical_value_in(cm);
-    const double limit_cm = drone_.max_advance.numerical_value_in(cm);
-    if (std::abs(dist_cm) > limit_cm) {
+    if (mp_units::abs(distance) > drone_.max_advance) {
         return {false, "advance: distance exceeds max_advance"};
     }
+
+    const double dist_cm = distance.numerical_value_in(cm);
 
     const common::Position3D pos = gps_.position();
     const common::Orientation heading = gps_.heading();
@@ -83,11 +82,11 @@ common::types::MovementResult MockMovement::elevate(common::PhysicalLength dista
     using common::cm;
     using common::z_extent;
 
-    const double dist_cm = distance.numerical_value_in(cm);
-    const double limit_cm = drone_.max_elevate.numerical_value_in(cm);
-    if (std::abs(dist_cm) > limit_cm) {
+    if (mp_units::abs(distance) > drone_.max_elevate) {
         return {false, "elevate: distance exceeds max_elevate"};
     }
+
+    const double dist_cm = distance.numerical_value_in(cm);
 
     const common::Position3D pos = gps_.position();
     const common::Position3D new_pos{

@@ -7,6 +7,7 @@
 #include <user_common_207190406_209543255/LidarConstants.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 
 namespace algorithm_207190406_209543255::detail {
@@ -23,6 +24,8 @@ using user_common_207190406_209543255::kShortRangeLidarMax;
 namespace {
 
 constexpr std::size_t kMaxSweepReserve = 8;
+constexpr double kHeightEpsilonCm = 1e-6;
+constexpr double kForcedEscapeExpectedRate = 1.0;
 
 [[nodiscard]] MovementLimits limitsFrom(const types::DroneConfigData& drone) {
     return MovementLimits{drone.max_advance, drone.max_elevate, drone.max_rotate};
@@ -49,7 +52,7 @@ constexpr std::size_t kMaxSweepReserve = 8;
             return false;
         }
         z -= step;
-        if (z < min_z - 1e-6) {
+        if (z < min_z - kHeightEpsilonCm) {
             return false;
         }
         const Position3D below{start.x, start.y, z * z_extent[cm]};
@@ -66,8 +69,8 @@ constexpr std::size_t kMaxSweepReserve = 8;
     const double x = start.x.force_numerical_value_in(cm);
     const double y = start.y.force_numerical_value_in(cm);
     const double z = start.z.force_numerical_value_in(cm);
-    const double dx[4] = {step_cm, -step_cm, 0.0, 0.0};
-    const double dy[4] = {0.0, 0.0, step_cm, -step_cm};
+    const std::array<double, 4> dx = {step_cm, -step_cm, 0.0, 0.0};
+    const std::array<double, 4> dy = {0.0, 0.0, step_cm, -step_cm};
     for (int i = 0; i < 4; ++i) {
         const Position3D nb{(x + dx[i]) * x_extent[cm], (y + dy[i]) * y_extent[cm],
                             z * z_extent[cm]};
@@ -152,7 +155,7 @@ constexpr std::size_t kMaxSweepReserve = 8;
             const double step = config.resolution.force_numerical_value_in(cm);
             const bool column_unmapped = unmappedInColumnBelow(
                 in.map, config, in.state.position, reach.parent_of, reach.start_key);
-            const bool near_ceiling = max_z - z <= z_min + 1e-6;
+            const bool near_ceiling = max_z - z <= z_min + kHeightEpsilonCm;
             const bool house_layer_done =
                 house_volume && !hasHorizontalUnmapped(in.map, in.state.position, step);
             if ((near_ceiling || house_layer_done) && column_unmapped &&
@@ -218,8 +221,21 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
     const MovementLimits limits = limitsFrom(in.drone);
     const std::size_t reserve = reserveFor(in.lidar);
 
-    const ReachabilityResult reach = frontier_.exploreReachable(
-        in.map, in.state.position, in.drone.radius, blocked, maxExpansionsForMap(in.map));
+    const std::size_t full_map_cap = maxExpansionsForMap(in.map);
+    const std::size_t local_cap = std::min(full_map_cap, kLocalSearchExpansionCap);
+    ReachabilityResult reach =
+        frontier_.exploreReachable(in.map, in.state.position, in.drone.radius, blocked, local_cap);
+    if (reach.start_passable && reach.clusters.empty() && local_cap < full_map_cap) {
+        // The bounded local search found no frontier cluster at all (as opposed to "found
+        // clusters but they were all too far to afford" — buildCandidatePlans already handles
+        // that via the `travel + reserve > remaining_steps` budget check). Escalate once to a
+        // full-map search rather than reporting "nothing left to explore" prematurely. This is a
+        // single fallback attempt, not a loop/binary-search (Global Constraints: no iterative
+        // refinement on the hot path) — if the full-map search also finds nothing, plan()
+        // correctly falls through to its existing "no clusters" empty-plan return below.
+        reach = frontier_.exploreReachable(in.map, in.state.position, in.drone.radius, blocked,
+                                           full_map_cap);
+    }
     if (!reach.start_passable) {
         const FrontierPathResult unstick =
             frontier_.findUnstickPath(in.map, in.state.position, in.drone.radius);
@@ -230,7 +246,7 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
         escape.valid = true;
         escape.waypoints = unstick.path;
         escape.target_cluster_cells = 1;
-        escape.expected_rate = 1.0;
+        escape.expected_rate = kForcedEscapeExpectedRate;
         return escape;
     }
     if (reach.clusters.empty()) {
@@ -254,7 +270,7 @@ ExplorationPlan WavefrontPlanner::plan(const WavefrontInputs& in,
             forced.valid = true;
             forced.waypoints = stringPullConstantAltitude(in.map, drop.path, in.drone.radius);
             forced.target_cluster_cells = 1;
-            forced.expected_rate = 1.0;
+            forced.expected_rate = kForcedEscapeExpectedRate;
             forced.internals.frontier_cells = reach.frontier_cells;
             return forced;
         }

@@ -6,6 +6,7 @@
 
 #include <Simulator/MapsComparison.h>
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <queue>
@@ -101,9 +102,9 @@ void forEachGridCenter(const MapConfig& config, const Visitor& visitor) {
     const GridKey start = quantizePosition(spawn, scoring_config);
     reachable.insert(start);
 
-    static const int kDx[6] = {1, -1, 0, 0, 0, 0};
-    static const int kDy[6] = {0, 0, 1, -1, 0, 0};
-    static const int kDz[6] = {0, 0, 0, 0, 1, -1};
+    constexpr std::array<int, 6> kDx = {1, -1, 0, 0, 0, 0};
+    constexpr std::array<int, 6> kDy = {0, 0, 1, -1, 0, 0};
+    constexpr std::array<int, 6> kDz = {0, 0, 0, 0, 1, -1};
 
     std::queue<GridKey> queue;
     queue.push(start);

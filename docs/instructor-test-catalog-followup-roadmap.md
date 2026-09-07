@@ -11,7 +11,7 @@ Scoping doc for the 4 follow-up points. Written 2026-08-28. **All four points do
 | 4 — Orchestrator `verify-instructor-test-catalog` | Done (`2e95f81`) |
 
 Re-verify anytime with `.cursor/skills/verify-instructor-test-catalog/SKILL.md`. Independence
-variants (VAR-01…04) are implemented on `independent-component-variants` — re-verify with
+variants (VAR-01…04) are on `known-issues-fixes` (VAR-01 PASSes as of 2026-09-06) — re-verify with
 `.cursor/skills/verify-independent-component-variants/SKILL.md` (see
 `docs/superpowers/plans/2026-08-28-independent-component-variants.md` execution notes).
 

@@ -81,7 +81,7 @@ int VoxelStamp::quant(double value, double origin, double step) {
 
 const std::vector<detail::ConeTemplate>& ConeTemplateCache::get(
     const common::types::LidarConfigData& lidar,
-    PhysicalLength resolution) {
+    PhysicalLength resolution) const {
     const double res_cm = resolution.force_numerical_value_in(cm);
     const double z_min = lidar.z_min.force_numerical_value_in(cm);
     const double z_max = lidar.z_max.force_numerical_value_in(cm);

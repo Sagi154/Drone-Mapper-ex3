@@ -6,8 +6,17 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <iostream>
 
 namespace skeleton_host {
+
+namespace {
+bool diagEnabled() {
+    static const bool on = std::getenv("HOST_DIAG_ILLEGAL") != nullptr;
+    return on;
+}
+}  // namespace
 
 HostMovement::HostMovement(HostGPS& gps,
                            const HostMap3D& hidden_map,
@@ -87,6 +96,72 @@ bool HostMovement::sphereHitsWallOrLeavesMap(double x, double y, double z) const
     return false;
 }
 
+void HostMovement::diagCulprits(double x, double y, double z) const {
+    const double r = radius_cm_;
+    const double res = hidden_map_.resolutionCm();
+    const auto lo = [&](double c, double m) {
+        return static_cast<int>(std::floor((c - r - m) / res));
+    };
+    const auto hi = [&](double c, double m) {
+        return static_cast<int>(std::floor((c + r - m) / res));
+    };
+    for (int ix = lo(x, hidden_map_.minXcm()); ix <= hi(x, hidden_map_.minXcm()); ++ix) {
+        for (int iy = lo(y, hidden_map_.minYcm()); iy <= hi(y, hidden_map_.minYcm()); ++iy) {
+            for (int iz = lo(z, hidden_map_.minZcm()); iz <= hi(z, hidden_map_.minZcm()); ++iz) {
+                if (!hidden_map_.indexInRange(ix, iy, iz)) {
+                    continue;
+                }
+                if (hidden_map_.atIndex(static_cast<std::size_t>(ix), static_cast<std::size_t>(iy),
+                                        static_cast<std::size_t>(iz)) !=
+                    common::types::VoxelOccupancy::Occupied) {
+                    continue;
+                }
+                const double vx0 = hidden_map_.minXcm() + static_cast<double>(ix) * res;
+                const double vy0 = hidden_map_.minYcm() + static_cast<double>(iy) * res;
+                const double vz0 = hidden_map_.minZcm() + static_cast<double>(iz) * res;
+                const double dx = x - std::clamp(x, vx0, vx0 + res);
+                const double dy = y - std::clamp(y, vy0, vy0 + res);
+                const double dz = z - std::clamp(z, vz0, vz0 + res);
+                if (dx * dx + dy * dy + dz * dz >= r * r) {
+                    continue;
+                }
+                std::cout << " culprit_voxel=[" << vx0 << ',' << vy0 << ',' << vz0 << "]+" << res
+                          << " gap=" << std::sqrt(dx * dx + dy * dy + dz * dz) << " plugin_map=";
+                if (diag_output_map_ == nullptr) {
+                    std::cout << "n/a";
+                    continue;
+                }
+                int ox = 0;
+                int oy = 0;
+                int oz = 0;
+                const double cx = vx0 + res * 0.5;
+                const double cy = vy0 + res * 0.5;
+                const double cz = vz0 + res * 0.5;
+                if (!diag_output_map_->worldToIndex(cx, cy, cz, ox, oy, oz)) {
+                    std::cout << "outside";
+                    continue;
+                }
+                switch (diag_output_map_->atIndex(static_cast<std::size_t>(ox),
+                                                 static_cast<std::size_t>(oy),
+                                                 static_cast<std::size_t>(oz))) {
+                    case common::types::VoxelOccupancy::Occupied:
+                        std::cout << "Occupied";
+                        break;
+                    case common::types::VoxelOccupancy::Empty:
+                        std::cout << "Empty";
+                        break;
+                    case common::types::VoxelOccupancy::Unmapped:
+                        std::cout << "Unmapped";
+                        break;
+                    default:
+                        std::cout << "other";
+                        break;
+                }
+            }
+        }
+    }
+}
+
 bool HostMovement::pathBlocked(double x0,
                                double y0,
                                double z0,
@@ -105,9 +180,32 @@ bool HostMovement::pathBlocked(double x0,
         const double y = y0 + dy * t;
         const double z = z0 + dz * t;
         if (!centerInMissionBounds(x, y, z)) {
+            if (diagEnabled()) {
+                std::cout << "DIAG_ILLEGAL kind=MISSION_BOUNDS from=(" << x0 << ',' << y0 << ','
+                          << z0 << ") to=(" << x1 << ',' << y1 << ',' << z1 << ") at=(" << x << ','
+                          << y << ',' << z << ") r=" << radius_cm_ << '\n';
+            }
             return true;
         }
         if (sphereHitsWallOrLeavesMap(x, y, z)) {
+            if (diagEnabled()) {
+                int cix = 0;
+                int ciy = 0;
+                int ciz = 0;
+                const bool in_map = hidden_map_.worldToIndex(x, y, z, cix, ciy, ciz);
+                const bool center_occ =
+                    in_map && hidden_map_.atIndex(static_cast<std::size_t>(cix),
+                                                  static_cast<std::size_t>(ciy),
+                                                  static_cast<std::size_t>(ciz)) ==
+                                  common::types::VoxelOccupancy::Occupied;
+                std::cout << "DIAG_ILLEGAL kind="
+                          << (!in_map ? "LEAVES_MAP" : (center_occ ? "CENTER_OCCUPIED" : "SPHERE_GRAZE"))
+                          << " from=(" << x0 << ',' << y0 << ',' << z0 << ") to=(" << x1 << ',' << y1
+                          << ',' << z1 << ") at=(" << x << ',' << y << ',' << z
+                          << ") r=" << radius_cm_ << " t=" << t;
+                diagCulprits(x, y, z);
+                std::cout << '\n';
+            }
             return true;
         }
     }

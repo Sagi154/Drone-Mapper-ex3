@@ -3,9 +3,10 @@ name: verify-independent-component-variants
 description: >-
   Docker-builds independence harness targets and runs VAR-01..04 check scripts
   (foreign host, foreign MissionControl findings dump, adversarial containment,
-  optional baseline lawnmower), then reports PASS/FAIL/SKIP per variant. Use when
-  verifying plugin independence after Algorithm/MissionControl/Simulator changes,
-  before submission, or when asked to re-run independent-component-variants checks.
+  baseline lawnmower). All four variants are mandatory. Reports PASS/FAIL/SKIP
+  per variant. Use when verifying plugin independence after
+  Algorithm/MissionControl/Simulator changes, before submission, or when asked
+  to re-run independent-component-variants checks.
 disable-model-invocation: true
 ---
 
@@ -25,7 +26,7 @@ This is **not** the instructor-catalog orchestrator
 |--------|---------|
 | **PASS** | Script exited 0; no crash (`exit < 128`); VAR asserts met |
 | **FAIL** | Script non-zero, crash, or timeout |
-| **SKIP** | User skipped that variant (e.g. `--skip-baseline`) |
+| **SKIP** | User explicitly narrowed the run (`--only-var0N`). Default runs never SKIP |
 
 VAR-02 is **diagnostic**: script PASS means crash-free + findings dumped. Do **not**
 auto-fail on low score / Empty=0 (foreign hits-only by design). Paste findings path
@@ -35,6 +36,10 @@ project B one-scan-per-step). Do not expect `docs/known-issues.md` to still list
 VAR-03 regression canary: former Known Issues #21 (removed — hang class is structurally
 gone). `bad_scan` must finish within timeout. Timeout on `bad_scan` → FAIL.
 
+VAR-04 is **mandatory** (~5 min). It is not a bonus and is not skipped by default.
+`check_baseline_algorithm.sh` must run unless the user asked for a single other
+variant with `--only-var01` / `--only-var02` / `--only-var03`.
+
 ## Prerequisites
 
 - Repo root = `Drone-Mapper-ex3/`
@@ -43,15 +48,17 @@ gone). `bad_scan` must finish within timeout. Timeout on `bad_scan` → FAIL.
   `Simulator/tests/fixtures/foreign_*`, `adversarial_*`, `baseline_*`,
   `Simulator/tests/manual/check_*.sh`)
 
-## Optional switches (ask once if unclear)
+## Switches (ask once if unclear)
 
 | Switch | Effect |
 |--------|--------|
-| (default) | VAR-01 + VAR-02 + VAR-03 (skip VAR-04 — ~5 min alone) |
-| `--with-baseline` | Also run VAR-04 `check_baseline_algorithm.sh` |
-| `--only-var01` / `--only-var02` / `--only-var03` / `--only-var04` | Single variant |
+| (default) | **VAR-01 + VAR-02 + VAR-03 + VAR-04** (all mandatory) |
+| `--only-var01` / `--only-var02` / `--only-var03` / `--only-var04` | Single variant (debug / re-run). Unselected rows SKIP |
 | `--skip-build` | Assume `build/default` already has needed binaries |
 | `--report-path PATH` | Write markdown report (default: chat only; optional file under `docs/`) |
+
+There is no `--with-baseline` and no `--skip-baseline`. Do not skip VAR-04
+unless the user named a single other variant.
 
 ## Procedure
 
@@ -87,6 +94,8 @@ On build FAIL → stop; mark all selected variants FAIL (build).
 
 Ensure LF line endings / `chmod +x` on the scripts if Windows bind-mount mangled them.
 
+Default (all four). VAR-04 is required and is expected to take ~5 minutes:
+
 ```bash
 docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg \
   -v "<repo>:/work" -w /work drone-mapper-ex3-dev bash -lc '
@@ -96,16 +105,16 @@ docker run --rm -e VCPKG_ROOT=/usr/local/vcpkg \
             Simulator/tests/manual/check_foreign_mission_control.sh \
             Simulator/tests/manual/check_adversarial_plugins.sh \
             Simulator/tests/manual/check_baseline_algorithm.sh
-  # VAR-01
   bash Simulator/tests/manual/check_foreign_host.sh "$BD"
-  # VAR-02 (findings → /tmp/ex3_verify/foreign_mc_findings.txt inside container)
   bash Simulator/tests/manual/check_foreign_mission_control.sh "$BD"
-  # VAR-03
   bash Simulator/tests/manual/check_adversarial_plugins.sh "$BD"
-  # VAR-04 only if --with-baseline / --only-var04
-  # bash Simulator/tests/manual/check_baseline_algorithm.sh "$BD"
+  bash Simulator/tests/manual/check_baseline_algorithm.sh "$BD"
 '
 ```
+
+If an earlier check FAILs, still run the remaining selected variants unless a
+missing binary makes that impossible (do not abort the docker script with
+`set -e` across checks — run each script, record its exit, continue).
 
 Record each script’s exit code. For VAR-02, also surface a short summary from the
 findings file if reachable (or note path).
@@ -117,16 +126,17 @@ findings file if reachable (or note path).
 
 Date (UTC): …
 Branch: …
-Switches: …
+Switches: default (VAR-01…04) | --only-var0N
 
 | Variant | Script | Status | Notes |
 |---------|--------|--------|-------|
 | VAR-01 | check_foreign_host.sh | PASS/FAIL/SKIP | |
 | VAR-02 | check_foreign_mission_control.sh | PASS/FAIL/SKIP | findings (hits-only) |
 | VAR-03 | check_adversarial_plugins.sh | PASS/FAIL/SKIP | `bad_scan` canary |
-| VAR-04 | check_baseline_algorithm.sh | PASS/FAIL/SKIP | slow ~5m |
+| VAR-04 | check_baseline_algorithm.sh | PASS/FAIL/SKIP | ~5m; mandatory unless --only-var0N |
 
-Overall: PASS only if every **selected** (non-SKIP) row is PASS.
+Overall: PASS only if every **selected** (non-SKIP) row is PASS. A default run
+is not PASS if VAR-04 was skipped.
 ```
 
 ## Evidence map
@@ -142,6 +152,6 @@ Overall: PASS only if every **selected** (non-SKIP) row is PASS.
 
 - Spec: `docs/superpowers/specs/2026-08-28-independent-component-variants-design.md`
 - Plan: `docs/superpowers/plans/2026-08-28-independent-component-variants.md`
-- Known Issues: `docs/known-issues.md` (former #20/#21 removed; current #14 is plan-batching)
+- Known Issues: `docs/known-issues.md` (former #20/#21 removed; plan-batching short-lidar is a remaining row)
 - Manual README: `Simulator/tests/manual/README.md`
 - Catalog orchestrator (different): `verify-instructor-test-catalog`

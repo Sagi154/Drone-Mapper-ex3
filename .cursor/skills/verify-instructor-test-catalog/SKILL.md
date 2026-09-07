@@ -11,6 +11,10 @@ Runs every automated + skill-based check that maps to
 catalog ID** (`CLI-01`, `ZIP-07`, `e14`, …). This is the Phase-B wiring layer that makes the
 blind-agent catalog actionable.
 
+This is **not** the submission-readiness meta-skill
+(`verify-submission-readiness`). Catalog IDs stay here; that skill sequences
+this as one stage.
+
 **Source of truth for IDs and classifications:** `docs/simulator_runtime_test_catalog.md`
 (MANDATORY / OPTIONAL / BONUS / GENUINELY-UNSPECIFIED). Do not invent IDs.
 

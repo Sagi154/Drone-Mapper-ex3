@@ -23,9 +23,6 @@ using common::Orientation;
 using common::Position3D;
 using common::cm;
 using common::deg;
-using common::x_extent;
-using common::y_extent;
-using common::z_extent;
 using user_common_207190406_209543255::kDownwardScanThreshold;
 using user_common_207190406_209543255::kHouseMaxZSpan;
 using user_common_207190406_209543255::kHouseMinXySpan;
@@ -36,34 +33,26 @@ using user_common_207190406_209543255::kSmallOutdoorMaxSpan;
 
 namespace {
 
+constexpr common::AltitudeAngle kZenith = 90.0 * deg;
+constexpr common::AltitudeAngle kNadir = -90.0 * deg;
+constexpr double kHeightEpsilonCm = 1e-6;
+
 struct Offset {
     int dx;
     int dy;
     int dz;
 };
 
-constexpr Offset kFaceOffsets[6] = {
+constexpr std::array<Offset, 6> kFaceOffsets = {{
     {1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
     {0, -1, 0}, {0, 0, 1},  {0, 0, -1},
-};
+}};
 
 struct ScoredDirection {
     std::size_t gain = 0;
     Orientation direction{};
     const ctpl::detail::ConeTemplate* cone = nullptr;
 };
-
-[[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
-    const double step = config.resolution.force_numerical_value_in(cm);
-    const double ox = config.offset.x.force_numerical_value_in(cm);
-    const double oy = config.offset.y.force_numerical_value_in(cm);
-    const double oz = config.offset.z.force_numerical_value_in(cm);
-    return Position3D{
-        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
-        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
-        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
-    };
-}
 
 [[nodiscard]] std::array<double, 3> unitVector(const Orientation& dir) {
     const Position3D tip = bm::pointAlongBeam(Position3D{}, dir, 1.0 * cm);
@@ -96,7 +85,7 @@ struct ScoredDirection {
     const double z = origin.z.force_numerical_value_in(cm);
     const double max_z = config.boundaries.max_height.force_numerical_value_in(cm);
     const double z_min = lidar.z_min.force_numerical_value_in(cm);
-    return max_z - z <= z_min + 1e-6;
+    return max_z - z <= z_min + kHeightEpsilonCm;
 }
 
 [[nodiscard]] bool volumeGainAllowed(const types::MapConfig& config,
@@ -294,8 +283,8 @@ std::optional<Orientation> bestTravelScan(
     } else {
         probes.emplace_back(predicted.heading.horizontal, 0.0 * deg);
     }
-    probes.emplace_back(0.0 * deg, 90.0 * deg);
-    probes.emplace_back(0.0 * deg, -90.0 * deg);
+    probes.emplace_back(0.0 * deg, kZenith);
+    probes.emplace_back(0.0 * deg, kNadir);
 
     const types::MapConfig config = map.getMapConfig();
     for (const Orientation& probe : probes) {

@@ -2,16 +2,19 @@
 
 #include <Simulator/ISimulationRun.h>
 
-#include <Common/IGPS.h>
-#include <Common/IDroneMovement.h>
-#include <Common/ILidar.h>
-#include <Common/IMappingAlgorithm.h>
-#include <Common/IMissionControl.h>
-#include <Common/IMutableMap3D.h>
-
 #include <filesystem>
 #include <memory>
 #include <vector>
+
+namespace common {
+class IMap3D;
+class IMutableMap3D;
+class IGPS;
+class IDroneMovement;
+class ILidar;
+class IMappingAlgorithm;
+class IMissionControl;
+} // namespace common
 
 namespace simulator {
 
@@ -32,6 +35,8 @@ public:
                       const common::types::MissionConfigData&  mission_config,
                       std::filesystem::path                    output_map_file,
                       const std::vector<common::types::ErrorRef>& startup_errors);
+
+    ~SimulationRunImpl() override;
 
     [[nodiscard]] types::SimulationResult run() override;
 

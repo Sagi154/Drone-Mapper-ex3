@@ -302,7 +302,11 @@ std::size_t MappingAlgorithmImpl_207190406_209543255::remainingSteps(
 output map from the drone. A cell is walkable unless the drone **sphere** hits
 `Occupied` or `OutOfBounds`, or the cell is on the stall blacklist.
 **`Unmapped` is walkable.** That is deliberate: otherwise the drone would never
-leave the first empty bubble.
+leave the first empty bubble. The sphere test uses **corner-anchored** voxel
+boxes (the lattice point is the voxel's low corner, matching `Map3DImpl` /
+`skeleton_host`) — not boxes centered on the lattice. Ordinary replans cap the
+Dijkstra at `kLocalSearchExpansionCap` (3000 nodes) and retry once at full map
+size only if that local search finds no frontier at all.
 
 [`Algorithm/src/MappingAlgorithmFrontier.cpp`](../Algorithm/src/MappingAlgorithmFrontier.cpp) (121–128)
 

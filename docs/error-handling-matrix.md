@@ -42,6 +42,14 @@ competitive mode our `MissionControl` runs other teams' algorithms, and in compa
 | GPS returns out-of-bound coordinates | `DroneControl` | Compare with internal coordinates; throw if those are also OOB, otherwise ignore | `DroneControl`, `SimulationRun` |
 | Movement executed but GPS reports impossible coordinates | `DroneControl` | Try again to read GPS; return `Error` after N tries | `DroneControl` |
 
+## Implemented optional rows
+
+- **Drone returns `Error` status on a step (CI9):** `runMissionSteps` logs `DRONE_STEP_FAILED` and continues until `Completed` or `max_steps`. See `MissionControl/src/MissionControlImpl.cpp`.
+- **Faulty algorithm sends a movement that would go out of bounds (CI2):** `applyMovement` ignores Advance/Elevate whose predicted center fails `output_map_.isInBounds` (`predictedDestination`); Movement is not called. Hover/Rotate skip this check. See `MissionControl/src/DroneControlImpl.cpp`.
+- **Algorithm returns a movement that leaves the mission bounds (CI10):** when `mission_bounds` is set (not all-zero), `clampMovementToMissionBounds` shortens Advance/Elevate so the predicted center stays inside that AABB. Zero leftover distance skips Movement. **Order:** clamp first, then CI2 ignore if still world-OOB. See `MissionControl/src/DroneControlImpl.cpp`.
+- **Faulty algorithm returns a command with invalid values (CI3):** `step()` re-calls `nextStep` up to `kMaxInvalidCommandRetries` when the movement type is unsupported. After N failures it throws `std::runtime_error` out of `DroneControlImpl` (not caught on the wall-collision path). `SimulationRunImpl::run` maps that to `MISSION_EXCEPTION`. See `MissionControl/src/DroneControlImpl.cpp`.
+- **Algorithm returns a movement bigger than the max allowed (CI8):** `splitWithinLimits` (`MissionControl/src/DroneControlImpl.cpp:73`) breaks oversize Advance/Elevate/Rotate into in-limit fragments. The first fragment runs on the `nextStep` step; later `step()`s drain `pending_movements_` (`MissionControl/include/MissionControl/DroneControlImpl.h:48`) with no `nextStep` and no extra scan.
+
 ## How this interacts with the ex3 simulator
 
 The matrix stops at `SimulationRun`. Above it, assignment 3 adds:

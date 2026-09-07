@@ -4,6 +4,7 @@
 #include "MappingAlgorithmFrontier.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <queue>
@@ -43,25 +44,13 @@ struct Offset {
     int dz;
 };
 
-constexpr Offset kOffsets[6] = {
+constexpr std::array<Offset, 6> kOffsets = {{
     {1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
     {0, -1, 0}, {0, 0, 1},  {0, 0, -1},
-};
+}};
 
 [[nodiscard]] double gridStepCm(const types::MapConfig& config) {
     return config.resolution.force_numerical_value_in(cm);
-}
-
-[[nodiscard]] Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
-    const double step = gridStepCm(config);
-    const double ox = config.offset.x.force_numerical_value_in(cm);
-    const double oy = config.offset.y.force_numerical_value_in(cm);
-    const double oz = config.offset.z.force_numerical_value_in(cm);
-    return Position3D{
-        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
-        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
-        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
-    };
 }
 
 [[nodiscard]] types::VoxelOccupancy occupancyAt(const IMap3D& map, const Position3D& pos) {
@@ -82,31 +71,33 @@ constexpr Offset kOffsets[6] = {
     return kEmptyTraversalCost;
 }
 
-// True iff the axis-aligned voxel box centered at (dx,dy,dz)*step with half-extent
-// step/2 intersects the closed sphere of radius at the origin. Centre-distance
-// (forEachSphereSample) skips face neighbours when radius < step; box nearest-point
-// restores footprint checks for e.g. radius 7.5 cm on a 10 cm grid.
+// True iff neighbour voxel (dx,dy,dz) intersects the closed sphere of the given radius
+// centred at a lattice point. A lattice point is the LOW CORNER of its own voxel
+// (Map3DImpl indexes floor((pos - offset) / resolution), matched by skeleton_host's
+// HostMap3D), so neighbour d spans [d*step, (d+1)*step) relative to that point. The voxel
+// on the "behind" side of the centre (any nonzero offset with all axes in {-1,0}) shares
+// the corner with the centre voxel and touches it at distance 0; the voxel a full step
+// "ahead" (any axis == +1) only touches once radius >= step_cm. See
+// docs/superpowers/specs/2026-09-05-var01-sphere-clearance-fix-design.md §2.1/§5.1.
 [[nodiscard]] bool sphereIntersectsCellBox(int dx, int dy, int dz, double step_cm,
                                            double radius_cm) {
     if (dx == 0 && dy == 0 && dz == 0) {
         return true;
     }
-    const double half = step_cm * 0.5;
-    const double ox = static_cast<double>(dx) * step_cm;
-    const double oy = static_cast<double>(dy) * step_cm;
-    const double oz = static_cast<double>(dz) * step_cm;
-    const auto nearest1d = [half](double o) {
-        if (0.0 < o - half) {
-            return o - half;
+    const auto nearest1d = [step_cm](int d) {
+        const double lo = static_cast<double>(d) * step_cm;
+        const double hi = lo + step_cm;
+        if (lo > 0.0) {
+            return lo;
         }
-        if (0.0 > o + half) {
-            return o + half;
+        if (hi < 0.0) {
+            return hi;
         }
         return 0.0;
     };
-    const double nx = nearest1d(ox);
-    const double ny = nearest1d(oy);
-    const double nz = nearest1d(oz);
+    const double nx = nearest1d(dx);
+    const double ny = nearest1d(dy);
+    const double nz = nearest1d(dz);
     return (nx * nx + ny * ny + nz * nz) <= (radius_cm * radius_cm);
 }
 
@@ -412,6 +403,18 @@ GridKey quantizePosition(const Position3D& pos, const types::MapConfig& config) 
         static_cast<int>(std::lround((px - ox) / step)),
         static_cast<int>(std::lround((py - oy) / step)),
         static_cast<int>(std::lround((pz - oz) / step)),
+    };
+}
+
+Position3D keyToPoint(const GridKey& key, const types::MapConfig& config) {
+    const double step = gridStepCm(config);
+    const double ox = config.offset.x.force_numerical_value_in(cm);
+    const double oy = config.offset.y.force_numerical_value_in(cm);
+    const double oz = config.offset.z.force_numerical_value_in(cm);
+    return Position3D{
+        (ox + static_cast<double>(key.qx) * step) * x_extent[cm],
+        (oy + static_cast<double>(key.qy) * step) * y_extent[cm],
+        (oz + static_cast<double>(key.qz) * step) * z_extent[cm],
     };
 }
 

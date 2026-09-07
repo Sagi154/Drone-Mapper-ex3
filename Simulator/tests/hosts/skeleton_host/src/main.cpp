@@ -236,6 +236,7 @@ int main(int argc, char** argv) {
     skeleton_host::HostLidar lidar(gps, *hidden_map, configs.lidar);
     skeleton_host::HostMovement movement(gps, *hidden_map, configs.mission.mission_bounds,
                                          configs.drone.radius);
+    movement.setDiagOutputMap(output_map.get());
 
     auto& registrar = skeleton_host::HostRegistrar::instance();
     registrar.clear();

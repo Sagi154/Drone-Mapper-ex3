@@ -274,11 +274,14 @@ drone_warnings(simulator_output_dir_test)
 # Run-matrix orchestrator (frozen ISimulationRunFactory / ISimulationRun).
 add_library(simulator_orchestrator STATIC
     src/RunMatrixOrchestrator.cpp
+    src/SimulationImpl.cpp
+    ${CMAKE_SOURCE_DIR}/UserCommon/src/TimeFormat.cpp
 )
 add_library(simulator::orchestrator ALIAS simulator_orchestrator)
 target_include_directories(simulator_orchestrator PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/common_simulator/include
+    ${CMAKE_SOURCE_DIR}/UserCommon/include
 )
 target_link_libraries(simulator_orchestrator PUBLIC
     simulator::work

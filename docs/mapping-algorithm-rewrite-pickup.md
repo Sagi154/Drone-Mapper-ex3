@@ -120,7 +120,7 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 - `house_full` 0.06×3 is gone. Profiling small+short **48.33**. Large-drone `small_room` **85–86** (was 49–59).
 - `kMinInformationRate` / empty-stay cut **did not bind** on the 10k-step cells.
 
-### Outdoor Empty-carve — `honest` ← **current column**
+### Outdoor Empty-carve — `honest` — historical (2026-08-31)
 
 - Score sum **1793.4**, steps **92464**, **3× `MAX_STEPS`**, 0 errors.
 - CSV/md: `docs/benchmarks/2026-08-31-outdoor-empty-carve.{csv,md}`.
@@ -129,6 +129,20 @@ Also: `docs/mapping-algorithm-analysis.md` (policy review that started this work
 - `large_out` large+short **85.6** (inside 80–88). Long-lidar horizon volume on the 300 cm cube was measured and **reverted** (73→39).
 - `house_full` identical to score-aware nav (15–48). Rooms / `house_lower` 100 did not regress.
 - Do **not** globally unmask cone gain (rooms collapse). `small_out` (200 cm cube) may volume-carve non-downward cones; `large_out` long lidar stays masked.
+
+### VAR-01 Approach A — `honest` ← **current column** (2026-09-06)
+
+- Score sum **1832.7**, wall_sum **30.4s**, wall_max **3.0s**, `cells_ge_60s=0`, WARN=0.
+- CSV/md: `docs/benchmarks/2026-09-06-var01-approach-a.{csv,md}`; skill table in
+  `.cursor/skills/verify-cell-runtime/SKILL.md`.
+- Code: corner-anchored `sphereIntersectsCellBox` (VAR-01 PASS) +
+  `kLocalSearchExpansionCap = 3000` with one full-map fallback.
+- Group means: house_full **25.86**, large_out **74.02**, small_out **79.31**,
+  small_room **81.56**. `large_out` shorts **74.95 / 72.02** (the 2026-09-03 44.56 /
+  32.00 cliff is gone). Drag: `house_full` vs ex2 ~56–62; `small_out` large+long **45.38**;
+  `small_room` large+short **67.65**.
+- Do **not** globally unmask cone gain. Do not resume Approach B (voxel-center lattice
+  collapsed `house_full` to 0.061 @ 400 steps).
 
 ### Adversarial (hits-only foreign MC)
 
@@ -159,8 +173,9 @@ Diagnosed post-F failure modes (2026-08-31):
 | Outdoor far below D's 83 | Frontier-mask + no volume carving. Unmasked / "open-look" gain repeats D's pass-2 hit on rooms — do not re-enable globally. | **Landed (gated):** `small_out` volume-carves non-downward cones + 4-scan cap (mean 30→73). `large_out` short lidar horizon volume (large+short 67→86). Long lidar on the 300 cm cube stays masked. |
 | `small_room` large 49–59 | Same Occupied-floor / OOB trap as house. | Unstick + OOB → ~85–86 (near band). |
 
-Current honest sum **1793.4** (score-aware nav 1589.4). Still below ex2 on house_full (56–62),
-large_out (80–88), small_out mean (75–89, gap 2.2), small_room mean (87–90).
+Current honest sum **1832.7** (outdoor Empty-carve 1793.4). Still below ex2 on house_full
+(56–62), and on `small_out` large+long / `small_room` large+short. `large_out` mean 74.02
+is closer to the 80–88 band than 2026-09-03's 58-ish shorts-dragged mean.
 
 ### 2. Project E — mp-units on the substrate (after scores)
 
@@ -177,10 +192,10 @@ Issues excel remain on the assignment-compliance track.
 ## Next session — concrete first steps
 
 1. Read this file. Confirm `algorithm-benchmark-harness`.
-2. Re-measure Release honest if HEAD moved (`build/opt`, `scripts/benchmark/run_benchmark.py --columns honest`).
+2. Re-measure Release honest if HEAD moved (`verify-cell-runtime`, not 8-thread compose wall).
 3. Do not globally unmask cone gain. `small_out` already volume-carves non-downward cones.
-   Next levers: get `house_full` off the ceiling layer into the rest of the volume (prefer-descend
-   did not bind); recover `large_out` small+long toward F's 70; lift `small_out` large+long (36).
+   Next levers: get `house_full` deeper into the volume; lift `small_out` large+long (45);
+   recover `small_room` large+short (67.65).
 4. Project E / zip only after the score bar, or if the user says the deadline is the constraint.
 
 ---

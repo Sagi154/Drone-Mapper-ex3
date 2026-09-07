@@ -368,7 +368,12 @@ TEST(WavefrontPlanner, IgnoreBlockedRecoversWhenTheBlockedSetSealsTheDrone) {
 }
 
 TEST(WavefrontPlanner, AlternatesExcludeBestAndAreSortedByRate) {
-    Map map{{21, 21, 21}, makeConfig(), ct::VoxelOccupancy::Empty};
+    // 21x21x6 = 2646 voxels stays under kLocalSearchExpansionCap so the three planted
+    // clusters remain intact; a truncated BFS on the original 21^3 map split the far
+    // room into extra clusters and made alternates.size() an artifact of the cap.
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_height = 50.0 * z_extent[cm];
+    Map map{{21, 21, 6}, config, ct::VoxelOccupancy::Empty};
     // Near, tiny crumb: 1 cell well +Y of start — isolated from -Y pocket (no shared frontier glue).
     map.set(at(50.0, 160.0, 0.0), ct::VoxelOccupancy::Unmapped);
     // Near, medium crumb on the -Y side — a second distinct cluster.
@@ -408,6 +413,36 @@ TEST(WavefrontPlanner, AlternatesEmptyWithOnlyOneCluster) {
 
     ASSERT_TRUE(best.valid);
     EXPECT_TRUE(alternates.empty());
+}
+
+// What: a map larger than the local search cap, with the ONLY unmapped (frontier-worthy)
+// region far from the drone's start position — farther than a small bounded search would
+// reach. Expected: plan() must still find it via the full-map fallback (this is the guard
+// against the local cap silently making distant frontiers unreachable — design spec
+// docs/superpowers/plans/2026-09-06-var01-approach-a-runtime-fix.md Root Cause §4).
+TEST(WavefrontPlanner, PlanFallsBackToFullMapSearchWhenLocalCapFindsNoFrontier) {
+    // 41x41x3 voxels at 10cm resolution = 5043 reachable-search-space voxels, comfortably
+    // larger than the intended ~3000-node local cap (Task 4 tunes the exact constant; this
+    // test only needs "larger than whatever the cap turns out to be" to be meaningful, so
+    // assert the map's total voxel count is bigger than the cap constant directly).
+    ct::MapConfig config = makeConfig();
+    config.boundaries.max_x = 400.0 * x_extent[cm];
+    config.boundaries.max_y = 400.0 * y_extent[cm];
+    config.boundaries.max_height = 20.0 * z_extent[cm];
+    Map map{{41, 41, 3}, config, ct::VoxelOccupancy::Empty};
+    // Fill everything Empty except one small Unmapped pocket at the far corner from start.
+    const Position3D start = at(10.0, 10.0, 10.0);
+    const Position3D far_pocket = at(390.0, 390.0, 10.0);
+    map.set(far_pocket, ct::VoxelOccupancy::Unmapped);
+
+    ASSERT_GT(41 * 41 * 3, static_cast<int>(detail::kLocalSearchExpansionCap));
+
+    const detail::WavefrontPlanner planner;
+    const detail::BlockedCells blocked;
+    const detail::ExplorationPlan result = planner.plan(
+        {map, stateAt(start), makeLidar(), makeDrone(), 5000, blocked, false});
+    EXPECT_TRUE(result.valid);
+    EXPECT_FALSE(result.waypoints.empty());
 }
 
 TEST(WavefrontPlanner, AlternatesOmitClustersTheRemainingBudgetCannotAfford) {

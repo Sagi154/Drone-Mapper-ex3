@@ -71,19 +71,19 @@ class ConeTemplateCache {
 public:
     [[nodiscard]] const std::vector<detail::ConeTemplate>& get(
         const common::types::LidarConfigData& lidar,
-        PhysicalLength resolution);
+        PhysicalLength resolution) const;
 
 private:
     [[nodiscard]] static std::vector<detail::ConeTemplate> build(
         const common::types::LidarConfigData& lidar, PhysicalLength resolution);
 
-    std::vector<detail::ConeTemplate> templates_{};
-    bool built_ = false;
-    double res_cm_ = 0.0;
-    double z_min_ = 0.0;
-    double z_max_ = 0.0;
-    double d_ = 0.0;
-    std::size_t fov_circles_ = 0;
+    mutable std::vector<detail::ConeTemplate> templates_{};
+    mutable bool built_ = false;
+    mutable double res_cm_ = 0.0;
+    mutable double z_min_ = 0.0;
+    mutable double z_max_ = 0.0;
+    mutable double d_ = 0.0;
+    mutable std::size_t fov_circles_ = 0;
 };
 
 // ── walkTemplate: stamp-deduped walk over precomputed beam runs ───────────────

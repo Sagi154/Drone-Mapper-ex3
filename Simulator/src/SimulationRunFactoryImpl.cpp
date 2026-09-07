@@ -58,8 +58,7 @@ namespace UC = user_common_207190406_209543255;
     const double factor = mission.output_mapping_resolution_factor >= 1.0
                               ? mission.output_mapping_resolution_factor
                               : 1.0;
-    config.resolution =
-        (sim.map_resolution.force_numerical_value_in(cm) / factor) * cm;
+    config.resolution = sim.map_resolution / factor;
 
     if (!isUnsetBoundaries(mission.mission_bounds)) {
         // Shift mission-local bounds into world coordinates by adding map_offset.

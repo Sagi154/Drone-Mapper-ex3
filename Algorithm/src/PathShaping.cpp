@@ -4,10 +4,14 @@
 
 #include "MappingAlgorithmFrontier.h"
 
+#include <user_common_207190406_209543255/BeamMath.h>
+
 #include <cmath>
 #include <numbers>
 
 namespace algorithm_207190406_209543255::detail {
+
+namespace bm = user_common_207190406_209543255::beam_math;
 
 namespace {
 
@@ -35,16 +39,6 @@ constexpr double kSameAxisEpsilonCm = 1e-6;
         return 0;
     }
     return static_cast<std::size_t>(std::ceil(amount / per_step - 1e-9));
-}
-
-[[nodiscard]] double wrapDeg(double degrees) {
-    double x = std::fmod(degrees, 360.0);
-    if (x <= -180.0) {
-        x += 360.0;
-    } else if (x > 180.0) {
-        x -= 360.0;
-    }
-    return x;
 }
 
 } // namespace
@@ -102,7 +96,7 @@ std::size_t stepCostForPath(const std::vector<Position3D>& waypoints,
         const double planar = std::sqrt(dx * dx + dy * dy);
         if (planar > kSameAxisEpsilonCm) {
             const double target_deg = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
-            const double turn = std::abs(wrapDeg(target_deg - heading_deg));
+            const double turn = std::abs(bm::wrapDeg(target_deg - heading_deg));
             if (turn > 1e-9) {
                 steps += ceilDiv(turn, rotate_deg);
                 heading_deg = target_deg;

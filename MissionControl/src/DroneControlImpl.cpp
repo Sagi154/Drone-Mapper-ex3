@@ -2,11 +2,22 @@
 
 #include <MissionControl/ScanResultToVoxels.h>
 
+#include <Common/IDroneMovement.h>
+#include <Common/IGPS.h>
+#include <Common/ILidar.h>
+#include <Common/IMappingAlgorithm.h>
+#include <Common/IMutableMap3D.h>
+
 #include <user_common_207190406_209543255/SimulationCoordUtil.h>
 
 #include <mp-units/math.h>
 
+#include <cmath>
+#include <deque>
 #include <exception>
+#include <numbers>
+#include <stdexcept>
+#include <utility>
 
 namespace mission_control_207190406_209543255 {
 
@@ -26,6 +37,8 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
     });
 }
 
+constexpr int kMaxInvalidCommandRetries = 3;
+
 [[nodiscard]] bool isSupportedMovementType(common::types::MovementCommandType type) {
     switch (type) {
     case common::types::MovementCommandType::Hover:
@@ -35,6 +48,11 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
         return true;
     }
     return false;
+}
+
+[[nodiscard]] bool isInvalidMovementCommand(const common::types::MappingStepCommand& command) {
+    return command.movement.has_value() &&
+           !isSupportedMovementType(command.movement->type);
 }
 
 [[nodiscard]] bool movementWithinLimits(const common::types::MovementCommand& command,
@@ -52,6 +70,68 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
     return false;
 }
 
+[[nodiscard]] std::deque<common::types::MovementCommand> splitWithinLimits(
+    const common::types::MovementCommand& command,
+    const common::types::DroneConfigData& drone) {
+    std::deque<common::types::MovementCommand> parts;
+    if (movementWithinLimits(command, drone)) {
+        parts.push_back(command);
+        return parts;
+    }
+    switch (command.type) {
+    case common::types::MovementCommandType::Advance: {
+        auto remaining = command.distance;
+        while (remaining > drone.max_advance) {
+            auto frag = command;
+            frag.distance = drone.max_advance;
+            parts.push_back(frag);
+            remaining = remaining - drone.max_advance;
+        }
+        if (remaining > 0.0 * common::cm) {
+            auto frag = command;
+            frag.distance = remaining;
+            parts.push_back(frag);
+        }
+        break;
+    }
+    case common::types::MovementCommandType::Elevate: {
+        const auto sign = command.distance < 0.0 * common::cm ? -1.0 : 1.0;
+        auto mag = mp_units::abs(command.distance);
+        while (mag > drone.max_elevate) {
+            auto frag = command;
+            frag.distance = PhysicalLength{sign * drone.max_elevate};
+            parts.push_back(frag);
+            mag = mag - drone.max_elevate;
+        }
+        if (mag > 0.0 * common::cm) {
+            auto frag = command;
+            frag.distance = PhysicalLength{sign * mag};
+            parts.push_back(frag);
+        }
+        break;
+    }
+    case common::types::MovementCommandType::Rotate: {
+        auto remaining = command.angle;
+        while (remaining > drone.max_rotate) {
+            auto frag = command;
+            frag.angle = drone.max_rotate;
+            parts.push_back(frag);
+            remaining = remaining - drone.max_rotate;
+        }
+        if (remaining > 0.0 * common::horizontal_angle[common::deg]) {
+            auto frag = command;
+            frag.angle = remaining;
+            parts.push_back(frag);
+        }
+        break;
+    }
+    case common::types::MovementCommandType::Hover:
+        parts.push_back(command);
+        break;
+    }
+    return parts;
+}
+
 [[nodiscard]] common::types::MovementResult executeMovement(
     common::IDroneMovement& movement, const common::types::MovementCommand& command) {
     switch (command.type) {
@@ -67,24 +147,134 @@ void markDroneFootprintEmpty(common::IMutableMap3D& map, const Position3D& centr
     return common::types::MovementResult{false, "Unsupported movement command."};
 }
 
+[[nodiscard]] bool isUnsetMissionBounds(const common::types::MappingBounds& bounds) {
+    using common::cm;
+    using common::x_extent;
+    using common::y_extent;
+    using common::z_extent;
+    return bounds.min_x == 0.0 * x_extent[cm] && bounds.max_x == 0.0 * x_extent[cm] &&
+           bounds.min_y == 0.0 * y_extent[cm] && bounds.max_y == 0.0 * y_extent[cm] &&
+           bounds.min_height == 0.0 * z_extent[cm] &&
+           bounds.max_height == 0.0 * z_extent[cm];
+}
+
+[[nodiscard]] Position3D predictedDestination(const Position3D& pos,
+                                              const common::Orientation& heading,
+                                              const common::types::MovementCommand& command) {
+    using common::cm;
+    using common::deg;
+    using common::x_extent;
+    using common::y_extent;
+    using common::z_extent;
+    if (command.type == common::types::MovementCommandType::Elevate) {
+        const double dist_cm = command.distance.numerical_value_in(cm);
+        return Position3D{pos.x, pos.y, pos.z + dist_cm * z_extent[cm]};
+    }
+    if (command.type != common::types::MovementCommandType::Advance) {
+        return pos;
+    }
+    const double dist_cm = command.distance.numerical_value_in(cm);
+    const double angle_rad =
+        heading.horizontal.numerical_value_in(deg) * (std::numbers::pi / 180.0);
+    const double dx = std::cos(angle_rad);
+    const double dy = std::sin(angle_rad);
+    return Position3D{
+        pos.x + (dist_cm * dx) * x_extent[cm],
+        pos.y + (dist_cm * dy) * y_extent[cm],
+        pos.z,
+    };
+}
+
+[[nodiscard]] common::types::MovementCommand clampMovementToMissionBounds(
+    common::types::MovementCommand command, const Position3D& pos,
+    const common::Orientation& heading, const common::types::MappingBounds& bounds) {
+    using common::cm;
+    using common::deg;
+    if (command.type == common::types::MovementCommandType::Elevate) {
+        const double z0 = pos.z.numerical_value_in(cm);
+        const double dz = command.distance.numerical_value_in(cm);
+        const double z1 = z0 + dz;
+        const double zmin = bounds.min_height.numerical_value_in(cm);
+        const double zmax = bounds.max_height.numerical_value_in(cm);
+        double clamped_z = z1;
+        if (clamped_z > zmax) {
+            clamped_z = zmax;
+        }
+        if (clamped_z < zmin) {
+            clamped_z = zmin;
+        }
+        command.distance = (clamped_z - z0) * cm;
+        return command;
+    }
+    if (command.type != common::types::MovementCommandType::Advance) {
+        return command;
+    }
+    const double dist = command.distance.numerical_value_in(cm);
+    if (dist <= 0.0) {
+        return command;
+    }
+    const double rad =
+        heading.horizontal.numerical_value_in(deg) * (std::numbers::pi / 180.0);
+    const double dirx = std::cos(rad);
+    const double diry = std::sin(rad);
+    const double px = pos.x.numerical_value_in(cm);
+    const double py = pos.y.numerical_value_in(cm);
+    double t = dist;
+    constexpr double kEps = 1e-9;
+    const double xmin = bounds.min_x.numerical_value_in(cm);
+    const double xmax = bounds.max_x.numerical_value_in(cm);
+    const double ymin = bounds.min_y.numerical_value_in(cm);
+    const double ymax = bounds.max_y.numerical_value_in(cm);
+    if (dirx > kEps) {
+        t = std::min(t, (xmax - px) / dirx);
+    } else if (dirx < -kEps) {
+        t = std::min(t, (xmin - px) / dirx);
+    }
+    if (diry > kEps) {
+        t = std::min(t, (ymax - py) / diry);
+    } else if (diry < -kEps) {
+        t = std::min(t, (ymin - py) / diry);
+    }
+    if (t < 0.0) {
+        t = 0.0;
+    }
+    command.distance = t * cm;
+    return command;
+}
+
+[[nodiscard]] bool isZeroLengthMove(const common::types::MovementCommand& command) {
+    using common::cm;
+    using common::deg;
+    switch (command.type) {
+    case common::types::MovementCommandType::Advance:
+    case common::types::MovementCommandType::Elevate:
+        return mp_units::abs(command.distance) <= 0.0 * cm;
+    case common::types::MovementCommandType::Rotate:
+        return command.angle <= 0.0 * common::horizontal_angle[deg];
+    case common::types::MovementCommandType::Hover:
+        return false;
+    }
+    return false;
+}
+
 } // namespace
 
 DroneControlImpl::DroneControlImpl(const common::types::DroneConfigData& drone,
-                                   const common::types::MissionConfigData& mission,
                                    const common::types::LidarConfigData& lidar,
-                                   common::ILidar& lidar_sensor,
-                                   common::IGPS& gps,
+                                   const common::ILidar& lidar_sensor,
+                                   const common::IGPS& gps,
                                    common::IDroneMovement& movement,
                                    common::IMutableMap3D& output_map,
-                                   common::IMappingAlgorithm& mapping_algorithm)
+                                   common::IMappingAlgorithm& mapping_algorithm,
+                                   common::types::MappingBounds mission_bounds)
     : drone_(drone),
-      mission_(mission),
       lidar_(lidar),
       lidar_sensor_(lidar_sensor),
       gps_(gps),
       movement_(movement),
       output_map_(output_map),
-      mapping_algorithm_(mapping_algorithm) {}
+      mapping_algorithm_(mapping_algorithm),
+      mission_bounds_(mission_bounds) {}
 
 common::types::DroneStepResult DroneControlImpl::applyMovement(
     const common::types::MappingStepCommand& command) {
@@ -97,9 +287,24 @@ common::types::DroneStepResult DroneControlImpl::applyMovement(
     if (!movementWithinLimits(*command.movement, drone_)) {
         return {common::types::DroneStepStatus::Error, "Movement command exceeds drone limits."};
     }
+    common::types::MovementCommand move = *command.movement;
+    const Position3D here = gps_.position();
+    const common::Orientation heading = gps_.heading();
+    if (!isUnsetMissionBounds(mission_bounds_)) {
+        move = clampMovementToMissionBounds(move, here, heading, mission_bounds_);
+    }
+    if (isZeroLengthMove(move)) {
+        return {common::types::DroneStepStatus::Continue, {}};
+    }
+    if (move.type == common::types::MovementCommandType::Advance ||
+        move.type == common::types::MovementCommandType::Elevate) {
+        const Position3D dest = predictedDestination(here, heading, move);
+        if (!output_map_.isInBounds(dest)) {
+            return {common::types::DroneStepStatus::Continue, {}};
+        }
+    }
     try {
-        const common::types::MovementResult movement_result =
-            executeMovement(movement_, *command.movement);
+        const common::types::MovementResult movement_result = executeMovement(movement_, move);
         if (!movement_result.success) {
             return {common::types::DroneStepStatus::Continue, {}};
         }
@@ -122,14 +327,46 @@ common::types::DroneStepResult DroneControlImpl::step() {
     const common::types::DroneState current_state = state();
     markDroneFootprintEmpty(output_map_, current_state.position, drone_.radius);
 
+    if (!pending_movements_.empty()) {
+        common::types::MappingStepCommand fragment{};
+        fragment.movement = pending_movements_.front();
+        pending_movements_.pop_front();
+        fragment.status = common::types::AlgorithmStatus::Working;
+        const auto move_result = applyMovement(fragment);
+        if (move_result.status == common::types::DroneStepStatus::Error) {
+            return move_result;
+        }
+        ++step_index_;
+        return {common::types::DroneStepStatus::Continue, {}};
+    }
+
     const common::types::LidarScanResult* latest_scan_ptr =
         has_latest_scan_ ? &latest_scan_ : nullptr;
-    const common::types::MappingStepCommand command =
-        mapping_algorithm_.nextStep(current_state, latest_scan_ptr);
+    common::types::MappingStepCommand command{};
+    int invalid_tries = 0;
+    while (true) {
+        command = mapping_algorithm_.nextStep(current_state, latest_scan_ptr);
+        if (command.status == common::types::AlgorithmStatus::Finished ||
+            command.status == common::types::AlgorithmStatus::FinishedWithUnmappableVoxels) {
+            return {common::types::DroneStepStatus::Completed, {}};
+        }
+        if (!isInvalidMovementCommand(command)) {
+            break;
+        }
+        ++invalid_tries;
+        if (invalid_tries >= kMaxInvalidCommandRetries) {
+            throw std::runtime_error("Invalid movement command after retries.");
+        }
+    }
 
-    if (command.status == common::types::AlgorithmStatus::Finished ||
-        command.status == common::types::AlgorithmStatus::FinishedWithUnmappableVoxels) {
-        return {common::types::DroneStepStatus::Completed, {}};
+    if (command.movement.has_value() && !movementWithinLimits(*command.movement, drone_)) {
+        auto parts = splitWithinLimits(*command.movement, drone_);
+        if (parts.empty()) {
+            return {common::types::DroneStepStatus::Continue, {}};
+        }
+        command.movement = parts.front();
+        parts.pop_front();
+        pending_movements_ = std::move(parts);
     }
 
     const auto move_result = applyMovement(command);

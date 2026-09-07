@@ -10,19 +10,21 @@ separately built projects — `simulator_<ids>` executable that `dlopen`s an `Al
 `README.md` and root `HLD.pdf` are done (2026-08-27). Instructor-catalog follow-up Points 1–4 are
 done (2026-08-28) — see `docs/instructor-test-catalog-followup-roadmap.md`; re-verify with
 `verify-instructor-test-catalog`. Independent-component variants (VAR-01…04) harness is on
-branch `independent-component-variants` — re-verify with `verify-independent-component-variants`.
+`known-issues-fixes` (VAR-01 PASSes after the 2026-09-06 corner-anchored clearance fix) —
+re-verify with `verify-independent-component-variants`.
 Remaining mandatory work is Known Issues excel export at zip time and pre-submission packaging,
 not the Sagi/Yoav track split. Deadline: **Sep 6, 2026, 23:30**.
 
 **Mapping-algorithm track (separate from zip):** beat ex2's recorded 24-cell score bands on the
 honest MissionControl column. Pickup: `docs/mapping-algorithm-rewrite-pickup.md`. Do not treat
-`mission_score >= 0` as done for this track. Current honest column is outdoor Empty-carve
-(`docs/benchmarks/2026-08-31-outdoor-empty-carve.csv`, sum **1793.4**): `small_out` mean 72.81
-(was 30; gap 2 vs band 75–89), `large_out` 68.50 (was 60), `house_full` still 30.46. Do not
-globally unmask cone gain. Do not start Project E until `house_full` / `large_out` means
-clearly approach the bands. After algorithm changes, re-time cells with `verify-cell-runtime`
-(Release, serial, one process per cell). Do not treat `num_threads=8` compose wall as per-cell
-time, and do not add a wall-clock abort in Algorithm or MissionControl.
+`mission_score >= 0` as done for this track. Current honest column is VAR-01 Approach A
+(`docs/benchmarks/2026-09-06-var01-approach-a.md`, sum **1832.7**, wall_max **3.0s**,
+`cells_ge_60s=0`): `small_out` mean 79.31, `large_out` 74.02, `house_full` still 25.86,
+`small_room` large+short 67.65. Do not globally unmask cone gain. Do not start Project E until
+`house_full` / outdoor means clearly approach the bands. After algorithm changes, re-time cells
+with `verify-cell-runtime` (Release, serial, one process per cell). Do not treat
+`num_threads=8` compose wall as per-cell time, and do not add a wall-clock abort in Algorithm
+or MissionControl.
 
 ## Start here
 
@@ -55,7 +57,8 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 | `populate-known-issues` | Adding a row to `docs/known-issues.md` (optional excel export later) |
 | `advcpp-rubric-review` | Subjective AdvCpp rubric review (`e01`–`e23`): dispatches one explore subagent per code group (headers/API, C++ idiom, structure/flow, HLD alignment), reports findings as a judgment-call table — not a pass/fail script. Run before submission or after major refactors. |
 | `verify-instructor-test-catalog` | End-to-end instructor-catalog verification: Docker build + `ctest` + `run_all.sh` + `pre-submission-review` + `advcpp-rubric-review` → one PASS/FAIL/AMBIGUOUS report keyed by catalog ID |
-| `verify-independent-component-variants` | Independence harness (VAR-01…04): Docker build + `check_foreign_host` / `check_foreign_mission_control` / `check_adversarial_plugins` / optional `check_baseline_algorithm` → PASS/FAIL/SKIP per variant (not catalog IDs) |
+| `verify-submission-readiness` | Final-gate meta-orchestrator: ask switches, then frozen + catalog + VAR-01…04 + cell-runtime → one stage dashboard. Use when claiming submission ready or asking whether all verify checks are green. Not a catalog-ID report. |
+| `verify-independent-component-variants` | Independence harness (VAR-01…04, all mandatory): Docker build + `check_foreign_host` / `check_foreign_mission_control` / `check_adversarial_plugins` / `check_baseline_algorithm` → PASS/FAIL/SKIP per variant (not catalog IDs) |
 | `verify-cell-runtime` | Per-cell wall-clock vs the ~60 s / ~10 s small-map bar: Release serial 24-cell timing (not 8-thread compose wall). Use after algorithm changes, after a 24-cell score column, or when checking b05 timeout risk. Do not invent a smaller `max_steps` or a wall-clock abort in Algorithm/MC |
 
 ## Key docs
@@ -76,7 +79,7 @@ time, and do not add a wall-clock abort in Algorithm or MissionControl.
 | `docs/error-handling-matrix.md` | Mandatory + optional fault-handling table (course staff PDF) |
 | `docs/map3d-contract.md` | `.npy` dtype rules (maps are **mixed** `int8`/`uint8`), world↔voxel mapping |
 | `docs/review-error-codes.md` | AdvCpp rubric codes (`e*`, `b*`) — no ex3-specific guideline published yet |
-| `docs/known-issues.md` | Working Known Issues rows (14 remaining after 2026-09-01 prune of resolved/stale; excel export is a later zip step) |
+| `docs/known-issues.md` | Working Known Issues rows (12 remaining: optional CI4/6/7/11/12, lazy `.so` load, deferred AdvCpp leftovers) |
 | `docs/known-issues-guidelines.md` | Optional Known Issues excel — grade-neutral-or-better to submit |
 | `docs/open-questions.md` | Genuine ambiguities with a working assumption each — check the forum |
 | `docs/ex2-grading-handoff.md` | Lessons from the Ex2 grade (appealed to **87.5/100**) — frozen-API drift, obsolete bugs, and the ALG28 unbounded-BFS hang; not a plan for sequencing Ex3 |

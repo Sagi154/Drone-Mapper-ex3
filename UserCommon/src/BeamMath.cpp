@@ -26,8 +26,7 @@ Orientation absoluteBeamOrientation(const Orientation& drone_heading,
                        relative_beam.altitude + drone_heading.altitude};
 }
 
-namespace {
-[[nodiscard]] double wrapDeg(double degrees) {
+double wrapDeg(double degrees) {
     double x = std::fmod(degrees, 360.0);
     if (x <= -180.0) {
         x += 360.0;
@@ -36,7 +35,6 @@ namespace {
     }
     return x;
 }
-} // namespace
 
 Orientation normalizeOrientation(Orientation orientation) {
     using common::AltitudeAngle;

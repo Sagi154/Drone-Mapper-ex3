@@ -2,11 +2,15 @@
 
 #include <MissionControl/IDroneControl.h>
 
-#include <Common/IDroneMovement.h>
-#include <Common/IGPS.h>
-#include <Common/ILidar.h>
-#include <Common/IMappingAlgorithm.h>
-#include <Common/IMutableMap3D.h>
+#include <deque>
+
+namespace common {
+class ILidar;
+class IGPS;
+class IDroneMovement;
+class IMutableMap3D;
+class IMappingAlgorithm;
+} // namespace common
 
 namespace mission_control_207190406_209543255 {
 
@@ -14,13 +18,13 @@ namespace mission_control_207190406_209543255 {
 class DroneControlImpl final : public mission_control::IDroneControl {
 public:
     DroneControlImpl(const common::types::DroneConfigData& drone,
-                     const common::types::MissionConfigData& mission,
                      const common::types::LidarConfigData& lidar,
-                     common::ILidar& lidar_sensor,
-                     common::IGPS& gps,
+                     const common::ILidar& lidar_sensor,
+                     const common::IGPS& gps,
                      common::IDroneMovement& movement,
                      common::IMutableMap3D& output_map,
-                     common::IMappingAlgorithm& mapping_algorithm);
+                     common::IMappingAlgorithm& mapping_algorithm,
+                     common::types::MappingBounds mission_bounds = {});
 
     [[nodiscard]] common::types::DroneStepResult step() override;
     [[nodiscard]] common::types::DroneState state() const override;
@@ -31,16 +35,17 @@ private:
     void applyScanIfRequested(const common::types::MappingStepCommand& command);
 
     common::types::DroneConfigData drone_;
-    common::types::MissionConfigData mission_;
     common::types::LidarConfigData lidar_;
-    common::ILidar& lidar_sensor_;
-    common::IGPS& gps_;
+    const common::ILidar& lidar_sensor_;
+    const common::IGPS& gps_;
     common::IDroneMovement& movement_;
     common::IMutableMap3D& output_map_;
     common::IMappingAlgorithm& mapping_algorithm_;
+    common::types::MappingBounds mission_bounds_{};
     common::types::LidarScanResult latest_scan_{};
     bool has_latest_scan_ = false;
     std::size_t step_index_ = 0;
+    std::deque<common::types::MovementCommand> pending_movements_{};
 };
 
 } // namespace mission_control_207190406_209543255

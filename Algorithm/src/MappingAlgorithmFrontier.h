@@ -94,6 +94,8 @@ public:
 
 [[nodiscard]] GridKey quantizePosition(const common::Position3D& pos, const common::types::MapConfig& config);
 
+[[nodiscard]] common::Position3D keyToPoint(const GridKey& key, const common::types::MapConfig& config);
+
 [[nodiscard]] bool hasNotMappedInSphere(const common::IMap3D& map,
                                         const common::Position3D& centre,
                                         common::PhysicalLength radius);
@@ -114,7 +116,17 @@ public:
                                        const common::Position3D& to,
                                        common::PhysicalLength drone_radius);
 
-/// Voxel count of the mission bounds — the expansion cap for every search.
+/// Voxel count of the mission bounds. Used as the full-map fallback cap in
+/// `WavefrontPlanner::plan` (ordinary replans use `kLocalSearchExpansionCap` first)
+/// and as the expansion bound for other `exploreReachable` callers.
 [[nodiscard]] std::size_t maxExpansionsForMap(const common::IMap3D& map);
+
+// Reachability search bound for an ordinary replan. Chosen so a single replan's bounded BFS
+// (runBoundedSearch, MappingAlgorithmFrontier.cpp) costs low-single-digit milliseconds even on
+// the largest sim_compose.yaml map (large_out, 31x31x31 = 29,791 voxels), instead of scaling
+// with the whole map on every stall-triggered replan. See root-cause investigation in
+// docs/superpowers/plans/2026-09-06-var01-approach-a-runtime-fix.md. Tuned empirically in
+// Task 4; if you change this value, re-run verify-cell-runtime on the full 24-cell suite.
+constexpr std::size_t kLocalSearchExpansionCap = 3000;
 
 } // namespace algorithm_207190406_209543255::detail

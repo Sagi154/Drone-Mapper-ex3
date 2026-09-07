@@ -2,6 +2,10 @@
 
 #include "YamlParseUtil.hpp"
 
+namespace {
+constexpr double kDiameterToRadius = 2.0;
+} // namespace
+
 namespace simulator::io {
 
 namespace UC = user_common_207190406_209543255;
@@ -12,7 +16,7 @@ parseDroneConfig(const std::filesystem::path& path, UC::IRunErrorLog& log) {
         path, log, "drone_config", "CONFIG_FILE_NOT_FOUND",
         [](const YAML::Node& node, UC::ConfigParseResult<common::types::DroneConfigData>& result) {
             if (const auto v = detail::readLengthCm(node, "dimensions_cm")) {
-                result.value.radius = *v / 2.0;
+                result.value.radius = *v / kDiameterToRadius;
             } else {
                 result.errors.push_back({"CONFIG_MISSING_FIELD",
                                           "[drone_config] mandatory field dimensions_cm is absent"});

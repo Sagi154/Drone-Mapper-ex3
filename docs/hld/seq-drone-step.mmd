@@ -1,5 +1,6 @@
 sequenceDiagram
     participant MC as MissionControlImpl_207190406_209543255
+    participant Steps as runMissionSteps
     participant DC as DroneControlImpl
     participant Algo as MappingAlgorithmImpl_207190406_209543255
     participant GPS as MockGPS
@@ -8,20 +9,41 @@ sequenceDiagram
     participant SR as applyScanToMap
     participant Map as output Map3DImpl
 
-    loop until Finished / MaxSteps / Error
-        MC->>DC: step()
+    MC->>Steps: runMissionSteps
+    loop until Finished / MaxSteps
+        Steps->>DC: step()
         DC->>GPS: position() / heading()
-        DC->>Algo: nextStep(state, latest_scan)
-        Algo-->>DC: MappingStepCommand
-        alt recoverable wall throw from Move
-            DC->>Move: advance/elevate
-            Move-->>DC: throw blocked/boundary
-            DC-->>DC: Continue (no scan write)
-        else normal movement
+        DC->>Map: markDroneFootprintEmpty
+        alt pending fragment
+            Note over DC: drain pending_movements_ - no nextStep, no extra scan
             DC->>Move: rotate/advance/elevate
-            DC->>Lidar: scan(orientations)
-            DC->>SR: applyScanToMap
-            SR->>Map: set voxels
+            DC-->>Steps: Continue
+        else new command
+            DC->>Algo: nextStep(state, latest_scan)
+            Algo-->>DC: MappingStepCommand
+            Note over DC: CI3 retry nextStep up to kMaxInvalidCommandRetries if type invalid, then throw
+            alt AlgorithmStatus::Finished
+                Note over DC: no further move/scan
+                DC-->>Steps: Completed
+            else Continue
+                Note over DC: CI8 split oversize into pending_movements_, first fragment this step
+                alt world-OOB after mission-bounds clamp
+                    Note over DC: CI2 ignore - no Movement call
+                else recoverable wall throw from Move
+                    DC->>Move: advance/elevate
+                    Move-->>DC: throw std::runtime_error
+                    DC-->>DC: Continue
+                else normal movement
+                    Note over DC: CI10 clamp Advance/Elevate to mission_bounds when set
+                    DC->>Move: rotate/advance/elevate
+                end
+                opt command has scan_orientation
+                    DC->>Lidar: scan(orientations)
+                    DC->>SR: applyScanToMap
+                    SR->>Map: set voxels
+                end
+                DC-->>Steps: Continue
+            end
         end
-        DC-->>MC: DroneStepResult
     end
+    Steps-->>MC: MissionRunResult

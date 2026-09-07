@@ -32,53 +32,17 @@ namespace {
 constexpr double kHalfStepTolerance = 0.5;
 constexpr std::size_t kMaxArrivalScans = 4;
 constexpr double kPositionEpsilon = 1e-6;
+constexpr double kHeadingEpsilonDeg = 1e-6;
 
-} // namespace
-
-struct MappingAlgorithmImpl_207190406_209543255::Impl {
-    detail::WavefrontPlanner planner{};
-    detail::ExplorationPlan plan{};
-    detail::FrontierCells last_frontier{};
-    user_common_207190406_209543255::cone_template::ConeTemplateCache templates{};
-    user_common_207190406_209543255::cone_template::VoxelStamp stamp{};
-    std::vector<common::Orientation> arrival_scans{};
-    std::size_t arrival_scan_index = 0;
-    std::size_t waypoint_index = 0;
-    std::size_t steps_since_replan = 0;
-    bool has_plan = false;
-    int moving_stall_ticks = 0;
-    Position3D last_position{};
-    bool has_last_position = false;
-    detail::BlockedCells blocked_cells{};
-    detail::GridIntMap blocked_since{};
-    int recovery_attempts = 0;
-    int low_rate_replans = 0;
-    std::size_t unmapped_at_progress_mark = 0;
-    std::size_t progress_window_steps = 0;
-    int low_observed_windows = 0;
-    bool has_progress_baseline = false;
-    std::vector<detail::ExplorationPlan> pending_plans{};
-    bool finished = false;
-};
-
-MappingAlgorithmImpl_207190406_209543255::~MappingAlgorithmImpl_207190406_209543255() = default;
-
-MappingAlgorithmImpl_207190406_209543255::MappingAlgorithmImpl_207190406_209543255(
-    common::MappingAlgorithmDependencies dependencies)
-    : common::IMappingAlgorithm(dependencies), impl_(std::make_unique<Impl>()) {}
-
-bool MappingAlgorithmImpl_207190406_209543255::samePosition(const Position3D& a,
-                                                           const Position3D& b) const {
+bool samePosition(const Position3D& a, const Position3D& b) {
     const double dx = std::abs(a.x.force_numerical_value_in(cm) - b.x.force_numerical_value_in(cm));
     const double dy = std::abs(a.y.force_numerical_value_in(cm) - b.y.force_numerical_value_in(cm));
     const double dz = std::abs(a.z.force_numerical_value_in(cm) - b.z.force_numerical_value_in(cm));
     return dx <= kPositionEpsilon && dy <= kPositionEpsilon && dz <= kPositionEpsilon;
 }
 
-bool MappingAlgorithmImpl_207190406_209543255::reachedWaypoint(
-    const types::DroneState& state,
-    const Position3D& target,
-    const types::MapConfig& map_config) const {
+bool reachedWaypoint(const types::DroneState& state, const Position3D& target,
+                     const types::MapConfig& map_config) {
     const double step = map_config.resolution.force_numerical_value_in(cm);
     const double dx = std::abs(state.position.x.force_numerical_value_in(cm) -
                                target.x.force_numerical_value_in(cm));
@@ -90,142 +54,8 @@ bool MappingAlgorithmImpl_207190406_209543255::reachedWaypoint(
            dz <= step * kHalfStepTolerance;
 }
 
-std::optional<types::MovementCommand> MappingAlgorithmImpl_207190406_209543255::movementToward(
-    const types::DroneState& state, const Position3D& target) const {
-    const double dh =
-        target.z.force_numerical_value_in(cm) - state.position.z.force_numerical_value_in(cm);
-    if (std::abs(dh) > 1e-6) {
-        const double limit = drone_config_.max_elevate.force_numerical_value_in(cm);
-        types::MovementCommand cmd{};
-        cmd.type = types::MovementCommandType::Elevate;
-        cmd.distance = std::clamp(dh, -limit, limit) * cm;
-        return cmd;
-    }
-
-    const double dx =
-        target.x.force_numerical_value_in(cm) - state.position.x.force_numerical_value_in(cm);
-    const double dy =
-        target.y.force_numerical_value_in(cm) - state.position.y.force_numerical_value_in(cm);
-    if (std::abs(dx) < 1e-6 && std::abs(dy) < 1e-6) {
-        types::MovementCommand cmd{};
-        cmd.type = types::MovementCommandType::Hover;
-        return cmd;
-    }
-
-    const double target_heading = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
-    const double current_heading = state.heading.horizontal.force_numerical_value_in(deg);
-    double delta = std::fmod(target_heading - current_heading, 360.0);
-    if (delta > 180.0) {
-        delta -= 360.0;
-    }
-    if (delta < -180.0) {
-        delta += 360.0;
-    }
-
-    const double rot_limit = drone_config_.max_rotate.force_numerical_value_in(deg);
-    if (std::abs(delta) > 1e-6) {
-        types::MovementCommand cmd{};
-        cmd.type = types::MovementCommandType::Rotate;
-        cmd.rotation =
-            (delta > 0.0) ? types::RotationDirection::Left : types::RotationDirection::Right;
-        cmd.angle = std::min(std::abs(delta), rot_limit) * deg;
-        return cmd;
-    }
-
-    const double dist_cm = std::sqrt(dx * dx + dy * dy);
-    const double adv_limit = drone_config_.max_advance.force_numerical_value_in(cm);
-    types::MovementCommand cmd{};
-    cmd.type = types::MovementCommandType::Advance;
-    cmd.distance = std::min(dist_cm, adv_limit) * cm;
-    return cmd;
-}
-
-std::size_t MappingAlgorithmImpl_207190406_209543255::remainingSteps(
-    const types::DroneState& state) const {
-    const std::size_t budget = mission_config_.max_steps;
-    if (budget == 0) {
-        return 0;
-    }
-    return (state.step_index >= budget) ? 0 : (budget - state.step_index);
-}
-
-void MappingAlgorithmImpl_207190406_209543255::pruneExpiredBlockedCells(std::size_t step_index) {
-    for (auto it = impl_->blocked_since.begin(); it != impl_->blocked_since.end();) {
-        const auto inserted = static_cast<std::size_t>(it->second);
-        if (step_index >= inserted + kBlockedTtlSteps) {
-            impl_->blocked_cells.erase(it->first);
-            it = impl_->blocked_since.erase(it);
-        } else {
-            ++it;
-        }
-    }
-}
-
-bool MappingAlgorithmImpl_207190406_209543255::replan(const types::DroneState& state,
-                                                      bool ignore_blocked) {
-    const bool prev_stay = impl_->has_plan && impl_->plan.waypoints.empty();
-    const detail::WavefrontInputs inputs{
-        output_map_, state, lidar_config_, drone_config_,
-        remainingSteps(state), impl_->blocked_cells, ignore_blocked, prev_stay,
-    };
-    impl_->pending_plans.clear();
-    adoptPlan(impl_->planner.plan(inputs, &impl_->pending_plans), state);
-    return impl_->has_plan;
-}
-
-bool MappingAlgorithmImpl_207190406_209543255::popPendingPlan(const types::DroneState& state) {
-    while (!impl_->pending_plans.empty()) {
-        detail::ExplorationPlan candidate = std::move(impl_->pending_plans.front());
-        impl_->pending_plans.erase(impl_->pending_plans.begin());
-        if (!candidate.internals.target_keys.empty() &&
-            !detail::clusterStillFrontier(output_map_, candidate.internals.target_keys)) {
-            continue;
-        }
-        adoptPlan(std::move(candidate), state);
-        return true;
-    }
-    return false;
-}
-
-void MappingAlgorithmImpl_207190406_209543255::adoptPlan(detail::ExplorationPlan plan,
-                                                         const types::DroneState& state) {
-    impl_->plan = std::move(plan);
-    impl_->waypoint_index = 0;
-    impl_->arrival_scans.clear();
-    impl_->arrival_scan_index = 0;
-    impl_->steps_since_replan = 0;
-    impl_->has_plan = impl_->plan.valid;
-    impl_->last_frontier = impl_->plan.internals.frontier_cells;
-    if (impl_->has_plan && impl_->plan.waypoints.empty()) {
-        buildArrivalSweep(state, output_map_.getMapConfig());
-        if (impl_->arrival_scans.empty()) {
-            impl_->plan.expected_rate = 0.0;
-        }
-    }
-}
-
-void MappingAlgorithmImpl_207190406_209543255::buildArrivalSweep(
-    const types::DroneState& state, const types::MapConfig& map_config) {
-    const auto& templates = impl_->templates.get(lidar_config_, map_config.resolution);
-    impl_->arrival_scans = detail::buildSweepDirections(
-        output_map_, state.position, lidar_config_, impl_->last_frontier, templates,
-        impl_->stamp);
-    if (detail::isSmallOutdoorMission(map_config) &&
-        impl_->arrival_scans.size() > kMaxArrivalScans) {
-        impl_->arrival_scans.resize(kMaxArrivalScans);
-    }
-    impl_->arrival_scan_index = 0;
-}
-
-bool MappingAlgorithmImpl_207190406_209543255::targetClusterAlive() const {
-    if (impl_->plan.internals.target_keys.empty()) {
-        return true;
-    }
-    return detail::clusterStillFrontier(output_map_, impl_->plan.internals.target_keys);
-}
-
-types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
-    const types::DroneState& state, const types::MovementCommand& movement) const {
+types::DroneState predictPose(const types::DroneState& state,
+                              const types::MovementCommand& movement) {
     types::DroneState next = state;
     switch (movement.type) {
     case types::MovementCommandType::Hover:
@@ -262,7 +92,207 @@ types::DroneState MappingAlgorithmImpl_207190406_209543255::predictPose(
     return next;
 }
 
-types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::finishIfUnmapped(
+} // namespace
+
+struct MappingAlgorithmImpl_207190406_209543255::Impl {
+    Impl(const common::IMap3D& output_map, const types::LidarConfigData& lidar_config,
+         const types::DroneConfigData& drone_config,
+         const types::MissionConfigData& mission_config)
+        : output_map_(output_map),
+          lidar_config_(lidar_config),
+          drone_config_(drone_config),
+          mission_config_(mission_config) {}
+
+    const common::IMap3D& output_map_;
+    const types::LidarConfigData& lidar_config_;
+    const types::DroneConfigData& drone_config_;
+    const types::MissionConfigData& mission_config_;
+
+    detail::WavefrontPlanner planner{};
+    detail::ExplorationPlan plan{};
+    detail::FrontierCells last_frontier{};
+    user_common_207190406_209543255::cone_template::ConeTemplateCache templates{};
+    user_common_207190406_209543255::cone_template::VoxelStamp stamp{};
+    std::vector<common::Orientation> arrival_scans{};
+    std::size_t arrival_scan_index = 0;
+    std::size_t waypoint_index = 0;
+    std::size_t steps_since_replan = 0;
+    bool has_plan = false;
+    int moving_stall_ticks = 0;
+    Position3D last_position{};
+    bool has_last_position = false;
+    detail::BlockedCells blocked_cells{};
+    detail::GridIntMap blocked_since{};
+    int recovery_attempts = 0;
+    int low_rate_replans = 0;
+    std::size_t unmapped_at_progress_mark = 0;
+    std::size_t progress_window_steps = 0;
+    int low_observed_windows = 0;
+    bool has_progress_baseline = false;
+    std::vector<detail::ExplorationPlan> pending_plans{};
+    bool finished = false;
+
+    [[nodiscard]] std::size_t remainingSteps(const types::DroneState& state) const;
+    void pruneExpiredBlockedCells(std::size_t step_index);
+    [[nodiscard]] bool replan(const types::DroneState& state, bool ignore_blocked);
+    void adoptPlan(detail::ExplorationPlan plan, const types::DroneState& state);
+    [[nodiscard]] bool popPendingPlan(const types::DroneState& state);
+    [[nodiscard]] std::optional<types::MovementCommand> movementToward(
+        const types::DroneState& state, const Position3D& target) const;
+    void buildArrivalSweep(const types::DroneState& state, const types::MapConfig& map_config);
+    [[nodiscard]] bool targetClusterAlive() const;
+    [[nodiscard]] types::MappingStepCommand finishIfUnmapped(
+        std::optional<std::size_t> known_unmapped = std::nullopt) const;
+    [[nodiscard]] bool handleReplan(const types::DroneState& state, bool plan_exhausted,
+                                    bool interval_elapsed, bool cluster_dead);
+    [[nodiscard]] bool updateProgressWindow();
+    [[nodiscard]] types::MappingStepCommand emitMovementOrScan(
+        const types::DroneState& state, const types::MapConfig& map_config);
+};
+
+MappingAlgorithmImpl_207190406_209543255::~MappingAlgorithmImpl_207190406_209543255() = default;
+
+MappingAlgorithmImpl_207190406_209543255::MappingAlgorithmImpl_207190406_209543255(
+    common::MappingAlgorithmDependencies dependencies)
+    : common::IMappingAlgorithm(dependencies),
+      impl_(std::make_unique<Impl>(output_map_, lidar_config_, drone_config_, mission_config_)) {}
+
+std::optional<types::MovementCommand>
+MappingAlgorithmImpl_207190406_209543255::Impl::movementToward(const types::DroneState& state,
+                                                               const Position3D& target) const {
+    const double dh =
+        target.z.force_numerical_value_in(cm) - state.position.z.force_numerical_value_in(cm);
+    if (std::abs(dh) > kPositionEpsilon) {
+        const double limit = drone_config_.max_elevate.force_numerical_value_in(cm);
+        types::MovementCommand cmd{};
+        cmd.type = types::MovementCommandType::Elevate;
+        cmd.distance = std::clamp(dh, -limit, limit) * cm;
+        return cmd;
+    }
+
+    const double dx =
+        target.x.force_numerical_value_in(cm) - state.position.x.force_numerical_value_in(cm);
+    const double dy =
+        target.y.force_numerical_value_in(cm) - state.position.y.force_numerical_value_in(cm);
+    if (std::abs(dx) < kPositionEpsilon && std::abs(dy) < kPositionEpsilon) {
+        types::MovementCommand cmd{};
+        cmd.type = types::MovementCommandType::Hover;
+        return cmd;
+    }
+
+    const double target_heading = std::atan2(dy, dx) * (180.0 / std::numbers::pi);
+    const double current_heading = state.heading.horizontal.force_numerical_value_in(deg);
+    double delta = std::fmod(target_heading - current_heading, 360.0);
+    if (delta > 180.0) {
+        delta -= 360.0;
+    }
+    if (delta < -180.0) {
+        delta += 360.0;
+    }
+
+    const double rot_limit = drone_config_.max_rotate.force_numerical_value_in(deg);
+    if (std::abs(delta) > kHeadingEpsilonDeg) {
+        types::MovementCommand cmd{};
+        cmd.type = types::MovementCommandType::Rotate;
+        cmd.rotation =
+            (delta > 0.0) ? types::RotationDirection::Left : types::RotationDirection::Right;
+        cmd.angle = std::min(std::abs(delta), rot_limit) * deg;
+        return cmd;
+    }
+
+    const double dist_cm = std::sqrt(dx * dx + dy * dy);
+    const double adv_limit = drone_config_.max_advance.force_numerical_value_in(cm);
+    types::MovementCommand cmd{};
+    cmd.type = types::MovementCommandType::Advance;
+    cmd.distance = std::min(dist_cm, adv_limit) * cm;
+    return cmd;
+}
+
+std::size_t MappingAlgorithmImpl_207190406_209543255::Impl::remainingSteps(
+    const types::DroneState& state) const {
+    const std::size_t budget = mission_config_.max_steps;
+    if (budget == 0) {
+        return 0;
+    }
+    return (state.step_index >= budget) ? 0 : (budget - state.step_index);
+}
+
+void MappingAlgorithmImpl_207190406_209543255::Impl::pruneExpiredBlockedCells(
+    std::size_t step_index) {
+    for (auto it = blocked_since.begin(); it != blocked_since.end();) {
+        const auto inserted = static_cast<std::size_t>(it->second);
+        if (step_index >= inserted + kBlockedTtlSteps) {
+            blocked_cells.erase(it->first);
+            it = blocked_since.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+bool MappingAlgorithmImpl_207190406_209543255::Impl::replan(const types::DroneState& state,
+                                                            bool ignore_blocked) {
+    const bool prev_stay = has_plan && plan.waypoints.empty();
+    const detail::WavefrontInputs inputs{
+        output_map_, state, lidar_config_, drone_config_,
+        remainingSteps(state), blocked_cells, ignore_blocked, prev_stay,
+    };
+    pending_plans.clear();
+    adoptPlan(planner.plan(inputs, &pending_plans), state);
+    return has_plan;
+}
+
+bool MappingAlgorithmImpl_207190406_209543255::Impl::popPendingPlan(
+    const types::DroneState& state) {
+    while (!pending_plans.empty()) {
+        detail::ExplorationPlan candidate = std::move(pending_plans.front());
+        pending_plans.erase(pending_plans.begin());
+        if (!candidate.internals.target_keys.empty() &&
+            !detail::clusterStillFrontier(output_map_, candidate.internals.target_keys)) {
+            continue;
+        }
+        adoptPlan(std::move(candidate), state);
+        return true;
+    }
+    return false;
+}
+
+void MappingAlgorithmImpl_207190406_209543255::Impl::adoptPlan(detail::ExplorationPlan plan,
+                                                               const types::DroneState& state) {
+    this->plan = std::move(plan);
+    waypoint_index = 0;
+    arrival_scans.clear();
+    arrival_scan_index = 0;
+    steps_since_replan = 0;
+    has_plan = this->plan.valid;
+    last_frontier = this->plan.internals.frontier_cells;
+    if (has_plan && this->plan.waypoints.empty()) {
+        buildArrivalSweep(state, output_map_.getMapConfig());
+        if (arrival_scans.empty()) {
+            this->plan.expected_rate = 0.0;
+        }
+    }
+}
+
+void MappingAlgorithmImpl_207190406_209543255::Impl::buildArrivalSweep(
+    const types::DroneState& state, const types::MapConfig& map_config) {
+    const auto& templates = this->templates.get(lidar_config_, map_config.resolution);
+    arrival_scans = detail::buildSweepDirections(
+        output_map_, state.position, lidar_config_, last_frontier, templates, stamp);
+    if (detail::isSmallOutdoorMission(map_config) && arrival_scans.size() > kMaxArrivalScans) {
+        arrival_scans.resize(kMaxArrivalScans);
+    }
+    arrival_scan_index = 0;
+}
+
+bool MappingAlgorithmImpl_207190406_209543255::Impl::targetClusterAlive() const {
+    if (plan.internals.target_keys.empty()) {
+        return true;
+    }
+    return detail::clusterStillFrontier(output_map_, plan.internals.target_keys);
+}
+
+types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::Impl::finishIfUnmapped(
     std::optional<std::size_t> known_unmapped) const {
     types::MappingStepCommand cmd{};
     const bool any_unmapped = known_unmapped.has_value()
@@ -273,10 +303,10 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::finishIfUnma
     return cmd;
 }
 
-bool MappingAlgorithmImpl_207190406_209543255::handleReplan(const types::DroneState& state,
-                                                            bool plan_exhausted,
-                                                            bool interval_elapsed,
-                                                            bool cluster_dead) {
+bool MappingAlgorithmImpl_207190406_209543255::Impl::handleReplan(const types::DroneState& state,
+                                                                  bool plan_exhausted,
+                                                                  bool interval_elapsed,
+                                                                  bool cluster_dead) {
     if (!(plan_exhausted || interval_elapsed || cluster_dead)) {
         return false;
     }
@@ -284,75 +314,73 @@ bool MappingAlgorithmImpl_207190406_209543255::handleReplan(const types::DroneSt
     const bool reused_queue = can_reuse_queue && popPendingPlan(state);
     const bool have = reused_queue || replan(state, false);
     if (reused_queue) {
-        impl_->low_rate_replans = 0;
-        impl_->recovery_attempts = 0;
+        low_rate_replans = 0;
+        recovery_attempts = 0;
     } else {
-        const bool low = !have || impl_->plan.expected_rate < kMinInformationRate;
+        const bool low = !have || plan.expected_rate < kMinInformationRate;
         if (low) {
-            ++impl_->low_rate_replans;
-            if (!have && impl_->recovery_attempts < kRecoveryAttempts &&
-                replan(state, true)) {
-                ++impl_->recovery_attempts;
-                if (impl_->plan.expected_rate >= kMinInformationRate) {
-                    impl_->low_rate_replans = 0;
-                    impl_->recovery_attempts = 0;
+            ++low_rate_replans;
+            if (!have && recovery_attempts < kRecoveryAttempts && replan(state, true)) {
+                ++recovery_attempts;
+                if (plan.expected_rate >= kMinInformationRate) {
+                    low_rate_replans = 0;
+                    recovery_attempts = 0;
                 }
-            } else if (impl_->low_rate_replans >= kLowRateReplans) {
-                impl_->finished = true;
+            } else if (low_rate_replans >= kLowRateReplans) {
+                finished = true;
                 return true;
             }
         } else {
-            impl_->low_rate_replans = 0;
-            impl_->recovery_attempts = 0;
+            low_rate_replans = 0;
+            recovery_attempts = 0;
         }
     }
-    impl_->arrival_scans.clear();
-    impl_->arrival_scan_index = 0;
+    arrival_scans.clear();
+    arrival_scan_index = 0;
     return false;
 }
 
-bool MappingAlgorithmImpl_207190406_209543255::updateProgressWindow() {
-    if (!impl_->has_progress_baseline) {
-        impl_->unmapped_at_progress_mark = detail::countUnmappedInBounds(output_map_);
-        impl_->has_progress_baseline = true;
+bool MappingAlgorithmImpl_207190406_209543255::Impl::updateProgressWindow() {
+    if (!has_progress_baseline) {
+        unmapped_at_progress_mark = detail::countUnmappedInBounds(output_map_);
+        has_progress_baseline = true;
     }
-    ++impl_->progress_window_steps;
-    if (impl_->progress_window_steps < kObservedWindowSteps) {
+    ++progress_window_steps;
+    if (progress_window_steps < kObservedWindowSteps) {
         return false;
     }
     const std::size_t unmapped_now = detail::countUnmappedInBounds(output_map_);
-    const std::size_t prev = impl_->unmapped_at_progress_mark;
+    const std::size_t prev = unmapped_at_progress_mark;
     const std::size_t gained = (prev > unmapped_now) ? (prev - unmapped_now) : 0;
-    const double observed_rate = static_cast<double>(gained) /
-                                 static_cast<double>(impl_->progress_window_steps);
+    const double observed_rate =
+        static_cast<double>(gained) / static_cast<double>(progress_window_steps);
     if (observed_rate < kMinObservedInformationRate) {
-        ++impl_->low_observed_windows;
+        ++low_observed_windows;
     } else {
-        impl_->low_observed_windows = 0;
+        low_observed_windows = 0;
     }
-    impl_->unmapped_at_progress_mark = unmapped_now;
-    impl_->progress_window_steps = 0;
-    if (impl_->low_observed_windows >= kLowObservedWindows) {
-        impl_->finished = true;
+    unmapped_at_progress_mark = unmapped_now;
+    progress_window_steps = 0;
+    if (low_observed_windows >= kLowObservedWindows) {
+        finished = true;
         return true;
     }
     return false;
 }
 
-types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::emitMovementOrScan(
+types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::Impl::emitMovementOrScan(
     const types::DroneState& state, const types::MapConfig& map_config) {
     types::MappingStepCommand cmd{};
     cmd.status = types::AlgorithmStatus::Working;
 
-    if (impl_->waypoint_index < impl_->plan.waypoints.size()) {
-        const Position3D& target = impl_->plan.waypoints[impl_->waypoint_index];
+    if (waypoint_index < plan.waypoints.size()) {
+        const Position3D& target = plan.waypoints[waypoint_index];
         cmd.movement = movementToward(state, target);
         if (cmd.movement.has_value()) {
             const types::DroneState predicted = predictPose(state, *cmd.movement);
-            const auto& templates = impl_->templates.get(lidar_config_, map_config.resolution);
+            const auto& templates = this->templates.get(lidar_config_, map_config.resolution);
             const std::optional<Orientation> world = detail::bestTravelScan(
-                output_map_, predicted, target, lidar_config_, impl_->last_frontier,
-                templates, impl_->stamp);
+                output_map_, predicted, target, lidar_config_, last_frontier, templates, stamp);
             if (world.has_value()) {
                 cmd.scan_orientation =
                     Orientation{world->horizontal - predicted.heading.horizontal,
@@ -362,17 +390,17 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::emitMovement
         return cmd;
     }
 
-    if (impl_->arrival_scans.empty()) {
+    if (arrival_scans.empty()) {
         buildArrivalSweep(state, map_config);
     }
-    if (impl_->arrival_scan_index < impl_->arrival_scans.size()) {
-        const Orientation& world = impl_->arrival_scans[impl_->arrival_scan_index++];
+    if (arrival_scan_index < arrival_scans.size()) {
+        const Orientation& world = arrival_scans[arrival_scan_index++];
         cmd.scan_orientation = Orientation{world.horizontal - state.heading.horizontal,
                                            world.altitude - state.heading.altitude};
         return cmd;
     }
 
-    impl_->has_plan = false;
+    has_plan = false;
     cmd.movement = types::MovementCommand{};
     return cmd;
 }
@@ -388,7 +416,7 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     }
 
     const types::MapConfig map_config = output_map_.getMapConfig();
-    pruneExpiredBlockedCells(state.step_index);
+    impl_->pruneExpiredBlockedCells(state.step_index);
 
     if (impl_->has_plan && impl_->waypoint_index < impl_->plan.waypoints.size() &&
         impl_->has_last_position && samePosition(impl_->last_position, state.position)) {
@@ -414,25 +442,25 @@ types::MappingStepCommand MappingAlgorithmImpl_207190406_209543255::nextStep(
     const bool waypoints_done =
         impl_->has_plan && impl_->waypoint_index >= impl_->plan.waypoints.size();
     if (waypoints_done && impl_->arrival_scans.empty() && impl_->arrival_scan_index == 0) {
-        buildArrivalSweep(state, map_config);
+        impl_->buildArrivalSweep(state, map_config);
     }
 
     const bool scans_done = impl_->arrival_scan_index >= impl_->arrival_scans.size();
     const bool plan_exhausted = !impl_->has_plan || (waypoints_done && scans_done);
     const bool interval_elapsed = impl_->steps_since_replan >= kReplanIntervalSteps;
-    const bool cluster_dead = impl_->has_plan && !targetClusterAlive();
+    const bool cluster_dead = impl_->has_plan && !impl_->targetClusterAlive();
 
-    if (handleReplan(state, plan_exhausted, interval_elapsed, cluster_dead)) {
-        return finishIfUnmapped();
+    if (impl_->handleReplan(state, plan_exhausted, interval_elapsed, cluster_dead)) {
+        return impl_->finishIfUnmapped();
     }
 
     ++impl_->steps_since_replan;
 
-    if (updateProgressWindow()) {
-        return finishIfUnmapped(impl_->unmapped_at_progress_mark);
+    if (impl_->updateProgressWindow()) {
+        return impl_->finishIfUnmapped(impl_->unmapped_at_progress_mark);
     }
 
-    return emitMovementOrScan(state, map_config);
+    return impl_->emitMovementOrScan(state, map_config);
 }
 
 } // namespace algorithm_207190406_209543255

@@ -1,9 +1,12 @@
 #include <MissionControl/MissionControlImpl.h>
+#include <MissionControl/IDroneControl.h>
+#include <MissionControl/MissionRunLoop.h>
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -121,6 +124,28 @@ public:
 }
 
 } // namespace
+
+class FakeDroneControl final : public mission_control::IDroneControl {
+public:
+    explicit FakeDroneControl(std::vector<common::types::DroneStepResult> script)
+        : script_(std::move(script)) {}
+
+    [[nodiscard]] common::types::DroneStepResult step() override {
+        ++step_calls_;
+        if (call_index_ >= script_.size()) {
+            return {common::types::DroneStepStatus::Completed, {}};
+        }
+        return script_[call_index_++];
+    }
+
+    [[nodiscard]] common::types::DroneState state() const override { return {}; }
+
+    std::size_t step_calls_ = 0;
+
+private:
+    std::vector<common::types::DroneStepResult> script_;
+    std::size_t call_index_ = 0;
+};
 
 TEST(MissionControl, CompletesWhenAlgorithmFinishes) {
     FakeMap3D stand_in{makeMapConfig()};
@@ -249,7 +274,44 @@ TEST(MissionControl, VerboseOffWritesNoExtraFile) {
     std::filesystem::remove(output_file, ec);
 }
 
-TEST(MissionControl, FailedStepReportsStructuredErrorRef) {
+TEST(MissionControl, OversizeAdvanceCompletesWithoutErrors) {
+    FakeMap3D stand_in{makeMapConfig()};
+    FakeMap3D output{makeMapConfig()};
+    FakeGPS gps;
+    FakeLidar lidar{defaultLidar()};
+    FakeMovement movement;
+
+    const auto mission = makeMission(10);
+    const auto drone = defaultDrone();
+    const auto lidar_cfg = defaultLidar();
+    ScriptedAlgorithm algorithm{
+        {mission, lidar_cfg, drone, stand_in},
+        {{
+            .movement =
+                common::types::MovementCommand{
+                    .type = common::types::MovementCommandType::Advance,
+                    .distance = 50.0 * cm,
+                },
+            .status = common::types::AlgorithmStatus::Working,
+        }},
+    };
+
+    const auto output_file =
+        std::filesystem::temp_directory_path() / "mc_oversize_split_output.npy";
+    mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
+        common::MissionControlDependencies{
+            mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
+    };
+
+    const auto result = control.runMission();
+    EXPECT_EQ(result.status, common::types::MissionRunStatus::Completed);
+    EXPECT_TRUE(result.errors.empty());
+
+    std::error_code ec;
+    std::filesystem::remove(output_file, ec);
+}
+
+TEST(MissionControl, InvalidCommandsThrowAfterRetries) {
     FakeMap3D stand_in{makeMapConfig()};
     FakeMap3D output{makeMapConfig()};
     FakeGPS gps;
@@ -259,31 +321,61 @@ TEST(MissionControl, FailedStepReportsStructuredErrorRef) {
     const auto mission = makeMission(5);
     const auto drone = defaultDrone();
     const auto lidar_cfg = defaultLidar();
+    const auto bad = common::types::MovementCommand{
+        .type = static_cast<common::types::MovementCommandType>(99),
+    };
     ScriptedAlgorithm algorithm{
         {mission, lidar_cfg, drone, stand_in},
-        {{
-            .movement =
-                common::types::MovementCommand{
-                    .type = common::types::MovementCommandType::Advance,
-                    .distance = 500.0 * cm,
-                },
-            .status = common::types::AlgorithmStatus::Working,
-        }},
+        {
+            {.movement = bad, .status = common::types::AlgorithmStatus::Working},
+            {.movement = bad, .status = common::types::AlgorithmStatus::Working},
+            {.movement = bad, .status = common::types::AlgorithmStatus::Working},
+        },
     };
 
     const auto output_file =
-        std::filesystem::temp_directory_path() / "mc_failed_step_output.npy";
+        std::filesystem::temp_directory_path() / "mc_invalid_command_output.npy";
     mission_control_207190406_209543255::MissionControlImpl_207190406_209543255 control{
         common::MissionControlDependencies{
             mission, drone, lidar, gps, movement, output, algorithm, output_file, false},
     };
 
-    const auto result = control.runMission();
-    EXPECT_EQ(result.status, common::types::MissionRunStatus::Error);
-    ASSERT_FALSE(result.errors.empty());
-    EXPECT_EQ(result.errors.front().code, "DRONE_STEP_FAILED");
-    EXPECT_EQ(result.errors.front().message, "Drone step failed.");
+    EXPECT_THROW(
+        { (void)control.runMission(); },
+        std::runtime_error);
 
     std::error_code ec;
     std::filesystem::remove(output_file, ec);
+}
+
+TEST(MissionControl, StepErrorIsLoggedAndLoopContinuesUntilFinished) {
+    FakeDroneControl drone({
+        {common::types::DroneStepStatus::Error, "Movement command exceeds drone limits."},
+        {common::types::DroneStepStatus::Completed, {}},
+    });
+    const auto result = mission_control_207190406_209543255::runMissionSteps(
+        drone, 5, {}, false);
+    EXPECT_EQ(result.status, common::types::MissionRunStatus::Completed);
+    EXPECT_EQ(result.steps, 2U);
+    EXPECT_EQ(drone.step_calls_, 2U);
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_EQ(result.errors.front().code, "DRONE_STEP_FAILED");
+    EXPECT_EQ(result.errors.front().message, "Drone step failed.");
+}
+
+TEST(MissionControl, PersistentStepErrorRunsToMaxSteps) {
+    FakeDroneControl drone({
+        {common::types::DroneStepStatus::Error, "bad"},
+        {common::types::DroneStepStatus::Error, "bad"},
+        {common::types::DroneStepStatus::Error, "bad"},
+        {common::types::DroneStepStatus::Error, "bad"},
+    });
+    const auto result = mission_control_207190406_209543255::runMissionSteps(
+        drone, 3, {}, false);
+    EXPECT_EQ(result.status, common::types::MissionRunStatus::MaxSteps);
+    EXPECT_EQ(result.steps, 3U);
+    EXPECT_EQ(result.errors.size(), 3U);
+    EXPECT_EQ(result.errors[0].code, "DRONE_STEP_FAILED");
+    EXPECT_EQ(result.errors[1].code, "DRONE_STEP_FAILED");
+    EXPECT_EQ(result.errors[2].code, "DRONE_STEP_FAILED");
 }

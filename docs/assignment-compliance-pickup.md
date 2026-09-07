@@ -47,8 +47,13 @@ Highest-leverage next work is below.
 3. **Optional before zip:** run `.cursor/skills/verify-instructor-test-catalog/SKILL.md` for a
    catalog-ID PASS/FAIL/AMBIGUOUS report (Docker `ctest` + `run_all.sh` + pre-submission + AdvCpp
    rubric). Also run `.cursor/skills/verify-independent-component-variants/SKILL.md` (default
-   VAR-01…03; add `--with-baseline` for VAR-04) after merging
-   `independent-component-variants`.
+   VAR-01…03; add `--with-baseline` for VAR-04). VAR-01 is green on `known-issues-fixes` after
+   Approach A (corner-anchored clearance + local replan cap); re-verify after further algorithm
+   changes.
+4. **VAR-01 (landed 2026-09-06):** corner-anchored `sphereIntersectsCellBox` plus
+   `kLocalSearchExpansionCap = 3000`. Do **not** resume the reverted Occupied-AABB /
+   shrink / floor-support tree (`backup/var01-2026-09-05`; `docs/archive/2026-09-05-var01-attempt.md`).
+   Voxel-center lattice (Approach B) did **not** recover `house_full`; leave it on its worktree.
 
 ---
 
@@ -181,10 +186,17 @@ is explicitly allowed.
 ## Known Issues (working file, not the excel)
 
 `docs/known-issues.md` — staff example-table columns. Resolved/stale rows removed and
-renumbered `1..n` (2026-09-01). Remaining: optional Common-issues PDF skips, lazy `.so`
-load, unused `ISimulation`, Unmapped-as-passable, plan-batching short-lidar score drop.
-English only. At zip time, copy into the Google Sheet and export `.xlsx` to the zip root —
-do not submit the markdown.
+renumbered `1..n` (2026-09-01). CI9 (drone step `Error`: log and continue), CI2
+(ignore world/map OOB via `output_map_.isInBounds`), CI10 (clamp
+Advance/Elevate to `mission_bounds` when set; clamp then ignore), CI3
+(retry invalid `nextStep` up to `kMaxInvalidCommandRetries` then throw;
+`SimulationRun` maps to `MISSION_EXCEPTION`), and CI8 (split oversize
+Advance/Elevate/Rotate via `splitWithinLimits` / `pending_movements_`) are
+implemented and claimed in `bonus.txt`; remaining optional skips listed in
+`docs/known-issues.md`. Also remaining: lazy `.so` load, deferred AdvCpp
+leftovers. English only. At zip time,
+copy into the Google Sheet and export `.xlsx` to the zip root — do not submit
+the markdown.
 
 ---
 

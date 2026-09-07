@@ -3,6 +3,7 @@
 **Written to this file:** 2026-09-03.  
 **Re-verify:** 2026-09-03 (four explore groups A–D against the live tree after Tasks 1–7 on `fix-advcpp-rubric-findings`, plus leftover-site cleanup in Task 8).  
 **Score-parity follow-up:** 2026-09-03 (libm unwrap in movement/beam/sphere/scoring/planner hot paths so all 24 `sim_compose.yaml` scores match `main` `9374aea`; see `docs/benchmarks/2026-09-03-main-score-parity.md`).  
+**Landed 2026-09-06:** `docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md` on `known-issues-fixes`. Cheap gated sites from the table below were fixed; leftovers are Known Issues rows **#9–#14** (were #14–#19 before optional CI recoveries compacted the table). 24-cell `score_sum` still **1832.747**. `HLD.pdf` was regenerated again with the CI recovery HLD updates (size drifts; trust `docs/HLD.md`).
 **How to read this:** `e01`–`e23` are grader judgment from `context/Error Code Key.xlsx` / `docs/review-error-codes.md`. A site here is “worth a second look,” not an automated FAIL. `b*` codes are runtime deductions and are **not** in this table.
 
 Severity: **m** = minor, **n** = normal, **s** = severe (spreadsheet columns).
@@ -10,6 +11,31 @@ Severity: **m** = minor, **n** = normal, **s** = severe (spreadsheet columns).
 Do **not** put this markdown in the submission zip. If we will not fix a row before the deadline, file it via `populate-known-issues`.
 
 Source files confirmed before the pass: `docs/review-error-codes.md`, `context/AdvCpp Review Guideline.docx`, `context/Error Code Key.xlsx`.
+
+---
+
+## Landed 2026-09-06 (this table vs the live tree)
+
+The 2026-09-03 combined table below is the **snapshot the later plan consumed**. Do not treat unchecked line numbers as current. Plan:
+`docs/superpowers/plans/2026-09-06-advcpp-rubric-findings-fix.md`. Known Issues:
+`docs/known-issues.md` rows **#9–#14** / `docs/known-issues-explained.md` (compacted after CI9/CI2/CI10/CI3/CI8).
+
+| Code | Sites in the 2026-09-03 table | 2026-09-06 outcome |
+|------|-------------------------------|--------------------|
+| e01 | *(none then)* | UTC helpers split out of `IRunErrorLog.h` into `TimeFormat.h` (plan Task 1). |
+| e03 | libm unwraps + factory resolution | MockMovement **limit checks** and output-map resolution converted (Tasks 9–10). Remaining hot-path trig **kept** (KI #9). |
+| e04 | C arrays (neighbors/axes) | Replaced with `std::array` (Task 11). Cache-key `double` compare left. |
+| e06 / e08 | DroneControl lidar/GPS; unused `mission_`; MappingAlgorithm helpers | const-ref sensors, dropped `mission_`, helpers off the class API (Tasks 2–3, 5). |
+| e07 | *(none then)* | `ConeTemplateCache::get` / `PluginLoader::tryOpen` marked `const` (Task 4). |
+| e10 | PluginLoader load-one, wrapDeg, keyToPoint, plus leftovers | Those three shared (Tasks 6–8). Remaining loops/walks are KI #14. |
+| e13 | raw pointers / out-params | Deferred (KI #11). |
+| e14 / e15 | HLD class + sequence drift | Diagrams and `HLD.md` / `HLD.pdf` updated (Task 16). |
+| e16 | `double` cone/frontier APIs | Deferred (KI #10). |
+| e17 | fat interface includes | Forward-declare + out-of-line dtor on the planned headers (Task 12). MockLidar/MockMovement/`RunErrorLog.h` minors left. |
+| e21 | several re-walks | `ScanResultToVoxels` fused (Task 13). Other sites KI #13. |
+| e22 | cache `const vector&` / `detail` headers | Deferred (KI #12). |
+| e23 | named magic numbers | Named (Task 14). |
+| GUIDELINE | invalid YAML crash | Non-scalar `simulation_config` and nested parse failures set `ok=false` (Task 15). |
 
 ---
 
@@ -30,7 +56,7 @@ Cheap new nit also dropped: `e17` `BeamMath.h` umbrella `<Common/Types.h>` → `
 
 Rows below are **new** nits this pass named. They are not the 2026-09-02 combined-table sites. Not chasing a second plan for them.
 
-`HLD.pdf` is at the repo root (**205,402** bytes).
+`HLD.pdf` is at the repo root (**231,157** bytes after the 2026-09-06 HLD pass).
 
 ### Score / libm parity (accepted e03 risk)
 
@@ -145,17 +171,15 @@ No function in scope is still 100+ body lines. Largest remaining: `compareMaps` 
 
 ## Appendix — HLD (e14 / e15)
 
-`HLD.pdf` **is** at the repo root (**205,402** bytes, dated 2026-09-03 after Task 7).
+`HLD.pdf` **is** at the repo root (regenerated 2026-09-07 after the e14/e15 leftover pass).
 
-**Task 7 nodes confirmed present:** `parseSimulationCliArgs` / `SimulationCliArgs`, YAML parsers, report writers, `createOutputDir` / `errorLogPathFromOutputMap`, `applyScanToMap`, DI structs, factory aliases, registration structs, `MatrixCell` / loaded-plugin PODs, `RunErrorLog`, `SimulationCoordUtil`, `WavefrontPlanner` / `MappingAlgorithmFrontier`, `ConeTemplateCache` / `VoxelStamp`, `runPluginMatrix(bindings, composition, output_root, num_threads)`, expand inside that call, save map before `compareMaps`, `applyScanToMap` in the drone-step diagram.
+**Class diagram now includes:** `IRunErrorLog` + `RunErrorLog ..|> IRunErrorLog`, `PluginMatrixBinding` / `PluginMatrixResult`, `PathShaping` / `ScanPlanning` / `ExplorationPlan`, `WavefrontPlanner *-- MappingAlgorithmFrontier`, `SimulationRunFactoryImpl` → algorithm/MC factories, `unloadAll()` on `PluginLoader`, plus `runMissionSteps`, `ConfigParseResult`, `TimeFormat`, `BeamMath`, `LidarCone`.
 
-**In code, still absent from the class diagram (supporting types, not the 2026-09-02 core-class gap):** `IRunErrorLog`, `ConfigParseResult`, `PluginMatrixBinding`, `PluginMatrixResult`. Weaker internals not drawn: `PluginLoadOutcome`, `DlCloser`, `SimulationCliParseResult`, report-input PODs, `countRunMatrixCells` / `appendLoadErrors`, `ExplorationPlan` / `PathShaping` / `ScanPlanning`, `LidarCone` / `BeamMath`.
+**Comparative sequence vs `main.cpp` / `SimulationRunImpl`:** `main` → `runPluginMatrix` → one `expandRunMatrix` then one `distributeWork` over the plugin × cell matrix; nested YAML parse; `takePending*Factory` + `PluginMatrixBinding`; per-run `errorLogPathFromOutputMap`; startup skip scores `kErrorScore`; `writeSimulationOutputYaml` then `writeModeReport`.
 
-**Comparative sequence vs `main.cpp` / `SimulationRunImpl`:** CLI → output dir → composition parse → plugin load → one `runPluginMatrix` (one expand, one `distributeWork`) → per-slot `create` / `run` (per-run `RunErrorLog`, `runMission`, save, `worldInitialDronePosition`, `compareMaps`) → YAML writers. Diagram still shows `distributeWork` inside the per-cell loop and skips the per-run error-log path.
+**Drone-step vs `DroneControlImpl::step`:** `runMission()` → `runMissionSteps` → `step()`; footprint carve before `nextStep`; recoverable throw still runs `applyScanIfRequested` when `scan_orientation` is set; Finished / Error alts beside Continue. `MockMovement` collision **throws** `std::runtime_error`; limit checks return `{false, message}`.
 
-**Drone-step vs `DroneControlImpl::step`:** live order is footprint carve → `nextStep` → movement → `applyScanIfRequested` even after recoverable `Continue`. Diagram omits the carve and still says “no scan write” on the throw alt (`docs/HLD.md` mirrors that).
-
-README vs CMake: presets, `simulator_207190406_209543255`, both `.so` names, and `ctest --test-dir build/default` match.
+README vs CMake: presets, `simulator_207190406_209543255`, both `.so` names, and `ctest --test-dir build/default` match. Timestamps: `currentUtcTimestamp()` lives in `TimeFormat.h`.
 
 ---
 

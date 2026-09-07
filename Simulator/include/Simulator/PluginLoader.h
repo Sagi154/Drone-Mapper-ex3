@@ -5,8 +5,6 @@
 
 #include <Simulator/PluginLoadTypes.h>
 
-#include <dlfcn.h>
-
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -17,11 +15,7 @@
 namespace simulator {
 
 struct DlCloser {
-    void operator()(void* handle) const noexcept {
-        if (handle != nullptr) {
-            ::dlclose(handle);
-        }
-    }
+    void operator()(void* handle) const noexcept;
 };
 using DlHandle = std::unique_ptr<void, DlCloser>;
 
@@ -59,7 +53,7 @@ private:
     [[nodiscard]] PluginLoadOutcome loadOneAlgorithm(const std::filesystem::path& so_path);
     [[nodiscard]] PluginLoadOutcome loadOneMissionControl(const std::filesystem::path& so_path);
     [[nodiscard]] DlHandle tryOpen(const std::filesystem::path& so_path, std::string& canonical_out,
-                                   std::string& error_detail);
+                                   std::string& error_detail) const;
     [[nodiscard]] static std::vector<std::filesystem::path> listSoFiles(
         const std::filesystem::path& directory);
 
